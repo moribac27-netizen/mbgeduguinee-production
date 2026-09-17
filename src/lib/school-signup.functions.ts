@@ -58,5 +58,33 @@ export const registerSchool = createServerFn({ method: "POST" })
       return { ok: false, error: `Impossible de créer le compte administrateur: ${msg || "erreur inconnue"}` };
     }
 
+    // 3. Explicitly attach profile + role. The DB trigger (handle_new_user)
+    // fires on INSERT into auth.users, but at that point app_metadata is not
+    // yet the final value written by createUser() above — it reliably falls
+    // back to the sandbox school and no role. So we set the real values here
+    // ourselves, right after the user is confirmed created.
+    const { error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        full_name: data.fullName,
+        phone: data.phone ?? null,
+        school_id: school.id,
+      })
+      .eq("id", userRes.user.id);
+    if (profileErr) {
+      await supabaseAdmin.auth.admin.deleteUser(userRes.user.id);
+      await supabaseAdmin.from("schools").delete().eq("id", school.id);
+      return { ok: false, error: `Impossible de finaliser le profil: ${profileErr.message}` };
+    }
+
+    const { error: roleErr } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: userRes.user.id, role: "admin" });
+    if (roleErr) {
+      await supabaseAdmin.auth.admin.deleteUser(userRes.user.id);
+      await supabaseAdmin.from("schools").delete().eq("id", school.id);
+      return { ok: false, error: `Impossible d'attribuer le rôle: ${roleErr.message}` };
+    }
+
     return { ok: true, schoolId: school.id, userId: userRes.user.id, emailConfirmed: true };
   });
