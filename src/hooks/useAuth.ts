@@ -10,6 +10,13 @@ export type AppRole =
   | "comptable"
   | "enseignant"
   | "surveillant"
+  | "secretariat"
+  | "bibliothecaire"
+  | "infirmerie"
+  | "educatrice_maternelle"
+  | "responsable_transport"
+  | "responsable_cantine"
+  | "rh"
   | "parent"
   | "eleve";
 
@@ -21,6 +28,13 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   comptable: "Comptable",
   enseignant: "Enseignant",
   surveillant: "Surveillant",
+  secretariat: "Secrétariat",
+  bibliothecaire: "Bibliothécaire",
+  infirmerie: "Infirmerie",
+  educatrice_maternelle: "Éducatrice Maternelle",
+  responsable_transport: "Responsable Transport",
+  responsable_cantine: "Responsable Cantine",
+  rh: "Ressources Humaines",
   parent: "Parent",
   eleve: "Élève",
 };

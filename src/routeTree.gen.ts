@@ -37,11 +37,13 @@ import { Route as AuthenticatedEnseignantsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedEmploiDuTempsRouteImport } from './routes/_authenticated/emploi-du-temps'
 import { Route as AuthenticatedElevesRouteImport } from './routes/_authenticated/eleves'
 import { Route as AuthenticatedEleveRouteImport } from './routes/_authenticated/eleve'
+import { Route as AuthenticatedDisciplineRouteImport } from './routes/_authenticated/discipline'
 import { Route as AuthenticatedDirectionEtudesRouteImport } from './routes/_authenticated/direction-etudes'
 import { Route as AuthenticatedDirecteurRouteImport } from './routes/_authenticated/directeur'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCotisationsRouteImport } from './routes/_authenticated/cotisations'
 import { Route as AuthenticatedComptabiliteRouteImport } from './routes/_authenticated/comptabilite'
+import { Route as AuthenticatedCollaborateursRouteImport } from './routes/_authenticated/collaborateurs'
 import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticated/classes'
 import { Route as AuthenticatedCartesRouteImport } from './routes/_authenticated/cartes'
 import { Route as AuthenticatedCantineRouteImport } from './routes/_authenticated/cantine'
@@ -195,6 +197,11 @@ const AuthenticatedEleveRoute = AuthenticatedEleveRouteImport.update({
   path: '/eleve',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDisciplineRoute = AuthenticatedDisciplineRouteImport.update({
+  id: '/discipline',
+  path: '/discipline',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDirectionEtudesRoute =
   AuthenticatedDirectionEtudesRouteImport.update({
     id: '/direction-etudes',
@@ -221,6 +228,12 @@ const AuthenticatedComptabiliteRoute =
   AuthenticatedComptabiliteRouteImport.update({
     id: '/comptabilite',
     path: '/comptabilite',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCollaborateursRoute =
+  AuthenticatedCollaborateursRouteImport.update({
+    id: '/collaborateurs',
+    path: '/collaborateurs',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClassesRoute = AuthenticatedClassesRouteImport.update({
@@ -283,11 +296,13 @@ export interface FileRoutesByFullPath {
   '/cantine': typeof AuthenticatedCantineRoute
   '/cartes': typeof AuthenticatedCartesRoute
   '/classes': typeof AuthenticatedClassesRoute
+  '/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/cotisations': typeof AuthenticatedCotisationsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
+  '/discipline': typeof AuthenticatedDisciplineRoute
   '/eleve': typeof AuthenticatedEleveRoute
   '/eleves': typeof AuthenticatedElevesRoute
   '/emploi-du-temps': typeof AuthenticatedEmploiDuTempsRoute
@@ -326,11 +341,13 @@ export interface FileRoutesByTo {
   '/cantine': typeof AuthenticatedCantineRoute
   '/cartes': typeof AuthenticatedCartesRoute
   '/classes': typeof AuthenticatedClassesRoute
+  '/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/cotisations': typeof AuthenticatedCotisationsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
+  '/discipline': typeof AuthenticatedDisciplineRoute
   '/eleve': typeof AuthenticatedEleveRoute
   '/eleves': typeof AuthenticatedElevesRoute
   '/emploi-du-temps': typeof AuthenticatedEmploiDuTempsRoute
@@ -371,11 +388,13 @@ export interface FileRoutesById {
   '/_authenticated/cantine': typeof AuthenticatedCantineRoute
   '/_authenticated/cartes': typeof AuthenticatedCartesRoute
   '/_authenticated/classes': typeof AuthenticatedClassesRoute
+  '/_authenticated/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/_authenticated/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/_authenticated/cotisations': typeof AuthenticatedCotisationsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directeur': typeof AuthenticatedDirecteurRoute
   '/_authenticated/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
+  '/_authenticated/discipline': typeof AuthenticatedDisciplineRoute
   '/_authenticated/eleve': typeof AuthenticatedEleveRoute
   '/_authenticated/eleves': typeof AuthenticatedElevesRoute
   '/_authenticated/emploi-du-temps': typeof AuthenticatedEmploiDuTempsRoute
@@ -416,11 +435,13 @@ export interface FileRouteTypes {
     | '/cantine'
     | '/cartes'
     | '/classes'
+    | '/collaborateurs'
     | '/comptabilite'
     | '/cotisations'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
+    | '/discipline'
     | '/eleve'
     | '/eleves'
     | '/emploi-du-temps'
@@ -459,11 +480,13 @@ export interface FileRouteTypes {
     | '/cantine'
     | '/cartes'
     | '/classes'
+    | '/collaborateurs'
     | '/comptabilite'
     | '/cotisations'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
+    | '/discipline'
     | '/eleve'
     | '/eleves'
     | '/emploi-du-temps'
@@ -503,11 +526,13 @@ export interface FileRouteTypes {
     | '/_authenticated/cantine'
     | '/_authenticated/cartes'
     | '/_authenticated/classes'
+    | '/_authenticated/collaborateurs'
     | '/_authenticated/comptabilite'
     | '/_authenticated/cotisations'
     | '/_authenticated/dashboard'
     | '/_authenticated/directeur'
     | '/_authenticated/direction-etudes'
+    | '/_authenticated/discipline'
     | '/_authenticated/eleve'
     | '/_authenticated/eleves'
     | '/_authenticated/emploi-du-temps'
@@ -740,6 +765,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEleveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/discipline': {
+      id: '/_authenticated/discipline'
+      path: '/discipline'
+      fullPath: '/discipline'
+      preLoaderRoute: typeof AuthenticatedDisciplineRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/direction-etudes': {
       id: '/_authenticated/direction-etudes'
       path: '/direction-etudes'
@@ -773,6 +805,13 @@ declare module '@tanstack/react-router' {
       path: '/comptabilite'
       fullPath: '/comptabilite'
       preLoaderRoute: typeof AuthenticatedComptabiliteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/collaborateurs': {
+      id: '/_authenticated/collaborateurs'
+      path: '/collaborateurs'
+      fullPath: '/collaborateurs'
+      preLoaderRoute: typeof AuthenticatedCollaborateursRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/classes': {
@@ -851,11 +890,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCantineRoute: typeof AuthenticatedCantineRoute
   AuthenticatedCartesRoute: typeof AuthenticatedCartesRoute
   AuthenticatedClassesRoute: typeof AuthenticatedClassesRoute
+  AuthenticatedCollaborateursRoute: typeof AuthenticatedCollaborateursRoute
   AuthenticatedComptabiliteRoute: typeof AuthenticatedComptabiliteRoute
   AuthenticatedCotisationsRoute: typeof AuthenticatedCotisationsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirecteurRoute: typeof AuthenticatedDirecteurRoute
   AuthenticatedDirectionEtudesRoute: typeof AuthenticatedDirectionEtudesRoute
+  AuthenticatedDisciplineRoute: typeof AuthenticatedDisciplineRoute
   AuthenticatedEleveRoute: typeof AuthenticatedEleveRoute
   AuthenticatedElevesRoute: typeof AuthenticatedElevesRoute
   AuthenticatedEmploiDuTempsRoute: typeof AuthenticatedEmploiDuTempsRoute
@@ -892,11 +933,13 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCantineRoute: AuthenticatedCantineRoute,
   AuthenticatedCartesRoute: AuthenticatedCartesRoute,
   AuthenticatedClassesRoute: AuthenticatedClassesRoute,
+  AuthenticatedCollaborateursRoute: AuthenticatedCollaborateursRoute,
   AuthenticatedComptabiliteRoute: AuthenticatedComptabiliteRoute,
   AuthenticatedCotisationsRoute: AuthenticatedCotisationsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirecteurRoute: AuthenticatedDirecteurRoute,
   AuthenticatedDirectionEtudesRoute: AuthenticatedDirectionEtudesRoute,
+  AuthenticatedDisciplineRoute: AuthenticatedDisciplineRoute,
   AuthenticatedEleveRoute: AuthenticatedEleveRoute,
   AuthenticatedElevesRoute: AuthenticatedElevesRoute,
   AuthenticatedEmploiDuTempsRoute: AuthenticatedEmploiDuTempsRoute,

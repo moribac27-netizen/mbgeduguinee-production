@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       accidents: {
@@ -695,6 +720,69 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipline_incidents: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          follow_up_notes: string | null
+          follow_up_required: boolean | null
+          id: string
+          incident_date: string
+          incident_type: string
+          recorded_by: string | null
+          reported_by_user_id: string | null
+          sanction: string | null
+          school_id: string
+          student_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          follow_up_notes?: string | null
+          follow_up_required?: boolean | null
+          id?: string
+          incident_date?: string
+          incident_type: string
+          recorded_by?: string | null
+          reported_by_user_id?: string | null
+          sanction?: string | null
+          school_id: string
+          student_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          follow_up_notes?: string | null
+          follow_up_required?: boolean | null
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          recorded_by?: string | null
+          reported_by_user_id?: string | null
+          sanction?: string | null
+          school_id?: string
+          student_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipline_incidents_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipline_incidents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -2038,6 +2126,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          disabled_at: string | null
           full_name: string
           id: string
           phone: string | null
@@ -2047,6 +2136,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          disabled_at?: string | null
           full_name: string
           id: string
           phone?: string | null
@@ -2056,6 +2146,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          disabled_at?: string | null
           full_name?: string
           id?: string
           phone?: string | null
@@ -2341,6 +2432,12 @@ export type Database = {
           created_at: string
           current_period_end: string
           current_period_start: string
+          discount_expires_at: string | null
+          discount_granted_at: string | null
+          discount_granted_by: string | null
+          discount_reason: string | null
+          discount_type: string | null
+          discount_value: number | null
           external_reference: string | null
           id: string
           last_payment_amount: number | null
@@ -2358,6 +2455,12 @@ export type Database = {
           created_at?: string
           current_period_end?: string
           current_period_start?: string
+          discount_expires_at?: string | null
+          discount_granted_at?: string | null
+          discount_granted_by?: string | null
+          discount_reason?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
           external_reference?: string | null
           id?: string
           last_payment_amount?: number | null
@@ -2375,6 +2478,12 @@ export type Database = {
           created_at?: string
           current_period_end?: string
           current_period_start?: string
+          discount_expires_at?: string | null
+          discount_granted_at?: string | null
+          discount_granted_by?: string | null
+          discount_reason?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
           external_reference?: string | null
           id?: string
           last_payment_amount?: number | null
@@ -2499,6 +2608,57 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      student_access_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          school_id: string
+          student_id: string
+          used_as_role: string | null
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          school_id?: string
+          student_id: string
+          used_as_role?: string | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          school_id?: string
+          student_id?: string
+          used_as_role?: string | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_access_codes_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_access_codes_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_attendance: {
         Row: {
@@ -3581,6 +3741,7 @@ export type Database = {
     Functions: {
       auto_suspend_expired_subscriptions: { Args: never; Returns: number }
       current_school_id: { Args: never; Returns: string }
+      expire_overdue_subscriptions: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3594,8 +3755,14 @@ export type Database = {
         Args: { _student_id: string; _uid: string }
         Returns: boolean
       }
+      is_school_subscription_active: {
+        Args: { p_school_id: string }
+        Returns: boolean
+      }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
-      is_super_admin: { Args: { _uid: string }; Returns: boolean }
+      is_super_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { _uid: string }; Returns: boolean }
       next_receipt_number: { Args: { _school_id: string }; Returns: string }
       renew_or_change_subscription: {
         Args: {
@@ -3608,6 +3775,12 @@ export type Database = {
           created_at: string
           current_period_end: string
           current_period_start: string
+          discount_expires_at: string | null
+          discount_granted_at: string | null
+          discount_granted_by: string | null
+          discount_reason: string | null
+          discount_type: string | null
+          discount_value: number | null
           external_reference: string | null
           id: string
           last_payment_amount: number | null
@@ -3675,6 +3848,48 @@ export type Database = {
         }[]
       }
       school_write_blocked: { Args: { _school_id: string }; Returns: boolean }
+      set_school_subscription_discount: {
+        Args: {
+          p_discount_type: string
+          p_discount_value: number
+          p_expires_at?: string
+          p_reason?: string
+          p_school_id: string
+        }
+        Returns: {
+          billing_cycle: string
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          discount_expires_at: string | null
+          discount_granted_at: string | null
+          discount_granted_by: string | null
+          discount_reason: string | null
+          discount_type: string | null
+          discount_value: number | null
+          external_reference: string | null
+          id: string
+          last_payment_amount: number | null
+          last_payment_at: string | null
+          metadata: Json
+          payment_provider: string | null
+          plan_id: string
+          school_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "school_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      start_trial_subscription: {
+        Args: { p_plan_id: string; p_school_id: string }
+        Returns: undefined
+      }
       student_plan_paid: { Args: { _student_id: string }; Returns: boolean }
       student_recipient_users: {
         Args: { _student_id: string }
@@ -3719,6 +3934,13 @@ export type Database = {
         | "admin"
         | "directeur"
         | "enseignant"
+        | "secretariat"
+        | "bibliothecaire"
+        | "infirmerie"
+        | "educatrice_maternelle"
+        | "responsable_transport"
+        | "responsable_cantine"
+        | "rh"
         | "parent"
         | "eleve"
         | "comptable"
@@ -3885,6 +4107,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       account_type: [
@@ -3898,6 +4123,13 @@ export const Constants = {
         "admin",
         "directeur",
         "enseignant",
+        "secretariat",
+        "bibliothecaire",
+        "infirmerie",
+        "educatrice_maternelle",
+        "responsable_transport",
+        "responsable_cantine",
+        "rh",
         "parent",
         "eleve",
         "comptable",
