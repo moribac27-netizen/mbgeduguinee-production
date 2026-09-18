@@ -431,10 +431,19 @@ function Landing() {
                   </div>
                 )}
                 <ul className="mt-6 space-y-2 text-sm">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex gap-2"><Check className="size-4 text-primary mt-0.5 shrink-0" />{f}</li>
-                  ))}
-                </ul>
+  {(perStudent && !userId
+    ? [
+        "Aucun abonnement mensuel fixe",
+        "Tarif par élève avec part reversée à l'école",
+        "Accès complet dès un seuil d'élèves payés",
+        "Paiement groupé (école) ou individuel (parent/élève)",
+        "Reçu imprimable par élève",
+      ]
+    : p.features
+  ).map((f) => (
+    <li key={f} className="flex gap-2"><Check className="size-4 text-primary mt-0.5 shrink-0" />{f}</li>
+  ))}
+</ul>
                 <Button
                   className="w-full mt-6"
                   variant={p.is_popular ? "default" : "outline"}
