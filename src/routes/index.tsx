@@ -41,12 +41,11 @@ const FEATURES = [
 ];
 
 const FAQ = [
-  { q: "Puis-je essayer MBGEduGuinée gratuitement ?", a: "Oui. Chaque nouvelle école bénéficie automatiquement d'une période d'essai gratuite de 30 jours sur l'offre Standard, sans carte bancaire." },
+  { q: "Puis-je essayer MBGEduGuinée gratuitement ?", a: "Oui. Chaque nouvelle école bénéficie automatiquement d'une période d'essai gratuite de 30 jours, sans carte bancaire." },
   { q: "Quels moyens de paiement acceptez-vous ?", a: "Nous préparons l'intégration Orange Money, Mobile Money (MTN/Moov), Stripe (carte bancaire) et PayPal. Vous pouvez actuellement souscrire depuis votre espace et notre équipe vous accompagne pour la première facturation." },
-  { q: "Puis-je changer d'offre à tout moment ?", a: "Oui. Depuis votre espace de souscription, vous pouvez passer à une offre supérieure ou inférieure. Les changements prennent effet immédiatement." },
+  { q: "Comment fonctionne le plan par élève ?", a: "Après la création de votre établissement, vous accédez à un espace détaillant le tarif exact par élève et la part reversée à votre école. Créez votre compte pour découvrir tous les détails." },
   { q: "Mes données sont-elles sécurisées ?", a: "Chaque école est isolée par des politiques strictes (multi-tenant + RLS). Les sauvegardes sont automatiques et chiffrées." },
-  { q: "Que se passe-t-il à la fin de l'essai gratuit ?", a: "Vous recevez un rappel avant la fin de la période. Vous pouvez ensuite souscrire à l'offre de votre choix pour conserver vos données et fonctionnalités." },
-  { q: "Proposez-vous une formation ?", a: "Oui. Toutes les offres incluent une prise en main. Les offres Standard et Premium bénéficient d'un accompagnement personnalisé." },
+  { q: "Proposez-vous une formation ?", a: "Oui. Toutes les offres incluent une prise en main et un accompagnement personnalisé." },
 ];
 
 type Plan = {
@@ -129,13 +128,10 @@ function Landing() {
         .eq("is_active", true)
         .order("display_order", { ascending: true });
       setPlans(
-        (data ?? [])
-          // La page publique n'affiche que les offres à prix fixe (Basic, Standard).
-          .filter((p: any) => p.billing_model !== "per_student")
-          .map((p: any) => ({
-            ...p,
-            features: Array.isArray(p.features) ? p.features : [],
-          })),
+        (data ?? []).map((p: any) => ({
+          ...p,
+          features: Array.isArray(p.features) ? p.features : [],
+        })),
       );
       setLoading(false);
     })();
@@ -251,37 +247,10 @@ function Landing() {
         <div className="max-w-6xl mx-auto px-4 lg:px-6">
           <div className="text-center mb-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-              <Sparkles className="size-4" /> Essai gratuit de 30 jours
+              <Sparkles className="size-4" /> Aucun abonnement mensuel
             </div>
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Des tarifs adaptés à chaque école</h2>
-            <p className="mt-4 text-muted-foreground">Sans engagement. Annulez à tout moment.</p>
-
-            <div className="mt-8 flex justify-center">
-              <div className="inline-flex items-center p-1 rounded-full border bg-card shadow-sm" role="group" aria-label="Cycle de facturation">
-                {([
-                  { v: "monthly", label: "Mensuel" },
-                  { v: "yearly", label: "Annuel" },
-                ] as const).map((o) => (
-                  <button
-                    key={o.v}
-                    type="button"
-                    aria-pressed={publicCycle === o.v}
-                    onClick={() => setPublicCycle(o.v)}
-                    className={
-                      "px-5 sm:px-6 py-2 rounded-full text-sm font-medium transition-colors " +
-                      (publicCycle === o.v
-                        ? "bg-primary text-primary-foreground shadow"
-                        : "text-muted-foreground hover:text-foreground")
-                    }
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {publicCycle === "yearly" && (
-              <p className="mt-3 text-sm text-primary font-medium">Facturation annuelle — 2 mois offerts</p>
-            )}
+            <h2 className="font-display text-3xl md:text-4xl font-bold">Un tarif juste, basé sur vos élèves</h2>
+            <p className="mt-4 text-muted-foreground">Votre école touche une part sur chaque élève inscrit et payant. Créez votre établissement pour voir le détail complet.</p>
           </div>
 
           {currentSub && (
@@ -405,10 +374,10 @@ function Landing() {
 
 
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {loading && Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="p-8 rounded-2xl border bg-card animate-pulse h-96" />
-            ))}
+          <div className="grid md:grid-cols-1 max-w-md mx-auto gap-6">
+            {loading && (
+              <div className="p-8 rounded-2xl border bg-card animate-pulse h-80" />
+            )}
             {!loading && plans.map((p) => {
               const perStudent = (p as any).billing_model === "per_student";
               const unit = Number((p as any).price_per_student ?? 0);
@@ -419,36 +388,46 @@ function Landing() {
                 {p.is_popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">Recommandé</div>}
                 <h3 className="font-display text-2xl font-bold">{p.name}</h3>
                 {p.description && <p className="text-sm text-muted-foreground mt-2">{p.description}</p>}
+
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">
-                    {formatPrice(perStudent ? unit : (publicCycle === "yearly" ? (p.price_yearly ?? p.price_monthly * 12) : p.price_monthly))}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {p.currency}{perStudent ? " / élève / an" : `/${publicCycle === "yearly" ? "an" : "mois"}`}
-                  </span>
+                  {perStudent && !userId ? (
+                    <span className="text-2xl font-bold">Détails après inscription</span>
+                  ) : (
+                    <>
+                      <span className="text-4xl font-bold">
+                        {formatPrice(perStudent ? unit : (publicCycle === "yearly" ? (p.price_yearly ?? p.price_monthly * 12) : p.price_monthly))}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {p.currency}{perStudent ? " / élève / an" : `/${publicCycle === "yearly" ? "an" : "mois"}`}
+                      </span>
+                    </>
+                  )}
                 </div>
+
                 {perStudent ? (
-                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                    <p>
-                      Chaque élève doit régler {formatPrice(unit)} {p.currency}/an. Deux options : paiement individuel
-                      par l'élève ou le parent directement sur la plateforme, ou paiement groupé par l'école pour les
-                      élèves dont elle a déjà collecté l'argent.
-                    </p>
-                    <p>
-                      Votre école reçoit {formatPrice(share)} {p.currency} par élève payé, quel que soit le mode.
-                      L'accès complet est activé dès que {threshold} élèves ont payé.
-                    </p>
-                  </div>
+                  userId ? (
+                    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                      <p>
+                        Chaque élève doit régler {formatPrice(unit)} {p.currency}/an. Deux options : paiement individuel
+                        par l'élève ou le parent directement sur la plateforme, ou paiement groupé par l'école pour les
+                        élèves dont elle a déjà collecté l'argent.
+                      </p>
+                      <p>
+                        Votre école reçoit {formatPrice(share)} {p.currency} par élève payé, quel que soit le mode.
+                        L'accès complet est activé dès que {threshold} élèves ont payé.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                      <p>Aucun abonnement mensuel. Votre école touche une part sur chaque élève inscrit et payant.</p>
+                      <p className="font-medium text-foreground">Créez votre établissement pour découvrir le tarif exact et le montant reversé à votre école.</p>
+                    </div>
+                  )
                 ) : (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <div className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/20 text-accent-foreground">
                       <Sparkles className="size-3" /> 30 jours gratuits
                     </div>
-                    {publicCycle === "yearly" && (
-                      <div className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
-                        2 mois offerts
-                      </div>
-                    )}
                   </div>
                 )}
                 <ul className="mt-6 space-y-2 text-sm">
@@ -468,65 +447,6 @@ function Landing() {
             })}
 
           </div>
-
-          {/* Comparison table */}
-          {!loading && plans.length > 0 && (
-            <div className="mt-16">
-              <h3 className="font-display text-2xl font-bold text-center mb-6">Comparer les offres</h3>
-              <div className="overflow-x-auto rounded-xl border bg-card">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left p-4 font-medium">Fonctionnalité</th>
-                      {plans.map((p) => (
-                        <th key={p.id} className="p-4 font-display font-semibold">
-                          {p.name}
-                          {p.is_popular && <div className="text-xs font-normal text-primary mt-1">Recommandé</div>}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-t">
-                      <td className="p-4 text-muted-foreground">Tarif</td>
-                      {plans.map((p) => (
-                        <td key={p.id} className="p-4 text-center font-semibold">
-                          {(p as any).billing_model === "per_student"
-                            ? `${formatPrice(Number((p as any).price_per_student ?? 0))} ${p.currency} / élève / an`
-                            : `${formatPrice(p.price_monthly)} ${p.currency} / mois`}
-                        </td>
-                      ))}
-                    </tr>
-
-                    <tr className="border-t">
-                      <td className="p-4 text-muted-foreground">Limite d'élèves</td>
-                      {plans.map((p) => (
-                        <td key={p.id} className="p-4 text-center">{p.student_limit ? p.student_limit : "Illimité"}</td>
-                      ))}
-                    </tr>
-                    <tr className="border-t">
-                      <td className="p-4 text-muted-foreground">Essai gratuit</td>
-                      {plans.map((p) => (
-                        <td key={p.id} className="p-4 text-center"><Check className="size-4 text-primary inline" /> 30 jours</td>
-                      ))}
-                    </tr>
-                    {allFeatures.map((feat) => (
-                      <tr key={feat} className="border-t">
-                        <td className="p-4 text-muted-foreground">{feat}</td>
-                        {plans.map((p) => (
-                          <td key={p.id} className="p-4 text-center">
-                            {p.features.includes(feat)
-                              ? <Check className="size-4 text-primary inline" />
-                              : <X className="size-4 text-muted-foreground/40 inline" />}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
