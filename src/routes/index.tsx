@@ -384,44 +384,7 @@ function Landing() {
               const share = Number((p as any).school_share_per_student ?? 0);
               const threshold = Number((p as any).access_threshold_students ?? 20);
               return (
-              <div key={p.id} className={"p-8 rounded-2xl border bg-card relative " + (p.is_popular ? "border-primary shadow-lg ring-1 ring-primary/20" : "")}>
-                {p.is_popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">Recommandé</div>}
-                <h3 className="font-display text-2xl font-bold">{p.name}</h3>
-                {p.description && <p className="text-sm text-muted-foreground mt-2">{p.description}</p>}
-
-                <div className="mt-4 flex items-baseline gap-1">
-                  {perStudent && !userId ? (
-                    <span className="text-2xl font-bold">Détails après inscription</span>
-                  ) : (
-                    <>
-                      <span className="text-4xl font-bold">
-                        {formatPrice(perStudent ? unit : (publicCycle === "yearly" ? (p.price_yearly ?? p.price_monthly * 12) : p.price_monthly))}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {p.currency}{perStudent ? " / élève / an" : `/${publicCycle === "yearly" ? "an" : "mois"}`}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {perStudent ? (
-                  userId ? (
-                    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                      <p>
-                        Chaque élève doit régler {formatPrice(unit)} {p.currency}/an. Deux options : paiement individuel
-                        par l'élève ou le parent directement sur la plateforme, ou paiement groupé par l'école pour les
-                        élèves dont elle a déjà collecté l'argent.
-                      </p>
-                      <p>
-                        Votre école reçoit {formatPrice(share)} {p.currency} par élève payé, quel que soit le mode.
-                        L'accès complet est activé dès que {threshold} élèves ont payé.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                      <p>Aucun abonnement mensuel. Votre école touche une part sur chaque élève inscrit et payant.</p>
-                      <p className="font-medium text-foreground">Créez votre établissement pour découvrir le tarif exact et le montant reversé à votre école.</p>
-                    </div>
+              <div key={p.id} className={"p-8 rounded-2xl...
                   )
                 ) : (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
