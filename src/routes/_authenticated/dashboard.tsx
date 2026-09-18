@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useRoles, primaryRole } from "@/hooks/useAuth";
+import { useSchool } from "@/hooks/useSchool";
 import {
   Users,
   GraduationCap,
@@ -22,6 +23,9 @@ import {
   History,
   Bell,
   PenLine,
+  MapPin,
+  Phone,
+  Mail,
 } from "lucide-react";
 import {
   Bar,
@@ -72,6 +76,7 @@ const ACTION_LABELS: Record<string, string> = {
 function Dashboard() {
   const { roles } = useRoles();
   const role = primaryRole(roles);
+  const { school, logoUrl } = useSchool();
   const showFinance = roles.some((r) => ["admin", "directeur", "comptable"].includes(r));
   const showPedago = roles.some((r) => ["admin", "directeur", "enseignant"].includes(r));
 
@@ -244,6 +249,38 @@ function Dashboard() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      {school && (
+        <Card className="overflow-hidden">
+          <CardContent className="p-4 sm:p-5 flex items-center gap-4">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={school.name ?? "Logo"}
+                className="size-14 sm:size-16 rounded-lg object-cover border shrink-0"
+              />
+            ) : (
+              <div className="size-14 sm:size-16 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-display font-bold text-xl shrink-0">
+                {(school.name ?? "É").charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="font-display text-lg sm:text-xl font-bold truncate">{school.name}</div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground">
+                {school.address && (
+                  <span className="flex items-center gap-1"><MapPin className="size-3.5 shrink-0" />{school.address}</span>
+                )}
+                {school.phone && (
+                  <span className="flex items-center gap-1"><Phone className="size-3.5 shrink-0" />{school.phone}</span>
+                )}
+                {school.email && (
+                  <span className="flex items-center gap-1"><Mail className="size-3.5 shrink-0" />{school.email}</span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <h1 className="font-display text-2xl sm:text-3xl font-bold">Tableau de bord</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
