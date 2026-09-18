@@ -212,10 +212,10 @@ function AuthPage() {
           </div>
         </Link>
 
-        {plan && (
+                {plan && (
           <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/20 text-sm font-medium">
             <Sparkles className="size-4 text-accent" />
-            Essai gratuit de 30 jours — offre <span className="uppercase">{plan}</span>
+            Aucun abonnement mensuel — plan <span className="uppercase">{plan}</span>
           </div>
         )}
         <Card>
@@ -314,8 +314,8 @@ function AuthPage() {
             <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>Continuer avec Google</Button>
           </CardContent>
         </Card>
-        <p className="text-center text-xs text-muted-foreground mt-4">
-          En créant un compte, vous devenez <span className="font-medium">administrateur</span> de votre établissement avec 30 jours d'essai gratuit.
+                <p className="text-center text-xs text-muted-foreground mt-4">
+          En créant un compte, vous devenez <span className="font-medium">administrateur</span> de votre établissement.
         </p>
       </div>
     </div>

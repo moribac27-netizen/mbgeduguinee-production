@@ -5,8 +5,10 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
-  School, Users, GraduationCap, ClipboardList, CreditCard, Megaphone,
-  BarChart3, Check, X, ArrowRight, Sparkles, Loader2,
+  School, Users, GraduationCap, BookOpen, ClipboardList, CalendarClock,
+  CalendarCheck, CreditCard, Wallet, UtensilsCrossed, Library, Bus,
+  Megaphone, Check, X, ArrowRight, Sparkles, Loader2,
+  UserPlus, ShieldCheck, Receipt, Wallet as WalletIcon, TrendingUp, AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionHistory } from "@/components/SubscriptionHistory";
@@ -34,18 +36,40 @@ export const Route = createFileRoute("/")({
 const FEATURES = [
   { icon: Users, title: "Gestion des élèves", desc: "Inscriptions, dossiers, classes, photos." },
   { icon: GraduationCap, title: "Enseignants", desc: "Matières, emploi du temps, salaires." },
+  { icon: BookOpen, title: "Classes", desc: "Organisation, effectifs, niveaux." },
   { icon: ClipboardList, title: "Notes & bulletins", desc: "Moyennes, classement, bulletins PDF." },
+  { icon: CalendarClock, title: "Emploi du temps", desc: "Planning par classe et enseignant." },
+  { icon: CalendarCheck, title: "Présences", desc: "Appel quotidien, retards, absences." },
   { icon: CreditCard, title: "Paiements", desc: "Frais, reçus, relances automatiques." },
+  { icon: Wallet, title: "Comptabilité", desc: "Dépenses, solde, rapports financiers." },
+  { icon: UtensilsCrossed, title: "Cantine", desc: "Suivi des repas et inscriptions." },
+  { icon: Library, title: "Bibliothèque", desc: "Gestion des ouvrages et emprunts." },
+  { icon: Bus, title: "Transport", desc: "Suivi des circuits scolaires." },
   { icon: Megaphone, title: "Communication", desc: "Annonces, notifications aux parents." },
-  { icon: BarChart3, title: "Rapports", desc: "Statistiques financières et académiques." },
+];
+
+const STEPS = [
+  { icon: UserPlus, title: "Créez votre établissement", desc: "Inscription en quelques minutes, sans carte bancaire." },
+  { icon: Users, title: "Ajoutez vos élèves", desc: "Import ou saisie manuelle, classes et informations complètes." },
+  { icon: CreditCard, title: "Vos élèves/parents paient", desc: "Paiement individuel ou groupé, en toute transparence." },
+  { icon: ShieldCheck, title: "Accès complet débloqué", desc: "Dès le seuil atteint, toutes les fonctionnalités s'activent." },
+];
+
+const PREVIEW_STATS = [
+  { icon: Users, label: "Élèves inscrits", value: "482" },
+  { icon: GraduationCap, label: "Enseignants", value: "24" },
+  { icon: BookOpen, label: "Classes", value: "18" },
+  { icon: Receipt, label: "Paiements du jour", value: "1 250 000 GNF" },
+  { icon: WalletIcon, label: "Solde actuel", value: "8 430 000 GNF" },
+  { icon: CalendarCheck, label: "Présence aujourd'hui", value: "96%" },
 ];
 
 const FAQ = [
-  { q: "Puis-je essayer MBGEduGuinée gratuitement ?", a: "Oui. Chaque nouvelle école bénéficie automatiquement d'une période d'essai gratuite de 30 jours, sans carte bancaire." },
+  { q: "Comment fonctionne le plan par élève ?", a: "Aucun abonnement mensuel fixe. Chaque élève inscrit règle un tarif annuel, individuellement ou via l'école. Votre école touche une part sur chaque élève payé, et l'accès complet s'active dès qu'un seuil d'élèves payés est atteint. Créez votre compte pour voir le détail exact." },
   { q: "Quels moyens de paiement acceptez-vous ?", a: "Nous préparons l'intégration Orange Money, Mobile Money (MTN/Moov), Stripe (carte bancaire) et PayPal. Vous pouvez actuellement souscrire depuis votre espace et notre équipe vous accompagne pour la première facturation." },
-  { q: "Comment fonctionne le plan par élève ?", a: "Après la création de votre établissement, vous accédez à un espace détaillant le tarif exact par élève et la part reversée à votre école. Créez votre compte pour découvrir tous les détails." },
+  { q: "Que se passe-t-il avant que le seuil d'élèves payés soit atteint ?", a: "Vous pouvez créer votre établissement, configurer votre école et commencer à enregistrer vos élèves immédiatement. L'accès complet aux modules se débloque automatiquement une fois le seuil de paiements atteint." },
   { q: "Mes données sont-elles sécurisées ?", a: "Chaque école est isolée par des politiques strictes (multi-tenant + RLS). Les sauvegardes sont automatiques et chiffrées." },
-  { q: "Proposez-vous une formation ?", a: "Oui. Toutes les offres incluent une prise en main et un accompagnement personnalisé." },
+  { q: "Proposez-vous une formation ?", a: "Oui. La souscription inclut une prise en main et un accompagnement personnalisé pour votre équipe." },
 ];
 
 type Plan = {
@@ -212,7 +236,7 @@ function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/auth">
-                <Button size="lg" className="gap-2">Démarrer gratuitement <ArrowRight className="size-4" /></Button>
+                <Button size="lg" className="gap-2">Commencer maintenant <ArrowRight className="size-4" /></Button>
               </Link>
               <a href="#tarifs"><Button size="lg" variant="outline">Voir les tarifs</Button></a>
             </div>
@@ -227,7 +251,7 @@ function Landing() {
             <h2 className="font-display text-3xl md:text-4xl font-bold">Tout votre établissement, en un seul endroit.</h2>
             <p className="mt-4 text-muted-foreground">Des outils pensés pour les directeurs, enseignants, parents et élèves.</p>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {FEATURES.map((f) => {
               const Icon = f.icon;
               return (
@@ -239,6 +263,75 @@ function Landing() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="py-20 border-t bg-muted/30">
+        <div className="max-w-6xl mx-auto px-4 lg:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="font-display text-3xl md:text-4xl font-bold">Comment ça marche</h2>
+            <p className="mt-4 text-muted-foreground">Démarrez en quelques étapes simples.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div key={s.title} className="relative text-center">
+                  <div className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center mx-auto mb-4 font-display font-bold text-lg">
+                    {i + 1}
+                  </div>
+                  <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3"><Icon className="size-5" /></div>
+                  <h3 className="font-display font-semibold">{s.title}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{s.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Product preview */}
+      <section className="py-20 border-t">
+        <div className="max-w-6xl mx-auto px-4 lg:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <h2 className="font-display text-3xl md:text-4xl font-bold">Un tableau de bord clair et complet</h2>
+            <p className="mt-4 text-muted-foreground">Toutes les informations de votre établissement, en un coup d'œil.</p>
+          </div>
+          <div className="rounded-2xl border bg-card p-4 sm:p-8 shadow-lg max-w-4xl mx-auto">
+            <div className="flex items-center gap-2 mb-6">
+              <span className="size-3 rounded-full bg-destructive/60" />
+              <span className="size-3 rounded-full bg-accent/60" />
+              <span className="size-3 rounded-full bg-primary/60" />
+              <div className="ml-4 flex-1 h-6 rounded bg-muted flex items-center px-3">
+                <span className="text-xs text-muted-foreground">mbgeduguinee-production-n44w.vercel.app/dashboard</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mb-6 p-4 rounded-xl bg-muted/40">
+              <div className="size-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-display font-bold text-lg">É</div>
+              <div>
+                <div className="font-display font-semibold">École Les Palmiers</div>
+                <div className="text-xs text-muted-foreground">Conakry, Guinée</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+              {PREVIEW_STATS.map((s) => {
+                const Icon = s.icon;
+                return (
+                  <div key={s.label} className="p-4 rounded-xl bg-muted/60">
+                    <Icon className="size-5 text-primary mb-2" />
+                    <div className="text-lg font-bold font-display">{s.value}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 text-xs text-primary font-medium">
+              <span className="flex items-center gap-1"><TrendingUp className="size-3.5" /> Croissance stable des inscriptions ce mois</span>
+              <span className="flex items-center gap-1"><AlertTriangle className="size-3.5" /> 3 retards de paiement à relancer</span>
+            </div>
+          </div>
+          <p className="text-center text-xs text-muted-foreground mt-4">Aperçu illustratif — les données affichées sont des exemples.</p>
         </div>
       </section>
 
@@ -384,29 +477,39 @@ function Landing() {
               const share = Number((p as any).school_share_per_student ?? 0);
               const threshold = Number((p as any).access_threshold_students ?? 20);
               return (
-              <div key={p.id} className={"p-8 rounded-2xl...
-                  )
-                ) : (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <div className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/20 text-accent-foreground">
-                      <Sparkles className="size-3" /> 30 jours gratuits
+              <div key={p.id} className={"p-8 rounded-2xl border bg-card relative " + (p.is_popular ? "border-primary shadow-lg ring-1 ring-primary/20" : "")}>
+                {p.is_popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">Recommandé</div>}
+                <h3 className="font-display text-2xl font-bold">{p.name}</h3>
+                {p.description && <p className="text-sm text-muted-foreground mt-2">{p.description}</p>}
+
+                <div className="mt-4">
+                  {perStudent && !userId ? (
+                    <p className="text-sm font-medium">Créez votre établissement pour voir le tarif exact.</p>
+                  ) : perStudent ? (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="text-3xl font-bold text-foreground">{formatPrice(unit)}</span> {p.currency}/élève/an, dont {formatPrice(share)} {p.currency} reversés à l'école. Accès complet dès {threshold} élèves payés.
+                    </p>
+                  ) : (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold">{formatPrice(publicCycle === "yearly" ? (p.price_yearly ?? p.price_monthly * 12) : p.price_monthly)}</span>
+                      <span className="text-muted-foreground">{p.currency}/{publicCycle === "yearly" ? "an" : "mois"}</span>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+
                 <ul className="mt-6 space-y-2 text-sm">
-  {(perStudent && !userId
-    ? [
-        "Aucun abonnement mensuel fixe",
-        "Tarif par élève avec part reversée à l'école",
-        "Accès complet dès un seuil d'élèves payés",
-        "Paiement groupé (école) ou individuel (parent/élève)",
-        "Reçu imprimable par élève",
-      ]
-    : p.features
-  ).map((f) => (
-    <li key={f} className="flex gap-2"><Check className="size-4 text-primary mt-0.5 shrink-0" />{f}</li>
-  ))}
-</ul>
+                  {(perStudent && !userId
+                    ? [
+                        "Paiement groupé (école) ou individuel (parent/élève)",
+                        "Reçu imprimable par élève",
+                        "Accompagnement à la mise en place",
+                      ]
+                    : p.features
+                  ).map((f) => (
+                    <li key={f} className="flex gap-2"><Check className="size-4 text-primary mt-0.5 shrink-0" />{f}</li>
+                  ))}
+                </ul>
+
                 <Button
                   className="w-full mt-6"
                   variant={p.is_popular ? "default" : "outline"}
@@ -440,10 +543,53 @@ function Landing() {
         </div>
       </section>
 
-      <footer className="border-t py-8">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 flex flex-col sm:flex-row justify-between gap-4 text-sm text-muted-foreground">
-          <div>© 2026 MBGEduGuinée. Conçu en Guinée pour les écoles guinéennes.</div>
-          <div>Conakry · contact@eduguinee.gn</div>
+      {/* Final CTA */}
+      <section className="py-20 border-t bg-primary text-primary-foreground">
+        <div className="max-w-3xl mx-auto px-4 lg:px-6 text-center">
+          <h2 className="font-display text-3xl md:text-4xl font-bold">Prêt à digitaliser votre établissement ?</h2>
+          <p className="mt-4 text-primary-foreground/80">Créez votre compte en quelques minutes, sans engagement.</p>
+          <div className="mt-8">
+            <Link to="/auth">
+              <Button size="lg" variant="secondary" className="gap-2">Commencer maintenant <ArrowRight className="size-4" /></Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t py-12">
+        <div className="max-w-6xl mx-auto px-4 lg:px-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"><School className="size-4" /></div>
+              <span className="font-display font-bold">MBGEduGuinée</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Gestion scolaire numérique pour les écoles guinéennes.</p>
+          </div>
+          <div>
+            <h4 className="font-display font-semibold text-sm mb-3">Navigation</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li><a href="#fonctionnalites" className="hover:text-foreground">Fonctionnalités</a></li>
+              <li><a href="#tarifs" className="hover:text-foreground">Tarifs</a></li>
+              <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-display font-semibold text-sm mb-3">Légal</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>Conditions d'utilisation</li>
+              <li>Politique de confidentialité</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-display font-semibold text-sm mb-3">Contact</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>Conakry, Guinée</li>
+              <li>contact@eduguinee.gn</li>
+            </ul>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto px-4 lg:px-6 mt-10 pt-6 border-t text-sm text-muted-foreground">
+          © 2026 MBGEduGuinée. Conçu en Guinée pour les écoles guinéennes.
         </div>
       </footer>
     </div>
