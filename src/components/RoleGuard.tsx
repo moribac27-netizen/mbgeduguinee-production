@@ -8,13 +8,16 @@ import { canAccess, homeForRoles } from "@/lib/access";
 
 export function RoleGuard() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { roles, loading: rolesLoading } = useRoles();
-  const { isSuperAdmin, loading: saLoading } = useSuperAdmin();
+  const { roles, loading: rolesLoading, error: rolesError } = useRoles();
+  const { isSuperAdmin, loading: saLoading, error: saError } = useSuperAdmin();
   const navigate = useNavigate();
   const lastDeniedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (rolesLoading || saLoading) return;
+    // Erreur technique (réseau, RLS temporaire...) : ne pas conclure à
+    // "aucun rôle" ni déconnecter l'utilisateur sur un simple échec de requête.
+    if (rolesError || saError) return;
     // Compte sans rôle attribué : aucun espace ne lui correspond.
     if (!isSuperAdmin && roles.length === 0) {
       if (lastDeniedRef.current === "__no-role__") return;
@@ -36,7 +39,7 @@ export function RoleGuard() {
       description: "Vous n'êtes pas autorisé à consulter cette page.",
     });
     navigate({ to: home, replace: true });
-  }, [pathname, roles, isSuperAdmin, rolesLoading, saLoading, navigate]);
+  }, [pathname, roles, isSuperAdmin, rolesLoading, saLoading, rolesError, saError, navigate]);
 
   return null;
 }

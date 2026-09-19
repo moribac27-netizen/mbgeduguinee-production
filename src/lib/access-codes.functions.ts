@@ -75,6 +75,17 @@ export const redeemAccessCodeAndSignUp = createServerFn({ method: "POST" })
       return { ok: false as const, error: "Account creation failed" };
     }
     const newUserId = userRes.user.id;
+
+    // Attache explicitement profil + role : le trigger handle_new_user se
+    // déclenche avant que app_metadata soit definitivement écrit par
+    // createUser() ci-dessus, donc on force les bonnes valeurs ici.
+    await supabaseAdmin.from("profiles").update({
+      full_name: data.fullName,
+      phone: data.phone ?? null,
+      school_id: claimed.school_id,
+    }).eq("id", newUserId);
+    await supabaseAdmin.from("user_roles").insert({ user_id: newUserId, role: data.asRole });
+
     await supabaseAdmin.from("student_access_codes").update({ used_by: newUserId }).eq("id", claimed.id);
     if (data.asRole === "eleve") {
       await supabaseAdmin.from("students").update({ student_user_id: newUserId }).eq("id", claimed.student_id);
