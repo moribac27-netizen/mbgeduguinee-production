@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { StudentPhoto } from "@/components/StudentPhoto";
 import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
 import { useSignedUrl } from "@/hooks/useSignedUrl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Printer, Camera, IdCard, Search } from "lucide-react";
+import { Printer, Camera, IdCard, Search, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 
 export const Route = createFileRoute("/_authenticated/cartes")({
   head: () => ({ meta: [{ title: "Cartes scolaires — MBGEduGuinée" }] }),
@@ -26,6 +28,9 @@ function CartesPage() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [photoOpen, setPhotoOpen] = useState<any>(null);
   const [printFormat, setPrintFormat] = useState<"a4" | "cr80">("a4");
+
+  const { info: planInfo } = usePerStudentPlan();
+  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   const { data: school } = useQuery({
     queryKey: ["my-school-card"],
@@ -44,6 +49,10 @@ function CartesPage() {
     queryFn: async () => (await supabase.from("students").select("*, classes(name, level)").order("full_name")).data ?? [],
   });
 
+  function isLocked(studentId: string) {
+    return planInfo.isPerStudent && !paidIds.has(studentId);
+  }
+
   const filtered = useMemo(() => {
     return students.filter((s: any) => {
       if (classId !== "all" && s.class_id !== classId) return false;
@@ -52,19 +61,21 @@ function CartesPage() {
     });
   }, [students, classId, search]);
 
-  const selectedStudents = filtered.filter((s: any) => selected[s.id]);
-  const toPrint = selectedStudents.length > 0 ? selectedStudents : filtered;
+  const filteredSelectable = filtered.filter((s: any) => !isLocked(s.id));
+  const selectedStudents = filtered.filter((s: any) => selected[s.id] && !isLocked(s.id));
+  const toPrint = selectedStudents.length > 0 ? selectedStudents : filteredSelectable;
+  const lockedInView = filtered.length - filteredSelectable.length;
 
   function toggleAll(v: boolean) {
     const next: Record<string, boolean> = {};
-    if (v) filtered.forEach((s: any) => (next[s.id] = true));
+    if (v) filteredSelectable.forEach((s: any) => (next[s.id] = true));
     setSelected(next);
   }
 
   const logoUrl = useSignedUrl(school?.logo_url);
 
   function handlePrint() {
-    if (toPrint.length === 0) return toast.error("Aucun élève sélectionné");
+    if (toPrint.length === 0) return toast.error("Aucun élève sélectionné (ou tous les élèves visibles ont une cotisation impayée)");
     window.print();
   }
 
@@ -89,6 +100,12 @@ function CartesPage() {
           <Button onClick={handlePrint} className="gap-2"><Printer className="size-4" /> Imprimer ({toPrint.length})</Button>
         </div>
       </div>
+
+      {lockedInView > 0 && (
+        <p className="text-sm text-muted-foreground no-print flex items-center gap-1">
+          <Lock className="size-3.5" /> {lockedInView} élève(s) affiché(s) ont une cotisation impayée et ne peuvent pas être sélectionnés pour l'impression.
+        </p>
+      )}
 
       <Card className="no-print">
         <CardContent className="p-4 space-y-4">
@@ -115,30 +132,35 @@ function CartesPage() {
           <div className="border rounded-lg divide-y max-h-[420px] overflow-y-auto">
             <div className="flex items-center gap-3 px-4 py-2 bg-muted/40 text-sm font-medium">
               <Checkbox
-                checked={filtered.length > 0 && filtered.every((s: any) => selected[s.id])}
+                checked={filteredSelectable.length > 0 && filteredSelectable.every((s: any) => selected[s.id])}
                 onCheckedChange={(v) => toggleAll(!!v)}
               />
-              <span>Tout sélectionner ({filtered.length})</span>
+              <span>Tout sélectionner ({filteredSelectable.length} éligible{filteredSelectable.length > 1 ? "s" : ""})</span>
             </div>
-            {filtered.map((s: any) => (
-              <div key={s.id} className="flex items-center gap-3 px-4 py-2">
-                <Checkbox checked={!!selected[s.id]} onCheckedChange={(v) => setSelected({ ...selected, [s.id]: !!v })} />
-                <StudentPhoto path={s.photo_url} name={s.full_name} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{s.full_name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{s.matricule} · {s.classes?.name ?? "Sans classe"}</div>
+            {filtered.map((s: any) => {
+              const locked = isLocked(s.id);
+              return (
+                <div key={s.id} className={"flex items-center gap-3 px-4 py-2" + (locked ? " opacity-60" : "")}>
+                  <Checkbox disabled={locked} checked={!!selected[s.id] && !locked} onCheckedChange={(v) => setSelected({ ...selected, [s.id]: !!v })} />
+                  <StudentPhoto path={s.photo_url} name={s.full_name} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate flex items-center gap-2">
+                      {s.full_name}
+                      {locked && <Badge variant="destructive" className="text-[10px] px-1.5 py-0 gap-1"><Lock className="size-3" />Non payé</Badge>}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{s.matricule} · {s.classes?.name ?? "Sans classe"}</div>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setPhotoOpen(s)} disabled={locked}>
+                    <Camera className="size-4" /> Photo
+                  </Button>
                 </div>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setPhotoOpen(s)}>
-                  <Camera className="size-4" /> Photo
-                </Button>
-              </div>
-            ))}
+              );
+            })}
             {filtered.length === 0 && <div className="p-8 text-center text-muted-foreground text-sm">Aucun élève</div>}
           </div>
         </CardContent>
       </Card>
 
-      {/* Printable sheet */}
       {printFormat === "cr80" && (
         <p className="text-xs text-muted-foreground no-print">
           Format PVC CR80 : une carte par page, sans marge. Dans la boîte de dialogue d'impression, choisissez l'imprimante à cartes,

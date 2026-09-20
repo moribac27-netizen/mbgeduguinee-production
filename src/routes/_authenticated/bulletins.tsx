@@ -6,10 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, FileDown, Eye } from "lucide-react";
+import { Printer, FileDown, Eye, Lock } from "lucide-react";
 import { BulletinDocument, BULLETIN_PERIODS, periodLabel } from "@/components/BulletinDocument";
 import { BulletinPreviewDialog } from "@/components/BulletinPreviewDialog";
 import { logActivity } from "@/lib/audit";
+import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 
 export const Route = createFileRoute("/_authenticated/bulletins")({
   head: () => ({ meta: [{ title: "Bulletins scolaires — MBGEduGuinée" }] }),
@@ -22,6 +23,9 @@ function BulletinsPage() {
   const [studentId, setStudentId] = useState("");
   const [preview, setPreview] = useState(false);
 
+  const { info: planInfo } = usePerStudentPlan();
+  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+
   const { data: classes = [] } = useQuery({
     queryKey: ["classes-list"],
     queryFn: async () => (await supabase.from("classes").select("*").order("name")).data ?? [],
@@ -33,8 +37,10 @@ function BulletinsPage() {
   });
 
   const student = students.find((s: any) => s.id === studentId);
+  const isLocked = !!studentId && planInfo.isPerStudent && !paidIds.has(studentId);
 
   function handlePrint() {
+    if (isLocked) return;
     void logActivity({
       action: "print",
       entity_type: "bulletin",
@@ -72,13 +78,31 @@ function BulletinsPage() {
             <Label>Élève</Label>
             <Select value={studentId} onValueChange={setStudentId} disabled={!classId}>
               <SelectTrigger><SelectValue placeholder="Choisir un élève" /></SelectTrigger>
-              <SelectContent>{students.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {students.map((s: any) => {
+                  const locked = planInfo.isPerStudent && !paidIds.has(s.id);
+                  return (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.full_name}{locked ? " 🔒 (non payé)" : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {studentId && classId && (
+      {studentId && classId && isLocked && (
+        <Card className="no-print">
+          <CardContent className="py-10 text-center text-muted-foreground flex flex-col items-center gap-2">
+            <Lock className="size-6" />
+            <p>Bulletin verrouillé — la cotisation annuelle de {student?.full_name} doit être réglée pour y accéder.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {studentId && classId && !isLocked && (
         <>
           <div className="flex flex-wrap gap-2 no-print">
             <Button onClick={() => setPreview(true)} variant="secondary" className="gap-2"><Eye className="size-4" />Aperçu A4</Button>
@@ -105,15 +129,4 @@ function BulletinsPage() {
         .bulletin-analytics .recharts-surface { overflow: visible; }
         @media print {
           body * { visibility: hidden; }
-          .bulletin, .bulletin * { visibility: visible; }
-          .bulletin { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: none; }
-          .no-print { display: none !important; }
-          .bulletin-analytics { page-break-inside: auto; }
-          .bulletin-analytics .break-inside-avoid { page-break-inside: avoid; break-inside: avoid; }
-          .bulletin-analytics * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          @page { size: A4; margin: 1cm; }
-        }
-      `}</style>
-    </div>
-  );
-}
+          .bulletin,

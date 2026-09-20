@@ -9,10 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Award } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Award, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { maxScoreForLevel } from "@/lib/grading";
 import { useScopedClassOptions } from "@/hooks/useOptions";
+import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 
 export const Route = createFileRoute("/_authenticated/notes")({
   head: () => ({ meta: [{ title: "Notes — MBGEduGuinée" }] }),
@@ -26,6 +28,9 @@ function NotesPage() {
   const [open, setOpen] = useState(false);
 
   const { classes } = useScopedClassOptions();
+  const { info: planInfo } = usePerStudentPlan();
+  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+
   const { data: subjects = [] } = useQuery({
     queryKey: ["subjects"],
     queryFn: async () => (await supabase.from("subjects").select("*").order("name")).data ?? [],
@@ -45,18 +50,28 @@ function NotesPage() {
   const cls = classes.find((c: any) => c.id === classId);
   const maxScore = maxScoreForLevel(cls?.level);
 
+  function isLocked(studentId: string) {
+    return planInfo.isPerStudent && !paidIds.has(studentId);
+  }
+
   const rows = useMemo(() => {
     return students.map((s: any) => {
-      const sg = grades.filter((g: any) => g.student_id === s.id);
+      const locked = planInfo.isPerStudent && !paidIds.has(s.id);
+      const sg = locked ? [] : grades.filter((g: any) => g.student_id === s.id);
       let totalWeighted = 0, totalCoef = 0;
-      subjects.forEach((sub: any) => {
-        const g = sg.find((x: any) => x.subject_id === sub.id);
-        if (g) { totalWeighted += Number(g.score) * Number(sub.coefficient); totalCoef += Number(sub.coefficient); }
-      });
-      const avg = totalCoef > 0 ? totalWeighted / totalCoef : null;
-      return { student: s, grades: sg, avg };
+      if (!locked) {
+        subjects.forEach((sub: any) => {
+          const g = sg.find((x: any) => x.subject_id === sub.id);
+          if (g) { totalWeighted += Number(g.score) * Number(sub.coefficient); totalCoef += Number(sub.coefficient); }
+        });
+      }
+      const avg = !locked && totalCoef > 0 ? totalWeighted / totalCoef : null;
+      return { student: s, grades: sg, avg, locked };
     }).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
-  }, [students, grades, subjects]);
+  }, [students, grades, subjects, planInfo.isPerStudent, paidIds]);
+
+  // Élèves proposables à la saisie : on exclut ceux verrouillés (cotisation non payée)
+  const selectableStudents = students.filter((s: any) => !isLocked(s.id));
 
   return (
     <div className="space-y-6">
@@ -67,7 +82,7 @@ function NotesPage() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button className="gap-2" disabled={!classId}><Plus className="size-4" />Saisir une note</Button></DialogTrigger>
-          <GradeDialog students={students} subjects={subjects} period={period} maxScore={maxScore} onClose={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["grades"] }); }} />
+          <GradeDialog students={selectableStudents} subjects={subjects} period={period} maxScore={maxScore} onClose={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["grades"] }); }} />
         </Dialog>
       </div>
 
@@ -105,19 +120,28 @@ function NotesPage() {
               <TableBody>
                 {rows.length === 0 && <TableRow><TableCell colSpan={subjects.length + 3} className="text-center py-8 text-muted-foreground">Aucun élève dans cette classe</TableCell></TableRow>}
                 {rows.map((r, i) => (
-                  <TableRow key={r.student.id}>
+                  <TableRow key={r.student.id} className={r.locked ? "opacity-60" : undefined}>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {i === 0 && r.avg != null && <Award className="size-4 text-accent" />}
                         <span className="font-bold">{r.avg != null ? i + 1 : "—"}</span>
                       </div>
                     </TableCell>
-                    <TableCell><div className="font-medium">{r.student.full_name}</div><div className="text-xs text-muted-foreground font-mono">{r.student.matricule}</div></TableCell>
+                    <TableCell>
+                      <div className="font-medium flex items-center gap-2">
+                        {r.student.full_name}
+                        {r.locked && <Badge variant="destructive" className="text-[10px] px-1.5 py-0 gap-1"><Lock className="size-3" />Non payé</Badge>}
+                      </div>
+                      <div className="text-xs text-muted-foreground font-mono">{r.student.matricule}</div>
+                    </TableCell>
                     {subjects.map((s: any) => {
+                      if (r.locked) return <TableCell key={s.id} className="text-center text-sm text-muted-foreground">🔒</TableCell>;
                       const g = r.grades.find((x: any) => x.subject_id === s.id);
                       return <TableCell key={s.id} className="text-center text-sm">{g ? Number(g.score).toFixed(1) : <span className="text-muted-foreground">—</span>}</TableCell>;
                     })}
-                    <TableCell className="text-center font-bold">{r.avg != null ? r.avg.toFixed(2) : "—"} / {maxScore}</TableCell>
+                    <TableCell className="text-center font-bold">
+                      {r.locked ? <span className="text-muted-foreground text-sm">Cotisation requise</span> : `${r.avg != null ? r.avg.toFixed(2) : "—"} / ${maxScore}`}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -151,7 +175,13 @@ function GradeDialog({ students, subjects, period, maxScore, onClose }: any) {
           <Label>Élève</Label>
           <Select value={form.student_id} onValueChange={(v) => setForm({ ...form, student_id: v })}>
             <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-            <SelectContent>{students.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}</SelectContent>
+            <SelectContent>
+              {students.length === 0 ? (
+                <div className="px-2 py-3 text-sm text-muted-foreground">Aucun élève éligible (cotisation non réglée)</div>
+              ) : (
+                students.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)
+              )}
+            </SelectContent>
           </Select>
         </div>
         <div>
