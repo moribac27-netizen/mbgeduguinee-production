@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, GraduationCap, CreditCard, UserCheck, CalendarDays, Megaphone, FileText, Eye, UserPlus } from "lucide-react";
+import { Users, GraduationCap, CreditCard, UserCheck, CalendarDays, Megaphone, FileText, Eye, UserPlus, Lock } from "lucide-react";
 import { maxScoreForLevel } from "@/lib/grading";
 import { StudentPhoto } from "@/components/StudentPhoto";
 import { BulletinAnalytics } from "@/components/BulletinAnalytics";
@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { linkAdditionalChild } from "@/lib/access-codes.functions";
 import { toast } from "sonner";
+import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 
 export const Route = createFileRoute("/_authenticated/parent")({
   head: () => ({ meta: [{ title: "Espace Parent — MBGEduGuinée" }] }),
@@ -53,6 +54,11 @@ function ParentPortal() {
   const selected = children.find((c: any) => c.id === selectedId);
 
   const [addChildOpen, setAddChildOpen] = useState(false);
+
+  // Plan "par élève" : statut de paiement par enfant, calculé une seule fois
+  // pour l'école du parent connecté et réutilisé pour le badge + le verrouillage.
+  const { info: planInfo } = usePerStudentPlan();
+  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   return (
     <div className="space-y-6">
@@ -92,31 +98,42 @@ function ParentPortal() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
-                {children.map((c: any) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedId(c.id)}
-                    className={`px-4 py-3 rounded-lg border text-left transition flex items-center gap-3 ${selectedId === c.id ? "border-primary bg-primary/5" : "hover:bg-muted"}`}
-                  >
-                    <StudentPhoto path={c.photo_url} name={c.full_name} size="sm" />
-                    <div>
-                      <div className="font-medium">{c.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{c.matricule} · {c.classes?.name ?? "—"}</div>
-                    </div>
-                  </button>
-                ))}
+                {children.map((c: any) => {
+                  const unpaid = planInfo.isPerStudent && !paidIds.has(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedId(c.id)}
+                      className={`px-4 py-3 rounded-lg border text-left transition flex items-center gap-3 ${selectedId === c.id ? "border-primary bg-primary/5" : "hover:bg-muted"}`}
+                    >
+                      <StudentPhoto path={c.photo_url} name={c.full_name} size="sm" />
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {c.full_name}
+                          {unpaid && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Non payé</Badge>}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{c.matricule} · {c.classes?.name ?? "—"}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
 
-          {selected && <ChildDetails student={selected} />}
+          {selected && (
+            <ChildDetails
+              student={selected}
+              isLocked={planInfo.isPerStudent && !paidIds.has(selected.id)}
+            />
+          )}
         </>
       )}
     </div>
   );
 }
 
-function ChildDetails({ student }: { student: any }) {
+function ChildDetails({ student, isLocked }: { student: any; isLocked: boolean }) {
   const studentId = student.id;
   const [preview, setPreview] = useState(false);
   const max = maxScoreForLevel(student.classes?.level) as 10 | 20;
@@ -203,10 +220,23 @@ function ChildDetails({ student }: { student: any }) {
 
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
+  const LockedNotice = ({ what }: { what: string }) => (
+    <Card>
+      <CardContent className="py-10 text-center text-muted-foreground flex flex-col items-center gap-2">
+        <Lock className="size-6" />
+        <p>{what} verrouillé{what.endsWith("s") ? "s" : ""} — la cotisation annuelle de {student.full_name} doit être réglée pour y accéder.</p>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<GraduationCap className="size-4" />} label={`Moyenne générale ${max === 10 ? "/10" : "/20"}`} value={overall.toFixed(2)} />
+        <StatCard
+          icon={<GraduationCap className="size-4" />}
+          label={`Moyenne générale ${max === 10 ? "/10" : "/20"}`}
+          value={isLocked ? "—" : overall.toFixed(2)}
+        />
         <StatCard icon={<UserCheck className="size-4" />} label="Absences" value={String(absents)} sub={`${retards} retards`} />
         <StatCard icon={<CreditCard className="size-4" />} label="Total payé (GNF)" value={fmt(totalDue)} />
         <StatCard icon={<FileText className="size-4" />} label="Classe" value={student.classes?.name ?? "—"} />
@@ -232,34 +262,40 @@ function ChildDetails({ student }: { student: any }) {
         </TabsList>
 
         <TabsContent value="notes">
-          <Card><CardHeader><CardTitle>Notes par matière</CardTitle></CardHeader><CardContent>
-            {avgList.length === 0 ? <p className="text-muted-foreground">Aucune note.</p> : (
-              <div className="space-y-2">
-                {avgList.map((s) => (
-                  <div key={s.name} className="flex justify-between border-b py-2">
-                    <span>{s.name}</span>
-                    <span className="font-medium">{s.avg.toFixed(2)} / {max}</span>
+          {isLocked ? (
+            <LockedNotice what="Notes" />
+          ) : (
+            <>
+              <Card><CardHeader><CardTitle>Notes par matière</CardTitle></CardHeader><CardContent>
+                {avgList.length === 0 ? <p className="text-muted-foreground">Aucune note.</p> : (
+                  <div className="space-y-2">
+                    {avgList.map((s) => (
+                      <div key={s.name} className="flex justify-between border-b py-2">
+                        <span>{s.name}</span>
+                        <span className="font-medium">{s.avg.toFixed(2)} / {max}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent></Card>
+                )}
+              </CardContent></Card>
 
-          <Card className="mt-4"><CardHeader><CardTitle>Historique des notes</CardTitle></CardHeader><CardContent>
-            {grades.length === 0 ? <p className="text-muted-foreground">Aucune note.</p> : (
-              <div className="space-y-1 max-h-96 overflow-y-auto">
-                {grades.map((g: any) => (
-                  <div key={g.id} className="flex justify-between text-sm border-b py-1.5">
-                    <div>
-                      <span className="font-medium">{g.subjects?.name}</span>
-                      <span className="text-muted-foreground ml-2">{g.evaluation_type} · {g.period}</span>
-                    </div>
-                    <span className="font-medium">{Number(g.score).toFixed(2)} / {max}</span>
+              <Card className="mt-4"><CardHeader><CardTitle>Historique des notes</CardTitle></CardHeader><CardContent>
+                {grades.length === 0 ? <p className="text-muted-foreground">Aucune note.</p> : (
+                  <div className="space-y-1 max-h-96 overflow-y-auto">
+                    {grades.map((g: any) => (
+                      <div key={g.id} className="flex justify-between text-sm border-b py-1.5">
+                        <div>
+                          <span className="font-medium">{g.subjects?.name}</span>
+                          <span className="text-muted-foreground ml-2">{g.evaluation_type} · {g.period}</span>
+                        </div>
+                        <span className="font-medium">{Number(g.score).toFixed(2)} / {max}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent></Card>
+                )}
+              </CardContent></Card>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="paiements">
@@ -326,28 +362,31 @@ function ChildDetails({ student }: { student: any }) {
         </TabsContent>
 
         <TabsContent value="bulletin">
-          <Card><CardHeader><CardTitle>Bulletin</CardTitle></CardHeader><CardContent>
-            <p className="text-muted-foreground mb-3">Consultez l'aperçu A4 exact du bulletin, puis imprimez-le ou enregistrez-le en PDF.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setPreview(true)} disabled={!student.class_id} className="gap-2">
-                <Eye className="size-4" /> Aperçu avant impression
-              </Button>
-            </div>
-            {student.class_id && (
-              <BulletinAnalytics studentId={studentId} classId={student.class_id} maxScore={max} variant="screen" />
-            )}
-            {student.class_id && (
-              <BulletinPreviewDialog
-                open={preview}
-                onOpenChange={setPreview}
-                studentId={studentId}
-                studentName={student.full_name}
-                classId={student.class_id}
-              />
-            )}
-          </CardContent></Card>
+          {isLocked ? (
+            <LockedNotice what="Bulletin" />
+          ) : (
+            <Card><CardHeader><CardTitle>Bulletin</CardTitle></CardHeader><CardContent>
+              <p className="text-muted-foreground mb-3">Consultez l'aperçu A4 exact du bulletin, puis imprimez-le ou enregistrez-le en PDF.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setPreview(true)} disabled={!student.class_id} className="gap-2">
+                  <Eye className="size-4" /> Aperçu avant impression
+                </Button>
+              </div>
+              {student.class_id && (
+                <BulletinAnalytics studentId={studentId} classId={student.class_id} maxScore={max} variant="screen" />
+              )}
+              {student.class_id && (
+                <BulletinPreviewDialog
+                  open={preview}
+                  onOpenChange={setPreview}
+                  studentId={studentId}
+                  studentName={student.full_name}
+                  classId={student.class_id}
+                />
+              )}
+            </CardContent></Card>
+          )}
         </TabsContent>
-
 
         <TabsContent value="annonces">
           <Card><CardHeader><CardTitle>Annonces</CardTitle></CardHeader><CardContent>

@@ -11,14 +11,26 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { School, Sparkles } from "lucide-react";
+import { School, Sparkles, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { logLogin } from "@/lib/audit";
 import { resolveUserHome } from "@/lib/auth-redirect";
 
+// Montant fixe configurable (en GNF)
+const STUDENT_FEE = 100000;
 
 const emptySignUp = { email: "", password: "", fullName: "", phone: "", schoolName: "", schoolAddress: "", schoolPhone: "" };
 const emptyFamilySignUp = { code: "", email: "", password: "", fullName: "", phone: "", asRole: "parent" as "parent" | "eleve" };
+
+// Validation du format du code : XXXXX-XXXXX
+function validateAccessCodeFormat(code: string): boolean {
+  const pattern = /^[A-Z0-9]{5}-[A-Z0-9]{5}$/;
+  return pattern.test(code.trim());
+}
+
+function formatNumber(n: number) {
+  return new Intl.NumberFormat("fr-FR").format(n);
+}
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -44,6 +56,7 @@ function AuthPage() {
   const [signIn, setSignIn] = useState({ email: "", password: "" });
   const [signUp, setSignUp] = useState(emptySignUp);
   const [familySignUp, setFamilySignUp] = useState(emptyFamilySignUp);
+  const [familyMode, setFamilyMode] = useState<"signin" | "signup">("signin");
   const redeemFn = useServerFn(redeemAccessCodeAndSignUp);
 
   const afterAuth = async () => {
@@ -63,13 +76,13 @@ function AuthPage() {
     if (error) {
       const msg = error.message.toLowerCase();
       if (msg.includes("confirm")) setUnconfirmedEmail(signIn.email.trim());
+      else if (msg.includes("invalid")) return toast.error("Email ou mot de passe incorrect");
       return toast.error(error.message);
     }
     setUnconfirmedEmail(null);
     toast.success("Connexion réussie");
     void logLogin(signIn.email.trim());
     afterAuth();
-
   }
 
   async function handleResend() {
@@ -151,11 +164,18 @@ function AuthPage() {
   async function handleFamilySignUp(e: React.FormEvent) {
     e.preventDefault();
     if (familyLoading) return;
+
+    // Validation du format du code
+    const codeFormatted = familySignUp.code.trim().toUpperCase();
+    if (!validateAccessCodeFormat(codeFormatted)) {
+      return toast.error("Format du code invalide. Le code doit être au format XXXXX-XXXXX (ex: HZDVS-ZZ4WR)");
+    }
+
     setFamilyLoading(true);
     try {
       const res = await redeemFn({
         data: {
-          code: familySignUp.code.trim(),
+          code: codeFormatted,
           email: familySignUp.email.trim(),
           password: familySignUp.password,
           fullName: familySignUp.fullName.trim(),
@@ -165,22 +185,39 @@ function AuthPage() {
       });
       if (!res.ok) {
         setFamilyLoading(false);
-        toast.error(res.error);
-        return;
+        // Messages d'erreur plus spécifiques
+        const errorMsg = res.error?.toLowerCase() || "";
+        if (errorMsg.includes("utilisé") || errorMsg.includes("used")) {
+          return toast.error("Ce code a été utilisé. Contactez votre directeur ou informaticien pour un nouveau code.");
+        }
+        if (errorMsg.includes("invalide") || errorMsg.includes("invalid") || errorMsg.includes("found")) {
+          return toast.error("Ce code d'accès est invalide ou expiré. Contactez votre directeur ou informaticien.");
+        }
+        if (errorMsg.includes("email")) {
+          return toast.error("Cet email est déjà utilisé. Essayez un autre email ou connectez-vous directement.");
+        }
+        return toast.error(res.error);
       }
+
+      // Connexion automatique après création
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email: familySignUp.email.trim(),
         password: familySignUp.password,
       });
       setFamilyLoading(false);
+
       if (signInErr) {
-        toast.success("Compte créé. Connectez-vous avec votre e-mail et mot de passe.");
+        toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${formatNumber(STUDENT_FEE)} GNF validé par l'école.`);
         setFamilySignUp(emptyFamilySignUp);
+        setFamilyMode("signin");
         return;
       }
-      toast.success("Compte créé avec succès. Bienvenue !");
+
+      toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${formatNumber(STUDENT_FEE)} GNF validé par l'école.`);
       setFamilySignUp(emptyFamilySignUp);
-      afterAuth();
+      setFamilyMode("signin");
+      // Ne pas rediriger immédiatement, laisser le message affiché
+      setTimeout(afterAuth, 2000);
     } catch (err: any) {
       setFamilyLoading(false);
       toast.error(err?.message ?? "Échec de l'inscription");
@@ -212,7 +249,7 @@ function AuthPage() {
           </div>
         </Link>
 
-                {plan && (
+        {plan && (
           <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/20 text-sm font-medium">
             <Sparkles className="size-4 text-accent" />
             Aucun abonnement mensuel — plan <span className="uppercase">{plan}</span>
@@ -234,7 +271,7 @@ function AuthPage() {
                 <form onSubmit={handleSignIn} className="space-y-3">
                   <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
                   <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
-                  <Button type="submit" className="w-full" disabled={loading}>Se connecter</Button>
+                  <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
                   {unconfirmedEmail && (
                     <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
                       <p className="mb-2">Votre e-mail <span className="font-medium">{unconfirmedEmail}</span> n'est pas encore confirmé.</p>
@@ -267,43 +304,75 @@ function AuthPage() {
                 </form>
               </TabsContent>
               <TabsContent value="family">
-                <form onSubmit={handleFamilySignUp} className="space-y-3">
-                  <div>
-                    <Label>Code d'accès *</Label>
-                    <Input
-                      required
-                      className="font-mono tracking-wider"
-                      placeholder="EX. EDG7X-9KQP2"
-                      value={familySignUp.code}
-                      onChange={(e) => setFamilySignUp({ ...familySignUp, code: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Fourni par l'école — un code par personne.</p>
-                  </div>
-                  <div>
-                    <Label>Vous êtes *</Label>
-                    <RadioGroup
-                      className="flex gap-4 mt-1"
-                      value={familySignUp.asRole}
-                      onValueChange={(v) => setFamilySignUp({ ...familySignUp, asRole: v as "parent" | "eleve" })}
-                    >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="parent" id="role-parent" />
-                        <Label htmlFor="role-parent" className="font-normal">Parent</Label>
+                {familyMode === "signin" ? (
+                  <form onSubmit={handleSignIn} className="space-y-3">
+                    <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
+                    <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
+                    <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
+                    <Button type="button" variant="link" className="w-full text-xs" onClick={() => setFamilyMode("signup")}>Créer un nouveau compte avec un code d'accès</Button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleFamilySignUp} className="space-y-3">
+                    <div>
+                      <Label>Code d'accès *</Label>
+                      <Input
+                        required
+                        className="font-mono tracking-wider uppercase"
+                        placeholder="XXXXX-XXXXX (ex: HZDVS-ZZ4WR)"
+                        value={familySignUp.code}
+                        onChange={(e) => setFamilySignUp({ ...familySignUp, code: e.target.value.toUpperCase() })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Fourni par votre directeur ou informaticien — un code par personne.</p>
+                    </div>
+
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3">
+                      <div className="flex gap-2 text-sm">
+                        <HelpCircle className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-blue-900 dark:text-blue-200">
+                          <p className="font-medium mb-1">Vous avez oublié votre code ?</p>
+                          <p>Contactez le directeur ou l'informaticien de votre école pour obtenir un nouveau code d'accès.</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="eleve" id="role-eleve" />
-                        <Label htmlFor="role-eleve" className="font-normal">Élève</Label>
+                    </div>
+
+                    <div>
+                      <Label>Vous êtes *</Label>
+                      <RadioGroup
+                        className="flex gap-4 mt-1"
+                        value={familySignUp.asRole}
+                        onValueChange={(v) => setFamilySignUp({ ...familySignUp, asRole: v as "parent" | "eleve" })}
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="parent" id="role-parent" />
+                          <Label htmlFor="role-parent" className="font-normal">Parent</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="eleve" id="role-eleve" />
+                          <Label htmlFor="role-eleve" className="font-normal">Élève</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    <div><Label>Nom complet *</Label><Input required value={familySignUp.fullName} onChange={(e) => setFamilySignUp({ ...familySignUp, fullName: e.target.value })} /></div>
+                    <div><Label>Téléphone</Label><Input value={familySignUp.phone} onChange={(e) => setFamilySignUp({ ...familySignUp, phone: e.target.value })} placeholder="+224..." /></div>
+                    <div><Label>Email *</Label><Input type="email" required value={familySignUp.email} onChange={(e) => setFamilySignUp({ ...familySignUp, email: e.target.value })} /></div>
+                    <div><Label>Mot de passe * (6 caractères min.)</Label><Input type="password" required minLength={6} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
+
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-900 dark:text-amber-200">
+                      <div className="flex gap-2">
+                        <AlertCircle className="size-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium">Montant à payer : <span className="font-bold">{formatNumber(STUDENT_FEE)} GNF</span></p>
+                          <p className="mt-1">Votre dossier sera accessible une fois ce montant validé par l'école.</p>
+                        </div>
                       </div>
-                    </RadioGroup>
-                  </div>
-                  <div><Label>Nom complet *</Label><Input required value={familySignUp.fullName} onChange={(e) => setFamilySignUp({ ...familySignUp, fullName: e.target.value })} /></div>
-                  <div><Label>Téléphone</Label><Input value={familySignUp.phone} onChange={(e) => setFamilySignUp({ ...familySignUp, phone: e.target.value })} placeholder="+224..." /></div>
-                  <div><Label>Email *</Label><Input type="email" required value={familySignUp.email} onChange={(e) => setFamilySignUp({ ...familySignUp, email: e.target.value })} /></div>
-                  <div><Label>Mot de passe * (6 caractères min.)</Label><Input type="password" required minLength={6} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
-                  <Button type="submit" className="w-full" disabled={familyLoading}>
-                    {familyLoading ? "Création en cours..." : "Créer mon compte"}
-                  </Button>
-                </form>
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={familyLoading}>
+                      {familyLoading ? "Création en cours..." : "Créer mon compte"}
+                    </Button>
+                    <Button type="button" variant="link" className="w-full text-xs" onClick={() => setFamilyMode("signin")}>Vous avez déjà un compte ?</Button>
+                  </form>
+                )}
               </TabsContent>
             </Tabs>
             <div className="my-4 flex items-center gap-3">
@@ -314,8 +383,8 @@ function AuthPage() {
             <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>Continuer avec Google</Button>
           </CardContent>
         </Card>
-                <p className="text-center text-xs text-muted-foreground mt-4">
-          En créant un compte, vous devenez <span className="font-medium">administrateur</span> de votre établissement.
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          En créant un compte établissement, vous devenez <span className="font-medium">administrateur</span> de votre établissement.
         </p>
       </div>
     </div>

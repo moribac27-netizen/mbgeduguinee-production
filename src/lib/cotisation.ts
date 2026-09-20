@@ -1,9 +1,9 @@
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { newCotisationReceiptNumber } from "./cotisation-print";
 
 export type RegisterPaymentResult =
   | { status: "already_paid"; row: any }
+  | { status: "already_pending"; row: any }
   | { status: "created"; row: any }
   | { status: "updated"; row: any }
   | { status: "error"; error: string };
@@ -27,25 +27,30 @@ export async function registerStudentPayment(opts: {
       .eq("academic_year", opts.academicYear)
       .maybeSingle();
 
+    if (existing?.status === "paye") {
+      return { status: "already_paid", row: existing };
+    }
+    if (existing?.status === "en_attente") {
+      return { status: "already_pending", row: existing };
+    }
+
     const payload = {
       school_id: opts.schoolId,
       student_id: opts.studentId,
       academic_year: opts.academicYear,
       amount: opts.amount,
       school_share: opts.schoolShare,
-      status: "paye",
+      status: "en_attente",
       payment_mode: "individuel",
       payment_method: "orange_money",
       reference: opts.reference ?? null,
-      receipt_number: newCotisationReceiptNumber(opts.academicYear),
+      receipt_number: null,
       paid_by: opts.paidBy ?? null,
       paid_at: new Date().toISOString(),
     } as any;
 
+    // Ligne existante (ex. rejetée) : on la remet en attente avec les nouvelles infos
     if (existing) {
-      if (existing.status === "paye") {
-        return { status: "already_paid", row: existing };
-      }
       const { data: updated, error: uErr } = await (supabase as any)
         .from("student_plan_payments")
         .update(payload)

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Loader2, Printer, Smartphone } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Loader2, Printer, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { usePerStudentPlan } from "@/hooks/usePerStudentPlan";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
@@ -25,11 +25,6 @@ interface Props {
   className?: string | null;
 }
 
-/**
- * Cotisation annuelle « plan par élève » côté parent / élève :
- * état du paiement, règlement individuel et reçu imprimable.
- * N'affiche rien si l'école n'est pas sur le plan par élève.
- */
 export function CotisationCard({ studentId, studentName, matricule, className }: Props) {
   const { info } = usePerStudentPlan();
   const meta = usePdfMeta("Cotisation annuelle");
@@ -53,7 +48,7 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
 
   if (!info.isPerStudent) return null;
 
-  const paid = payment?.status === "paye";
+  const status = payment?.status ?? null; // null | "en_attente" | "paye" | "rejeté"
 
   function receipt(row: any) {
     printCotisationReceipt(meta, {
@@ -85,26 +80,29 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
       paidBy: u.user?.id ?? null,
     });
     setSaving(false);
+
     if (res.status === "error") {
       toast.error("Enregistrement impossible", { description: res.error });
       return;
     }
-
     if (res.status === "already_paid") {
       setOpen(false);
       setReference("");
-      toast.info("Paiement déjà enregistré");
+      toast.info("Paiement déjà validé");
       receipt(res.row);
       return;
     }
+    if (res.status === "already_pending") {
+      setOpen(false);
+      setReference("");
+      toast.info("Un paiement est déjà en attente de validation par l'école.");
+      return;
+    }
 
-    // created or updated
     setOpen(false);
     setReference("");
-    toast.success("Cotisation enregistrée");
+    toast.success("Paiement déclaré. Il sera actif dès validation par l'école.");
     await refetch();
-    if (res.row) receipt(res.row);
-    // log activity for audit
     void logActivity({ action: "create", entity_type: "student_plan_payment", entity_id: res.row?.id ?? null, metadata: { mode: "individuel", reference } });
   }
 
@@ -115,12 +113,12 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
           <Smartphone className="size-4 text-primary" /> Cotisation annuelle {info.academicYear}
         </CardTitle>
         <CardDescription>
-          {formatGNF(info.unitPrice)} par élève et par an. Sans cette cotisation, les notes, bulletins et
+          {formatGNF(info.unitPrice)} par élève et par an. Sans cette cotisation validée, les notes, bulletins et
           documents de l'élève restent inaccessibles.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {paid ? (
+        {status === "paye" ? (
           <div className="flex flex-wrap items-center gap-3">
             <Badge className="gap-1"><CheckCircle2 className="size-3" /> Cotisation réglée</Badge>
             <span className="text-sm text-muted-foreground">Reçu n° {payment.receipt_number ?? "—"}</span>
@@ -128,16 +126,32 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
               <Printer className="size-4 mr-1" /> Imprimer le reçu
             </Button>
           </div>
+        ) : status === "en_attente" ? (
+          <div className="space-y-2">
+            <Badge variant="secondary" className="gap-1"><Clock className="size-3" /> En attente de validation</Badge>
+            <p className="text-sm text-muted-foreground">
+              Votre paiement a été déclaré{payment.reference ? ` (référence ${payment.reference})` : ""} et sera
+              activé dès vérification par l'école. Les notes et le bulletin restent verrouillés en attendant.
+            </p>
+          </div>
         ) : (
           <>
-            <Badge variant="destructive">Non payée</Badge>
+            {status === "rejeté" && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                <Badge variant="destructive" className="gap-1 mb-1"><XCircle className="size-3" /> Paiement rejeté</Badge>
+                <p className="text-muted-foreground">
+                  {payment?.rejection_reason ? `Motif : ${payment.rejection_reason}` : "Motif non précisé."} Vous pouvez déclarer un nouveau paiement ci-dessous.
+                </p>
+              </div>
+            )}
+            {status !== "rejeté" && <Badge variant="destructive">Non payée</Badge>}
             <p className="text-sm text-muted-foreground">
               Payez {formatGNF(info.unitPrice)} par Orange Money au {ORANGE_MONEY.local} ({ORANGE_MONEY.holder}),
-              puis enregistrez le paiement ci-dessous pour recevoir votre reçu.
+              puis déclarez le paiement ci-dessous. Il sera vérifié par l'école avant activation.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" asChild><a href={orangeMoneyUssdLink()}>Composer {ORANGE_MONEY.ussd}</a></Button>
-              <Button onClick={() => setOpen(true)}>Enregistrer mon paiement</Button>
+              <Button onClick={() => setOpen(true)}>Déclarer mon paiement</Button>
             </div>
           </>
         )}
@@ -149,7 +163,7 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
             <DialogTitle>Cotisation de {studentName}</DialogTitle>
             <DialogDescription>
               Montant : {formatGNF(info.unitPrice)} · Année {info.academicYear}. Indiquez la référence de la
-              transaction Orange Money (facultatif).
+              transaction Orange Money pour accélérer la vérification.
             </DialogDescription>
           </DialogHeader>
           <div>
@@ -159,7 +173,7 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Annuler</Button>
             <Button onClick={() => void pay()} disabled={saving}>
-              {saving ? <><Loader2 className="size-4 mr-2 animate-spin" /> Enregistrement…</> : "Confirmer le paiement"}
+              {saving ? <><Loader2 className="size-4 mr-2 animate-spin" /> Envoi…</> : "Déclarer le paiement"}
             </Button>
           </DialogFooter>
         </DialogContent>

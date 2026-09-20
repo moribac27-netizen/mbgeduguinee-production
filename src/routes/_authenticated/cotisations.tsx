@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Coins, Loader2, Printer, Search, Users } from "lucide-react";
+import { CheckCircle2, Clock, Coins, Loader2, Printer, Search, Users, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
@@ -66,10 +66,16 @@ function CotisationsPage() {
     return m;
   }, [payments]);
 
+  const pendingCount = (payments as any[]).filter((p) => p.status === "en_attente").length;
+
   const filtered = (students as any[]).filter((s) =>
     [s.full_name, s.matricule].some((v: string) => v?.toLowerCase().includes(search.toLowerCase())),
   );
-  const unpaidSelectable = filtered.filter((s) => !paidIds.has(s.id));
+  // Sélectionnable pour l'encaissement groupé : pas déjà payé, et pas de déclaration en attente à traiter d'abord
+  const unpaidSelectable = filtered.filter((s) => {
+    const row = byStudent.get(s.id);
+    return !paidIds.has(s.id) && row?.status !== "en_attente";
+  });
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -94,6 +100,8 @@ function CotisationsPage() {
       payment_method: "espece",
       receipt_number: newCotisationReceiptNumber(info.academicYear),
       paid_by: u.user?.id ?? null,
+      validated_by: u.user?.id ?? null,
+      validated_at: new Date().toISOString(),
     }));
     const { error } = await (supabase as any).from("student_plan_payments").insert(rows);
     setSaving(false);
@@ -101,6 +109,37 @@ function CotisationsPage() {
     if (error) return toast.error("Enregistrement impossible", { description: error.message });
     toast.success(`${rows.length} cotisation(s) enregistrée(s)`);
     setSelected(new Set());
+    await Promise.all([refetch(), refetchPaid(), refetchPayments()]);
+  }
+
+  async function validatePending(row: any) {
+    const { data: u } = await supabase.auth.getUser();
+    const receipt_number = row.receipt_number ?? newCotisationReceiptNumber(row.academic_year);
+    const { error } = await (supabase as any)
+      .from("student_plan_payments")
+      .update({
+        status: "paye",
+        receipt_number,
+        validated_by: u.user?.id,
+        validated_at: new Date().toISOString(),
+        rejection_reason: null,
+      })
+      .eq("id", row.id);
+    if (error) return toast.error(error.message);
+    toast.success("Cotisation validée");
+    await Promise.all([refetch(), refetchPaid(), refetchPayments()]);
+  }
+
+  async function rejectPending(row: any) {
+    const reason = window.prompt("Motif du rejet ?");
+    if (!reason) return;
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await (supabase as any)
+      .from("student_plan_payments")
+      .update({ status: "rejeté", rejection_reason: reason, validated_by: u.user?.id, validated_at: new Date().toISOString() })
+      .eq("id", row.id);
+    if (error) return toast.error(error.message);
+    toast.success("Cotisation rejetée");
     await Promise.all([refetch(), refetchPaid(), refetchPayments()]);
   }
 
@@ -148,7 +187,7 @@ function CotisationsPage() {
         </p>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users className="size-4 text-primary" /> Élèves à jour</CardTitle></CardHeader>
           <CardContent>
@@ -159,6 +198,13 @@ function CotisationsPage() {
             <p className="text-xs text-muted-foreground mt-2">
               {info.unlocked ? "Accès complet activé." : `Encore ${info.threshold - info.paidCount} élève(s) pour activer l'accès complet.`}
             </p>
+          </CardContent>
+        </Card>
+        <Card className={pendingCount > 0 ? "border-amber-500/40" : undefined}>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Clock className="size-4 text-amber-600" /> En attente de validation</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{pendingCount}</div>
+            <p className="text-xs text-muted-foreground mt-2">Paiements déclarés par les familles, à vérifier ci-dessous.</p>
           </CardContent>
         </Card>
         <Card>
@@ -182,8 +228,10 @@ function CotisationsPage() {
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle>Paiement groupé</CardTitle>
-            <CardDescription>Sélectionnez les élèves dont l'école a déjà encaissé la cotisation.</CardDescription>
+            <CardTitle>Élèves</CardTitle>
+            <CardDescription>
+              Validez les paiements déclarés par les familles, ou cochez les élèves dont l'école a encaissé la cotisation en direct.
+            </CardDescription>
           </div>
           <Button disabled={selected.size === 0} onClick={() => setConfirm(true)}>
             Encaisser {selected.size > 0 ? `${selected.size} élève(s)` : ""}
@@ -209,36 +257,55 @@ function CotisationsPage() {
                   <TableHead>Matricule</TableHead>
                   <TableHead>Élève</TableHead>
                   <TableHead>Classe</TableHead>
-                  <TableHead>Cotisation</TableHead>
-                  <TableHead className="text-right">Reçu</TableHead>
+                  <TableHead>Référence</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Aucun élève</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Aucun élève</TableCell></TableRow>
                 )}
                 {filtered.map((s: any) => {
                   const row = byStudent.get(s.id);
                   const isPaid = paidIds.has(s.id);
+                  const isPending = row?.status === "en_attente";
+                  const isRejected = row?.status === "rejeté";
                   return (
                     <TableRow key={s.id}>
                       <TableCell>
-                        <Checkbox disabled={isPaid} checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} />
+                        <Checkbox
+                          disabled={isPaid || isPending}
+                          checked={selected.has(s.id)}
+                          onCheckedChange={() => toggle(s.id)}
+                        />
                       </TableCell>
                       <TableCell className="font-mono text-xs">{s.matricule}</TableCell>
                       <TableCell className="font-medium">{s.full_name}</TableCell>
                       <TableCell>{s.classes?.name ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{row?.reference ?? "—"}</TableCell>
                       <TableCell>
-                        {isPaid
-                          ? <Badge className="gap-1"><CheckCircle2 className="size-3" /> Payée</Badge>
-                          : <Badge variant="destructive">Non payée</Badge>}
+                        {isPaid ? (
+                          <Badge className="gap-1"><CheckCircle2 className="size-3" /> Payée</Badge>
+                        ) : isPending ? (
+                          <Badge variant="secondary" className="gap-1"><Clock className="size-3" /> En attente</Badge>
+                        ) : isRejected ? (
+                          <Badge variant="destructive" className="gap-1" title={row?.rejection_reason ?? ""}><XCircle className="size-3" /> Rejetée</Badge>
+                        ) : (
+                          <Badge variant="outline">Non payée</Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {row && (
+                      <TableCell className="text-right space-x-1 whitespace-nowrap">
+                        {isPending ? (
+                          <>
+                            <Button size="sm" className="gap-1" onClick={() => validatePending(row)}><CheckCircle2 className="size-3.5" />Valider</Button>
+                            <Button size="sm" variant="outline" className="gap-1 text-destructive" onClick={() => rejectPending(row)}><XCircle className="size-3.5" />Rejeter</Button>
+                          </>
+                        ) : row && isPaid ? (
                           <Button variant="ghost" size="icon" title="Imprimer le reçu" onClick={() => receipt(s, row)}>
                             <Printer className="size-4" />
                           </Button>
-                        )}
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   );
