@@ -83,7 +83,7 @@ function BulletinsPage() {
                   const locked = planInfo.isPerStudent && !paidIds.has(s.id);
                   return (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.full_name}{locked ? " 🔒 (non payé)" : ""}
+                      {s.full_name}{locked ? " (non payé)" : ""}
                     </SelectItem>
                   );
                 })}
@@ -129,4 +129,15 @@ function BulletinsPage() {
         .bulletin-analytics .recharts-surface { overflow: visible; }
         @media print {
           body * { visibility: hidden; }
-          .bulletin,
+          .bulletin, .bulletin * { visibility: visible; }
+          .bulletin { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: none; }
+          .no-print { display: none !important; }
+          .bulletin-analytics { page-break-inside: auto; }
+          .bulletin-analytics .break-inside-avoid { page-break-inside: avoid; break-inside: avoid; }
+          .bulletin-analytics * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          @page { size: A4; margin: 1cm; }
+        }
+      `}</style>
+    </div>
+  );
+}

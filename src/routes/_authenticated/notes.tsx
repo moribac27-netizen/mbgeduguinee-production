@@ -70,7 +70,6 @@ function NotesPage() {
     }).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
   }, [students, grades, subjects, planInfo.isPerStudent, paidIds]);
 
-  // Élèves proposables à la saisie : on exclut ceux verrouillés (cotisation non payée)
   const selectableStudents = students.filter((s: any) => !isLocked(s.id));
 
   return (
@@ -135,7 +134,7 @@ function NotesPage() {
                       <div className="text-xs text-muted-foreground font-mono">{r.student.matricule}</div>
                     </TableCell>
                     {subjects.map((s: any) => {
-                      if (r.locked) return <TableCell key={s.id} className="text-center text-sm text-muted-foreground">🔒</TableCell>;
+                      if (r.locked) return <TableCell key={s.id} className="text-center text-sm text-muted-foreground">-</TableCell>;
                       const g = r.grades.find((x: any) => x.subject_id === s.id);
                       return <TableCell key={s.id} className="text-center text-sm">{g ? Number(g.score).toFixed(1) : <span className="text-muted-foreground">—</span>}</TableCell>;
                     })}
