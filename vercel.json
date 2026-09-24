@@ -33,7 +33,7 @@
   "crons": [
     {
       "path": "/api/cron/backups",
-      "schedule": "0 * * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
