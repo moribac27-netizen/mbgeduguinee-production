@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { linkAdditionalChild } from "@/lib/access-codes.functions";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 
 export const Route = createFileRoute("/_authenticated/parent")({
@@ -31,18 +32,57 @@ function fmt(n: number) {
 }
 
 function ParentPortal() {
-  // Fetch children linked to current parent via student_parents OR legacy parent_user_id
-  const { data: children = [], isLoading } = useQuery({
-    queryKey: ["parent-children"],
+  const { user } = useAuth();
+  const parentUserId = user?.id ?? null;
+
+  // Fetch only children explicitly linked to the authenticated parent.
+  // student_parents is the canonical M2M relation; the legacy parent_user_id
+  // fallback keeps older records readable until every deployment is backfilled.
+  const { data: children = [], isLoading, isError, error } = useQuery({
+    queryKey: ["parent-children", parentUserId],
+    enabled: !!parentUserId,
     queryFn: async () => {
-      const { data: user } = await supabase.auth.getUser();
-      const uid = user.user?.id;
+      const uid = parentUserId;
       if (!uid) return [];
-      const { data } = await supabase
+
+      const { data: links, error: linksError } = await supabase
+        .from("student_parents")
+        .select("student_id")
+        .eq("parent_user_id", uid);
+
+      if (linksError) throw linksError;
+
+      const studentIds = Array.from(
+        new Set((links ?? []).map((link) => link.student_id).filter(Boolean))
+      );
+
+      // Keep compatibility with legacy records that may not yet exist in
+      // student_parents. This query is still explicitly scoped to auth.uid().
+      const legacyQuery = supabase
         .from("students")
         .select("id, full_name, matricule, photo_url, class_id, classes(name, level)")
-        .order("full_name");
-      return data ?? [];
+        .eq("parent_user_id", uid);
+
+      let linkedStudents: any[] = [];
+      if (studentIds.length) {
+        const { data, error: linkedError } = await supabase
+          .from("students")
+          .select("id, full_name, matricule, photo_url, class_id, classes(name, level)")
+          .in("id", studentIds);
+        if (linkedError) throw linkedError;
+        linkedStudents = data ?? [];
+      }
+
+      const { data: legacyStudents, error: legacyError } = await legacyQuery;
+      if (legacyError) throw legacyError;
+
+      const merged = new Map<string, any>();
+      for (const student of linkedStudents) merged.set(student.id, student);
+      for (const student of legacyStudents ?? []) merged.set(student.id, student);
+
+      return Array.from(merged.values()).sort((a, b) =>
+        a.full_name.localeCompare(b.full_name, "fr", { sensitivity: "base" })
+      );
     },
   });
 
@@ -76,6 +116,18 @@ function ParentPortal() {
 
       {isLoading ? (
         <p className="text-muted-foreground">Chargement...</p>
+      ) : isError ? (
+        <Card>
+          <CardContent className="py-10 text-center">
+            <p className="text-destructive font-medium">Impossible de charger vos enfants.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Vérifiez votre connexion puis réessayez.
+            </p>
+            {import.meta.env.DEV && error instanceof Error && (
+              <p className="text-xs text-muted-foreground mt-2">{error.message}</p>
+            )}
+          </CardContent>
+        </Card>
       ) : children.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
@@ -431,15 +483,27 @@ function AddChildDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (loading || !code.trim()) return;
+    const normalizedCode = code.trim().toUpperCase();
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(normalizedCode)) {
+      toast.error("Format du code invalide. Utilisez XXXXX-XXXXX.");
+      return;
+    }
     setLoading(true);
     try {
-      await linkFn({ data: { code: code.trim() } });
+      await linkFn({ data: { code: normalizedCode } });
       toast.success("Enfant ajouté à votre compte.");
       qc.invalidateQueries({ queryKey: ["parent-children"] });
       setCode("");
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err?.message ?? "Code invalide ou déjà utilisé.");
+      const message = String(err?.message ?? "");
+      if (/already|duplicate|unique|déjà|utilisé/i.test(message)) {
+        toast.error("Cet enfant est déjà rattaché à votre compte.");
+      } else if (/invalid|invalide|code/i.test(message)) {
+        toast.error("Code invalide, expiré ou déjà utilisé. Demandez un nouveau code à l'école.");
+      } else {
+        toast.error("Impossible de rattacher cet enfant pour le moment. Réessayez.");
+      }
     } finally {
       setLoading(false);
     }

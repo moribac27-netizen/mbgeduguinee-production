@@ -1,5 +1,5 @@
-import { createFileRoute, Link, redirect, useNavigate, useSearch } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { registerSchool } from "@/lib/school-signup.functions";
@@ -11,13 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { School, Sparkles, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
+import { School, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { logLogin } from "@/lib/audit";
 import { resolveUserHome } from "@/lib/auth-redirect";
 
 // Montant fixe configurable (en GNF)
-const STUDENT_FEE = 100000;
+const STUDENT_FEE = 50000;
 
 const emptySignUp = { email: "", password: "", fullName: "", phone: "", schoolName: "", schoolAddress: "", schoolPhone: "" };
 const emptyFamilySignUp = { code: "", email: "", password: "", fullName: "", phone: "", asRole: "parent" as "parent" | "eleve" };
@@ -34,35 +34,34 @@ function formatNumber(n: number) {
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>): { plan?: string; cycle?: "monthly" | "yearly" } => ({
-    ...(s.plan ? { plan: String(s.plan) } : {}),
-    ...(s.cycle === "yearly" || s.cycle === "monthly" ? { cycle: s.cycle } : {}),
-  }),
-  beforeLoad: async ({ search }) => {
+  beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      if (search.plan) throw redirect({ to: "/souscription", search: { plan: search.plan, ...(search.cycle ? { cycle: search.cycle } : {}) } });
-      throw redirect({ to: await resolveUserHome() });
-    }
+    if (data.user) throw redirect({ to: await resolveUserHome() });
   },
   head: () => ({ meta: [{ title: "Connexion — MBGEduGuinée" }] }),
   component: AuthPage,
 });
 
 function AuthPage() {
-  const { plan, cycle } = useSearch({ from: "/auth" });
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [signIn, setSignIn] = useState({ email: "", password: "" });
   const [signUp, setSignUp] = useState(emptySignUp);
   const [familySignUp, setFamilySignUp] = useState(emptyFamilySignUp);
   const [familyMode, setFamilyMode] = useState<"signin" | "signup">("signin");
+  const [resetLoading, setResetLoading] = useState(false);
   const redeemFn = useServerFn(redeemAccessCodeAndSignUp);
 
-  const afterAuth = async () => {
-    if (plan) return navigate({ to: "/souscription", search: { plan, ...(cycle ? { cycle } : {}) } });
-    return navigate({ to: await resolveUserHome(), replace: true });
-  };
+  const afterAuth = async () => navigate({ to: await resolveUserHome(), replace: true });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const type = hash.get("type");
+    if (type === "recovery" || type === "invite") {
+      void navigate({ to: "/definir-mot-de-passe", replace: true });
+    }
+  }, [navigate]);
 
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
@@ -225,9 +224,7 @@ function AuthPage() {
   }
 
   async function handleGoogle() {
-    const dest = plan
-      ? `/auth?plan=${encodeURIComponent(plan)}${cycle ? `&cycle=${cycle}` : ""}`
-      : "/auth";
+    const dest = "/auth";
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin + dest,
     });
@@ -248,13 +245,6 @@ function AuthPage() {
             <div className="text-xs text-muted-foreground mt-1">Gestion scolaire numérique</div>
           </div>
         </Link>
-
-        {plan && (
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/20 text-sm font-medium">
-            <Sparkles className="size-4 text-accent" />
-            Aucun abonnement mensuel — plan <span className="uppercase">{plan}</span>
-          </div>
-        )}
         <Card>
           <CardHeader>
             <CardTitle>Bienvenue</CardTitle>
@@ -272,6 +262,25 @@ function AuthPage() {
                   <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
                   <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
                   <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-xs"
+                    disabled={resetLoading}
+                    onClick={async () => {
+                      const email = signIn.email.trim();
+                      if (!email) return toast.error("Saisissez d’abord votre adresse e-mail.");
+                      setResetLoading(true);
+                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: `${window.location.origin}/definir-mot-de-passe`,
+                      });
+                      setResetLoading(false);
+                      if (error) return toast.error(`Impossible d’envoyer le lien : ${error.message}`);
+                      toast.success("Lien de récupération envoyé. Vérifiez votre boîte e-mail.");
+                    }}
+                  >
+                    {resetLoading ? "Envoi…" : "Mot de passe oublié ?"}
+                  </Button>
                   {unconfirmedEmail && (
                     <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
                       <p className="mb-2">Votre e-mail <span className="font-medium">{unconfirmedEmail}</span> n'est pas encore confirmé.</p>
@@ -297,7 +306,7 @@ function AuthPage() {
                   <div><Label>Nom complet *</Label><Input required value={signUp.fullName} onChange={(e) => setSignUp({ ...signUp, fullName: e.target.value })} /></div>
                   <div><Label>Téléphone</Label><Input value={signUp.phone} onChange={(e) => setSignUp({ ...signUp, phone: e.target.value })} placeholder="+224..." /></div>
                   <div><Label>Email *</Label><Input type="email" required value={signUp.email} onChange={(e) => setSignUp({ ...signUp, email: e.target.value })} /></div>
-                  <div><Label>Mot de passe * (6 caractères min.)</Label><Input type="password" required minLength={6} value={signUp.password} onChange={(e) => setSignUp({ ...signUp, password: e.target.value })} /></div>
+                  <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={signUp.password} onChange={(e) => setSignUp({ ...signUp, password: e.target.value })} /></div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Création en cours..." : "Créer mon établissement"}
                   </Button>
@@ -355,7 +364,7 @@ function AuthPage() {
                     <div><Label>Nom complet *</Label><Input required value={familySignUp.fullName} onChange={(e) => setFamilySignUp({ ...familySignUp, fullName: e.target.value })} /></div>
                     <div><Label>Téléphone</Label><Input value={familySignUp.phone} onChange={(e) => setFamilySignUp({ ...familySignUp, phone: e.target.value })} placeholder="+224..." /></div>
                     <div><Label>Email *</Label><Input type="email" required value={familySignUp.email} onChange={(e) => setFamilySignUp({ ...familySignUp, email: e.target.value })} /></div>
-                    <div><Label>Mot de passe * (6 caractères min.)</Label><Input type="password" required minLength={6} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
+                    <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
 
                     <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-900 dark:text-amber-200">
                       <div className="flex gap-2">

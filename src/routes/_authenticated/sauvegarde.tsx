@@ -27,35 +27,26 @@ export const Route = createFileRoute("/_authenticated/sauvegarde")({
 
 // Tables sauvegardées (ordre = ordre de restauration pour respecter les FK)
 const BACKUP_TABLES = [
-  "schools",
-  "profiles",
-  "user_roles",
-  "subjects",
-  "classes",
-  "rooms",
-  "teachers",
-  "students",
-  "teacher_class_assignments",
-  "schedule_slots",
-  "grades",
-  "exams",
-  "student_attendance",
-  "teacher_attendance",
-  "payments",
-  "financial_accounts",
-  "revenues",
-  "expenses",
-  "employee_contracts",
-  "payslips",
-  "employee_leaves",
-  "library_categories",
-  "library_books",
-  "library_loans",
-  "announcements",
-  "messages",
-  "message_broadcasts",
-  "activity_logs",
+  "schools", "profiles", "user_roles",
+  "subjects", "classes", "rooms", "teachers", "teacher_class_assignments",
+  "students", "student_parents", "student_access_codes",
+  "schedule_slots", "exams", "grades", "student_attendance", "teacher_attendance",
+  "payments", "student_plan_payments", "cotisation_payment_audit",
+  "financial_accounts", "revenues", "expenses",
+  "employee_contracts", "employee_leaves", "payslips",
+  "library_categories", "library_books", "library_loans",
+  "medical_records", "medical_visits", "medicines", "treatments", "accidents",
+  "discipline_incidents",
+  "transport_routes", "transport_buses", "transport_drivers", "transport_subscriptions", "transport_attendance",
+  "canteen_menus", "canteen_subscriptions", "canteen_payments", "canteen_consumption",
+  "nursery_sections", "nursery_children", "nursery_competencies", "nursery_evaluations", "nursery_daily_logs", "nursery_schedule_slots",
+  "announcements", "circulars", "circular_reads", "messages", "message_broadcasts", "notifications",
+  "calendar_events", "school_events", "activity_logs",
+  "backups", "backup_schedules",
 ] as const;
+const SCHOOL_SCOPED_TABLES = new Set<string>([
+  ...BACKUP_TABLES.filter((t) => !["schools", "user_roles", "circular_reads"].includes(t)),
+]);
 
 type BackupRow = {
   id: string;
@@ -135,19 +126,47 @@ function BackupPage() {
 
   useEffect(() => { if (isSuperAdmin) loadAll(); }, [isSuperAdmin]);
 
-  async function snapshotToJSON() {
+  async function snapshotToJSON(targetSchoolId: string) {
     const dump: Record<string, any[]> = {};
     const counts: Record<string, number> = {};
     let total = 0;
+
+    // Les tables globales sont réduites aux enregistrements rattachés à l'école.
+    const { data: schoolProfiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("school_id", targetSchoolId);
+    if (profilesError) throw new Error(`Sauvegarde impossible pour profiles: ${profilesError.message}`);
+    const userIds = (schoolProfiles ?? []).map((r) => r.id);
+
+    const { data: schoolCirculars, error: circularsError } = await supabase
+      .from("circulars")
+      .select("id")
+      .eq("school_id", targetSchoolId);
+    if (circularsError) throw new Error(`Sauvegarde impossible pour circulars: ${circularsError.message}`);
+    const circularIds = (schoolCirculars ?? []).map((r) => r.id);
+
     for (const t of BACKUP_TABLES) {
-      const { data, error } = await supabase.from(t as any).select("*");
-      if (error) {
-        // ignorer les tables inaccessibles au lieu d'échouer l'ensemble
-        dump[t] = [];
-        counts[t] = 0;
-        continue;
+      const rows: any[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        let query = supabase.from(t as any).select("*");
+        if (SCHOOL_SCOPED_TABLES.has(t)) query = query.eq("school_id", targetSchoolId) as any;
+        else if (t === "schools") query = query.eq("id", targetSchoolId) as any;
+        else if (t === "user_roles") {
+          if (!userIds.length) { dump[t] = []; counts[t] = 0; break; }
+          query = query.in("user_id", userIds) as any;
+        } else if (t === "circular_reads") {
+          if (!circularIds.length) { dump[t] = []; counts[t] = 0; break; }
+          query = query.in("circular_id", circularIds) as any;
+        }
+        const { data, error } = await query.range(from, from + pageSize - 1);
+        if (error) throw new Error(`Sauvegarde impossible pour ${t}: ${error.message}`);
+        const page = (data as any[]) ?? [];
+        rows.push(...page);
+        if (page.length < pageSize) break;
       }
-      dump[t] = (data as any[]) ?? [];
+      if (!(t in dump)) dump[t] = rows;
       counts[t] = dump[t].length;
       total += counts[t];
     }
@@ -162,7 +181,7 @@ function BackupPage() {
       const { data: userRes } = await supabase.auth.getUser();
       const createdBy = userRes.user?.id ?? null;
 
-      const { dump, counts, total } = await snapshotToJSON();
+      const { dump, counts, total } = await snapshotToJSON(schoolId);
 
       const payload = {
         version: 1,
@@ -241,7 +260,7 @@ function BackupPage() {
   async function exportFullJSON() {
     setRunning(true);
     try {
-      const { dump, total } = await snapshotToJSON();
+      const { dump, total } = await snapshotToJSON(schoolId!);
       const payload = { version: 1, app: "MBGEduGuinée", school_id: schoolId,
         created_at: new Date().toISOString(), tables: BACKUP_TABLES, data: dump };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -284,8 +303,12 @@ function BackupPage() {
       }
       await logActivity({ action: "update", entity_type: "backup", entity_id: restoreOpen.id,
         entity_label: "Restauration", metadata: { restored, errors: errors.length } });
-      if (errors.length) toast.warning(`Restauration partielle : ${restored} lignes. ${errors.length} erreur(s).`);
-      else toast.success(`Restauration terminée : ${restored} enregistrements`);
+      if (errors.length) {
+        await supabase.from("backups").update({ status: "failed", error_message: errors.join("\n") }).eq("id", restoreOpen.id);
+        toast.error(`Restauration incomplète : ${restored} lignes. ${errors.length} erreur(s).`);
+      } else {
+        toast.success(`Restauration terminée : ${restored} enregistrements`);
+      }
       setRestoreOpen(null);
       setRestoreConfirm("");
       loadAll();

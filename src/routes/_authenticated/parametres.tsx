@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Upload, Save, ImageIcon, Loader2 } from "lucide-react";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 export const Route = createFileRoute("/_authenticated/parametres")({
   head: () => ({ meta: [{ title: "Paramètres — MBGEduGuinée" }] }),
@@ -115,7 +116,7 @@ function SettingsPage() {
         <TabsContent value="academic" className="mt-4">
           <Card><CardHeader><CardTitle>Année et périodes</CardTitle></CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
-              <Field label="Année scolaire en cours"><Input value={form.academic_year ?? ""} onChange={(e) => set("academic_year", e.target.value)} placeholder="2025-2026" /></Field>
+              <Field label="Année scolaire en cours"><Input value={getCurrentAcademicYear()} readOnly aria-readonly="true" /><p className="text-xs text-muted-foreground mt-1">Calculée automatiquement selon la date en Guinée (rentrée le 1er septembre). Les données des années précédentes restent conservées.</p></Field>
               <Field label="Système de périodes">
                 <Select value={form.period_system ?? "trimester"} onValueChange={(v) => set("period_system", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>

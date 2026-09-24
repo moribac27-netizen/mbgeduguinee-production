@@ -233,7 +233,7 @@ function SchoolCard({ student, school, logoUrl }: { student: any; school: any; l
   const photoUrl = useSignedUrl(student.photo_url);
   const primary = school?.theme_primary || "#8B4513";
   const secondary = school?.theme_secondary || "#DAA520";
-  const year = school?.academic_year || "2025-2026";
+  const year = school?.academic_year || "—";
   return (
     <div
       className="school-card relative overflow-hidden rounded-xl border shadow-sm bg-white text-black"

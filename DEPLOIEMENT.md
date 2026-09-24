@@ -52,6 +52,8 @@ l'URL du projet, la clé *publishable/anon*, et la clé *service_role* (secrète
 
 Vercel → Settings → Environment Variables. À définir pour **Production** et **Preview** :
 
+`APP_URL` doit correspondre à l’URL publique de l’application (domaine Vercel ou domaine personnalisé).
+
 | Variable | Valeur |
 | --- | --- |
 | `VITE_SUPABASE_URL` | URL de votre projet Supabase |
@@ -62,6 +64,8 @@ Vercel → Settings → Environment Variables. À définir pour **Production** e
 | `SUPABASE_SERVICE_ROLE_KEY` | clé service_role (**secrète**) |
 
 ⚠️ La clé `service_role` ne doit **jamais** être préfixée par `VITE_`.
+
+⚠️ `SUPABASE_URL`, `VITE_SUPABASE_URL` et toutes les clés Supabase doivent appartenir au **même projet Supabase**. Ne mélangez pas deux `project-ref`.
 
 Puis **Deployments → Redeploy** pour que les variables soient prises en compte.
 
@@ -99,3 +103,34 @@ réimportez-les ensuite dans le nouveau projet. Pour un gros volume, demandez-mo
 Le bouton **Publish** de Lovable met l'application en ligne immédiatement (URL `.lovable.app`,
 domaine personnalisé possible), avec la base, l'authentification et les sauvegardes déjà gérées.
 Vercel n'a d'intérêt que si vous voulez maîtriser vous-même l'hébergement et la base.
+
+## Migration financière MBGEduGuinée — cotisation annuelle unique
+
+Avant mise en production, sauvegarder la base puis appliquer `supabase/migrations/20260921190000_mbg_unique_annual_contribution.sql`.
+Cette migration retire définitivement le modèle d'abonnement établissement et active le modèle 50 000 GNF/élève/an avec seuil de 20 cotisations `VALIDATED`.
+
+## Durcissement production — v6 final
+
+Le dépôt utilise désormais `npm ci` pour des installations reproductibles. La migration
+`supabase/migrations/20260923120000_production_hardening.sql` impose une frontière RLS
+multi-établissement sur toutes les tables portant `school_id`, applique le verrou individuel
+`VALIDATED` aux notes et présences, et conserve le mode `FULL/RESTRICTED` pour les examens.
+
+La sauvegarde automatique utilise la route serveur `/api/cron/backups`. Sur Vercel, le cron
+est déclenché toutes les heures et vérifie les planifications arrivées à échéance. Il faut définir
+`CRON_SECRET` dans Vercel (Production) ; la même valeur doit être secrète et ne doit jamais être
+committée. Les sauvegardes automatiques sont stockées par établissement et la rétention configurée
+est appliquée lors de l'exécution.
+
+Avant le premier déploiement public :
+
+- [ ] Appliquer toutes les migrations Supabase, notamment `20260923120000_production_hardening.sql`.
+- [ ] Vérifier que `school-backups` est un bucket privé.
+- [ ] Définir `CRON_SECRET` dans Vercel.
+- [ ] Vérifier les variables Supabase et qu'elles pointent toutes vers le même projet.
+- [ ] Tester les scénarios 0/19/20/25 cotisations validées.
+- [ ] Tester l'isolation de deux écoles avec des comptes réels.
+- [ ] Tester qu'un élève `PENDING` ne peut pas lire ses notes/présences via l'API directe.
+- [ ] Tester qu'un élève `VALIDATED` peut accéder à son dossier.
+- [ ] Tester une sauvegarde > 1 000 lignes afin de vérifier la pagination.
+- [ ] Tester une restauration sur une base de préproduction avant toute restauration réelle.

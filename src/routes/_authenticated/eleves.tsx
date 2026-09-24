@@ -298,7 +298,7 @@ function DisciplineHistoryDialog({ student, onClose }: { student: any; onClose: 
 
 function StudentDialog({ editing, classes, onClose }: { editing: Student | null; classes: any[]; onClose: () => void }) {
   const [form, setForm] = useState<any>(editing ?? {
-    matricule: "EDG-" + Math.floor(1000 + Math.random() * 9000),
+    matricule: "EDG-" + globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase(),
     full_name: "", gender: "M", birth_date: "", birth_place: "", address: "",
     class_id: "", parent_name: "", parent_phone: "", status: "actif", photo_url: null,
   });

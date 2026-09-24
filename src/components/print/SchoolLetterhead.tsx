@@ -4,58 +4,46 @@ import type { SchoolInfo } from "@/hooks/useSchool";
 interface Props {
   school: SchoolInfo | null;
   logoUrl?: string | null;
-  /** Titre du document (ex : « Bulletin de notes ») */
   title?: string;
-  /** Ligne secondaire (période, mois, référence…) */
   subtitle?: string | null;
   compact?: boolean;
 }
 
-/**
- * En-tête officiel réutilisé par tous les documents imprimables.
- * Toutes les informations proviennent du profil de l'école connectée.
- */
+/** En-tête commun à tous les documents MBGEduGuinée. */
 export function SchoolLetterhead({ school, logoUrl, title, subtitle, compact = false }: Props) {
   const contact = [school?.phone, school?.email].filter(Boolean).join(" · ");
   const place = [school?.address, school?.city].filter(Boolean).join(", ");
   return (
-    <div className={`flex items-center gap-4 border-b-2 border-black ${compact ? "pb-2 mb-3" : "pb-4 mb-4"}`}>
-      <div className={compact ? "size-12 shrink-0" : "size-16 shrink-0"}>
+    <div className={`mbg-letterhead ${compact ? "mbg-letterhead-compact" : ""}`}>
+      <div className="mbg-brand-mark">
         {logoUrl ? (
-          <img src={logoUrl} alt={school?.name ?? "Logo de l'école"} className="size-full object-contain" />
+          <img src={logoUrl} alt={school?.name ?? "Logo de l'établissement"} />
         ) : (
-          <div className="size-full rounded-full bg-black text-white flex items-center justify-center">
-            <School className="size-6" />
-          </div>
+          <div className="mbg-brand-fallback"><School className="size-5" /></div>
         )}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className={`font-bold uppercase leading-tight ${compact ? "text-sm" : "text-base"}`}>
-          {school?.name ?? "Établissement scolaire"}
-        </div>
-        {place && <div className="text-[10px] leading-tight">{place}</div>}
-        {contact && <div className="text-[10px] leading-tight">{contact}</div>}
-        {school?.website && <div className="text-[10px] leading-tight">{school.website}</div>}
+      <div className="mbg-school-meta">
+        <div className="mbg-school-name">{school?.name ?? "Établissement scolaire"}</div>
+        {place && <div>{place}</div>}
+        {contact && <div>{contact}</div>}
+        {school?.website && <div>{school.website}</div>}
       </div>
-      <div className="text-right text-[10px] shrink-0">
-        <div className="font-bold">RÉPUBLIQUE DE GUINÉE</div>
+      <div className="mbg-doc-meta">
+        <div className="mbg-country">RÉPUBLIQUE DE GUINÉE</div>
         <div>Travail — Justice — Solidarité</div>
-        {school?.academic_year && <div className="mt-1">Année scolaire : {school.academic_year}</div>}
-        {title && <div className={`mt-1 font-bold uppercase ${compact ? "text-xs" : "text-sm"}`}>{title}</div>}
+        {school?.academic_year && <div className="mbg-year">Année scolaire : {school.academic_year}</div>}
+        {title && <div className="mbg-document-title">{title}</div>}
         {subtitle && <div>{subtitle}</div>}
       </div>
     </div>
   );
 }
 
-export function SchoolPrintFooter({ school }: { school: SchoolInfo | null }) {
+export function SchoolPrintFooter({ school, documentRef }: { school: SchoolInfo | null; documentRef?: string | null }) {
   return (
-    <div className="text-[9px] text-center mt-6 text-gray-600">
-      {school?.name ?? "Établissement"}
-      {school?.phone ? ` — ${school.phone}` : ""}
-      {school?.receipt_legal_notice ? ` — ${school.receipt_legal_notice}` : ""}
-      {" · Document généré par MBGEduGuinée le "}
-      {new Date().toLocaleDateString("fr-FR")}
+    <div className="mbg-print-footer">
+      <span>{school?.name ?? "Établissement"}{school?.phone ? ` · ${school.phone}` : ""}</span>
+      <span>{documentRef ? `Réf. ${documentRef} · ` : ""}Document généré par MBGEduGuinée le ${new Date().toLocaleDateString("fr-FR")}</span>
     </div>
   );
 }

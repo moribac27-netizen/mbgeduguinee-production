@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { StudentPhoto } from "@/components/StudentPhoto";
 import { BulletinAnalytics } from "@/components/BulletinAnalytics";
 import { BulletinPreviewDialog } from "@/components/BulletinPreviewDialog";
 import { CotisationCard } from "@/components/CotisationCard";
+import { usePerStudentPlan } from "@/hooks/usePerStudentPlan";
 
 export const Route = createFileRoute("/_authenticated/eleve")({
   head: () => ({ meta: [{ title: "Espace Élève — MBGEduGuinée" }] }),
@@ -23,22 +24,35 @@ function fmt(n: number) {
 }
 
 function StudentPortal() {
-  const { data: student, isLoading } = useQuery({
+  const { data: student, isLoading, isError, error } = useQuery({
     queryKey: ["me-student"],
     queryFn: async () => {
-      const { data: user } = await supabase.auth.getUser();
+      const { data: user, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
       const uid = user.user?.id;
       if (!uid) return null;
-      const { data } = await supabase
+      const { data, error: studentError } = await supabase
         .from("students")
         .select("id, full_name, matricule, class_id, photo_url, classes(name, level)")
         .eq("student_user_id", uid)
         .maybeSingle();
+      if (studentError) throw studentError;
       return data;
     },
   });
 
   if (isLoading) return <p className="text-muted-foreground">Chargement...</p>;
+  if (isError) {
+    return (
+      <Card><CardContent className="py-10 text-center">
+        <p className="text-destructive font-medium">Impossible de charger votre espace élève.</p>
+        <p className="text-sm text-muted-foreground mt-1">Vérifiez votre connexion puis réessayez.</p>
+        {import.meta.env.DEV && error instanceof Error && (
+          <p className="text-xs text-muted-foreground mt-2">{error.message}</p>
+        )}
+      </CardContent></Card>
+    );
+  }
   if (!student) {
     return (
       <Card><CardContent className="py-10 text-center text-muted-foreground">
@@ -54,26 +68,44 @@ function StudentDashboard({ student }: { student: any }) {
   const studentId = student.id;
   const [preview, setPreview] = useState(false);
   const max = maxScoreForLevel(student.classes?.level) as 10 | 20;
+  const { info: planInfo, loading: planLoading, error: planError } = usePerStudentPlan();
+  const { data: planPayment, isLoading: planPaymentLoading, error: planPaymentError } = useQuery({
+    queryKey: ["student-plan-payment", studentId, planInfo.academicYear],
+    enabled: !!studentId && !!planInfo.academicYear && planInfo.isPerStudent,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("student_plan_payments")
+        .select("id, status, academic_year, amount, receipt_number, paid_at, reference")
+        .eq("student_id", studentId)
+        .eq("academic_year", planInfo.academicYear)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+  const planCheckLoading = planLoading || planPaymentLoading;
+  const planCheckError = planError || planPaymentError;
+  const contentLocked = !!planCheckError || planCheckLoading || (planInfo.isPerStudent && planPayment?.status !== "VALIDATED");
   const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
-  const { data: grades = [] } = useQuery({
+  const { data: grades = [], error: gradesError } = useQuery({
     queryKey: ["eleve-grades", studentId],
     queryFn: async () => (await supabase.from("grades").select("id, score, period, evaluation_type, created_at, subjects(name, coefficient)").eq("student_id", studentId).order("created_at", { ascending: false })).data ?? [],
   });
-  const { data: payments = [] } = useQuery({
+  const { data: payments = [], error: paymentsError } = useQuery({
     queryKey: ["eleve-payments", studentId],
     queryFn: async () => (await supabase.from("payments").select("id, amount, payment_type, period, payment_method, paid_at, validation_status, receipt_number").eq("student_id", studentId).order("paid_at", { ascending: false })).data ?? [],
   });
-  const { data: attendance = [] } = useQuery({
+  const { data: attendance = [], error: attendanceError } = useQuery({
     queryKey: ["eleve-attendance", studentId],
     queryFn: async () => (await supabase.from("student_attendance").select("id, status, date, justification").eq("student_id", studentId).order("date", { ascending: false }).limit(60)).data ?? [],
   });
-  const { data: schedule = [] } = useQuery({
+  const { data: schedule = [], error: scheduleError } = useQuery({
     queryKey: ["eleve-schedule", student.class_id],
     enabled: !!student.class_id,
     queryFn: async () => (await supabase.from("schedule_slots").select("id, day_of_week, start_time, end_time, subjects(name), rooms(name), teachers(full_name)").eq("class_id", student.class_id).order("day_of_week").order("start_time")).data ?? [],
   });
-  const { data: announcements = [] } = useQuery({
+  const { data: announcements = [], error: announcementsError } = useQuery({
     queryKey: ["eleve-announcements"],
     queryFn: async () => (await supabase.from("announcements").select("id, title, content, created_at").order("created_at", { ascending: false }).limit(10)).data ?? [],
   });
@@ -110,8 +142,26 @@ function StudentDashboard({ student }: { student: any }) {
       />
 
 
+      {planCheckError && (
+        <Card className="border-destructive/30">
+          <CardContent className="py-4">
+            <p className="text-sm font-medium text-destructive">Impossible de vérifier l'état de la cotisation annuelle.</p>
+            <p className="text-xs text-muted-foreground mt-1">Les notes et le bulletin restent temporairement protégés.</p>
+            {import.meta.env.DEV && planCheckError instanceof Error && <p className="text-xs text-muted-foreground mt-2">{planCheckError.message}</p>}
+          </CardContent>
+        </Card>
+      )}
+      {(gradesError || paymentsError || attendanceError || scheduleError || announcementsError) && (
+        <Card className="border-amber-500/30">
+          <CardContent className="py-4">
+            <p className="text-sm font-medium">Certaines données n'ont pas pu être chargées.</p>
+            <p className="text-xs text-muted-foreground mt-1">Les zones concernées sont affichées sans masquer l'erreur.</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={<GraduationCap className="size-4" />} label={`Moyenne ${max === 10 ? "/10" : "/20"}`} value={overall.toFixed(2)} />
+        <Stat icon={<GraduationCap className="size-4" />} label={`Moyenne ${max === 10 ? "/10" : "/20"}`} value={contentLocked ? "—" : overall.toFixed(2)} />
         <Stat icon={<UserCheck className="size-4" />} label="Absences" value={String(absents)} />
         <Stat icon={<CreditCard className="size-4" />} label="Total payé (GNF)" value={fmt(totalPaid)} />
         <Stat icon={<FileText className="size-4" />} label="Notes enregistrées" value={String(grades.length)} />
@@ -128,6 +178,10 @@ function StudentDashboard({ student }: { student: any }) {
         </TabsList>
 
         <TabsContent value="notes">
+          {contentLocked ? (
+            <LockedNotice />
+          ) : (
+          <>
           <Card><CardHeader><CardTitle>Moyennes par matière</CardTitle></CardHeader><CardContent>
             {avgList.length === 0 ? <p className="text-muted-foreground">Aucune note.</p> : (
               <div className="space-y-2">
@@ -149,6 +203,8 @@ function StudentDashboard({ student }: { student: any }) {
               ))}
             </div>
           </CardContent></Card>
+          </>
+          )}
         </TabsContent>
 
         <TabsContent value="paiements">
@@ -205,6 +261,9 @@ function StudentDashboard({ student }: { student: any }) {
         </TabsContent>
 
         <TabsContent value="bulletin">
+          {contentLocked ? (
+            <LockedNotice />
+          ) : (
           <Card><CardHeader><CardTitle>Mon bulletin</CardTitle></CardHeader><CardContent>
             <p className="text-muted-foreground mb-3">Aperçu A4 identique au PDF imprimé.</p>
             <Button onClick={() => setPreview(true)} disabled={!student.class_id} className="gap-2">
@@ -223,6 +282,7 @@ function StudentDashboard({ student }: { student: any }) {
               />
             )}
           </CardContent></Card>
+          )}
         </TabsContent>
 
         <TabsContent value="annonces">
@@ -243,7 +303,16 @@ function StudentDashboard({ student }: { student: any }) {
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function LockedNotice() {
+  return (
+    <Card><CardContent className="py-8 text-center">
+      <p className="font-medium">Notes et bulletin verrouillés</p>
+      <p className="text-sm text-muted-foreground mt-1">La cotisation annuelle doit être validée par l'école pour accéder à ces contenus.</p>
+    </CardContent></Card>
+  );
+}
+
+function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <Card><CardContent className="pt-6">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon} {label}</div>

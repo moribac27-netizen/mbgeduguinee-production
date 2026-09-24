@@ -5,15 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSchool } from "@/hooks/useSchool";
-import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
-import { fmtMoney, fmtNum, fmtDate } from "@/lib/reports";
+import { usePerStudentPlan } from "@/hooks/usePerStudentPlan";
+import { fmtMoney, fmtNum } from "@/lib/reports";
 import { Briefcase, Users, GraduationCap, BookOpen, Baby, Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/directeur")({
   head: () => ({
     meta: [
       { title: "Espace Directeur — MBGEduGuinée" },
-      { name: "description", content: "Vue globale de l'école : effectifs, classes, enseignants, maternelle, finances et abonnement." },
+      { name: "description", content: "Vue globale de l'école : effectifs, classes, enseignants, maternelle, finances et cotisations annuelles." },
       { property: "og:title", content: "Espace Directeur — MBGEduGuinée" },
       { property: "og:description", content: "Tableau de bord de synthèse en lecture seule pour la direction de l'établissement." },
       { property: "og:type", content: "website" },
@@ -27,7 +27,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function DirecteurPage() {
   const { school } = useSchool();
-  const { subscription } = useSubscriptionStatus();
+  const { info: contribution } = usePerStudentPlan();
 
   const { data } = useQuery({
     queryKey: ["directeur-overview"],
@@ -220,20 +220,15 @@ function DirecteurPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Abonnement de l'école</CardTitle>
-            <CardDescription>Statut du compte établissement.</CardDescription>
+            <CardTitle className="text-base">Cotisation annuelle de l'école</CardTitle>
+            <CardDescription>Progression calculée à partir des cotisations VALIDATED.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Statut</span>
-              <Badge variant={subscription?.status === "active" ? "default" : subscription?.status === "expired" ? "destructive" : "secondary"}>
-                {subscription?.status ?? "—"}
-              </Badge>
-            </div>
-            <Row label="Cycle" value={subscription?.billingCycle === "annual" ? "Annuel" : subscription?.billingCycle === "monthly" ? "Mensuel" : "—"} />
-            <Row label="Fin d'essai" value={subscription?.trialEndsAt ? fmtDate(subscription.trialEndsAt) : "—"} />
-            <Row label="Fin de période" value={subscription?.currentPeriodEnd ? fmtDate(subscription.currentPeriodEnd) : "—"} />
-            <Row label="Élèves comptabilisés" value={fmtNum(data?.students ?? 0)} />
+            <div className="flex items-center justify-between"><span className="text-muted-foreground">Accès global</span><Badge variant={contribution.unlocked ? "default" : "secondary"}>{contribution.accessMode}</Badge></div>
+            <Row label="Cotisations validées" value={`${contribution.paidCount} / ${contribution.threshold}`} />
+            <Row label="Restantes" value={fmtNum(contribution.remaining)} />
+            <Row label="Part école" value={fmtMoney(contribution.schoolRevenue)} />
+            <Row label="Montant / élève" value={fmtMoney(contribution.unitPrice)} />
           </CardContent>
         </Card>
       </div>

@@ -20,7 +20,7 @@ function TeachersPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    matricule: "ENS-" + Math.floor(1000 + Math.random() * 9000),
+    matricule: "ENS-" + globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase(),
     full_name: "", phone: "", email: "", subjects: "", monthly_salary: 2000000,
   });
 

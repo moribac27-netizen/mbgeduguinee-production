@@ -6,16 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle2, Clock, XCircle, Loader2, Printer, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { usePerStudentPlan } from "@/hooks/usePerStudentPlan";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
 import { formatGNF, ORANGE_MONEY, orangeMoneyUssdLink } from "@/lib/orange-money";
-import { newCotisationReceiptNumber, printCotisationReceipt } from "@/lib/cotisation-print";
-import { logActivity } from "@/lib/audit";
+import { printCotisationReceipt } from "@/lib/cotisation-print";
 import { registerStudentPayment } from "@/lib/cotisation";
 
 interface Props {
@@ -30,25 +27,24 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
   const meta = usePdfMeta("Cotisation annuelle");
   const [open, setOpen] = useState(false);
   const [reference, setReference] = useState("");
+  const [payerPhone, setPayerPhone] = useState("");
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
 
   const { data: payment, refetch } = useQuery({
     queryKey: ["student-cotisation", studentId, info.academicYear],
-    enabled: !!studentId && !!info.academicYear && info.isPerStudent,
+    enabled: !!studentId && !!info.academicYear,
     queryFn: async () => {
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("student_plan_payments")
         .select("*")
         .eq("student_id", studentId)
         .eq("academic_year", info.academicYear)
         .maybeSingle();
+      if (error) throw error;
       return data ?? null;
     },
   });
-
-  if (!info.isPerStudent) return null;
-
-  const status = payment?.status ?? null; // null | "en_attente" | "paye" | "rejeté"
 
   function receipt(row: any) {
     printCotisationReceipt(meta, {
@@ -67,44 +63,25 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
   }
 
   async function pay() {
-    if (!info.schoolId) return toast.error("Établissement non identifié.");
+    if (!reference.trim()) return toast.error("La référence de transaction est obligatoire.");
     setSaving(true);
-    const { data: u } = await supabase.auth.getUser();
     const res = await registerStudentPayment({
       studentId,
-      schoolId: info.schoolId,
-      academicYear: info.academicYear,
-      amount: info.unitPrice,
-      schoolShare: info.schoolShare,
-      reference: reference || null,
-      paidBy: u.user?.id ?? null,
+      reference: reference.trim(),
+      transferDate: transferDate ? new Date(`${transferDate}T12:00:00`).toISOString() : null,
+      payerPhone: payerPhone.trim() || null,
     });
     setSaving(false);
-
-    if (res.status === "error") {
-      toast.error("Enregistrement impossible", { description: res.error });
-      return;
-    }
-    if (res.status === "already_paid") {
-      setOpen(false);
-      setReference("");
-      toast.info("Paiement déjà validé");
-      receipt(res.row);
-      return;
-    }
-    if (res.status === "already_pending") {
-      setOpen(false);
-      setReference("");
-      toast.info("Un paiement est déjà en attente de validation par l'école.");
-      return;
-    }
-
+    if (res.status === "error") return toast.error("Enregistrement impossible", { description: res.error });
     setOpen(false);
     setReference("");
-    toast.success("Paiement déclaré. Il sera actif dès validation par l'école.");
+    setPayerPhone("");
+    toast.success("Paiement déclaré. Il sera actif uniquement après validation.");
     await refetch();
-    void logActivity({ action: "create", entity_type: "student_plan_payment", entity_id: res.row?.id ?? null, metadata: { mode: "individuel", reference } });
   }
+
+  const status = payment?.status ?? null;
+  const canDeclare = status !== "VALIDATED" && status !== "AWAITING_VALIDATION";
 
   return (
     <Card>
@@ -113,45 +90,36 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
           <Smartphone className="size-4 text-primary" /> Cotisation annuelle {info.academicYear}
         </CardTitle>
         <CardDescription>
-          {formatGNF(info.unitPrice)} par élève et par an. Sans cette cotisation validée, les notes, bulletins et
-          documents de l'élève restent inaccessibles.
+          {formatGNF(info.unitPrice)} par élève et par an. La référence Orange Money est une déclaration, jamais une preuve automatique.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {status === "paye" ? (
+        {status === "VALIDATED" ? (
           <div className="flex flex-wrap items-center gap-3">
-            <Badge className="gap-1"><CheckCircle2 className="size-3" /> Cotisation réglée</Badge>
+            <Badge className="gap-1"><CheckCircle2 className="size-3" /> Cotisation validée</Badge>
             <span className="text-sm text-muted-foreground">Reçu n° {payment.receipt_number ?? "—"}</span>
-            <Button variant="outline" size="sm" onClick={() => receipt(payment)}>
-              <Printer className="size-4 mr-1" /> Imprimer le reçu
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => receipt(payment)}><Printer className="size-4 mr-1" /> Imprimer le reçu</Button>
           </div>
-        ) : status === "en_attente" ? (
+        ) : status === "AWAITING_VALIDATION" ? (
           <div className="space-y-2">
             <Badge variant="secondary" className="gap-1"><Clock className="size-3" /> En attente de validation</Badge>
-            <p className="text-sm text-muted-foreground">
-              Votre paiement a été déclaré{payment.reference ? ` (référence ${payment.reference})` : ""} et sera
-              activé dès vérification par l'école. Les notes et le bulletin restent verrouillés en attendant.
-            </p>
+            <p className="text-sm text-muted-foreground">Référence {payment.reference}. Le dossier reste verrouillé tant que la cotisation n'est pas VALIDATED.</p>
           </div>
         ) : (
           <>
-            {status === "rejeté" && (
+            {status === "REJECTED" && (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
                 <Badge variant="destructive" className="gap-1 mb-1"><XCircle className="size-3" /> Paiement rejeté</Badge>
-                <p className="text-muted-foreground">
-                  {payment?.rejection_reason ? `Motif : ${payment.rejection_reason}` : "Motif non précisé."} Vous pouvez déclarer un nouveau paiement ci-dessous.
-                </p>
+                <p className="text-muted-foreground">{payment?.rejection_reason ? `Motif : ${payment.rejection_reason}` : "Motif non précisé."}</p>
               </div>
             )}
-            {status !== "rejeté" && <Badge variant="destructive">Non payée</Badge>}
+            <Badge variant="destructive">Cotisation non validée</Badge>
             <p className="text-sm text-muted-foreground">
-              Payez {formatGNF(info.unitPrice)} par Orange Money au {ORANGE_MONEY.local} ({ORANGE_MONEY.holder}),
-              puis déclarez le paiement ci-dessous. Il sera vérifié par l'école avant activation.
+              Transférez {formatGNF(info.unitPrice)} par Orange Money au <strong>{ORANGE_MONEY.local}</strong> — {ORANGE_MONEY.holder} — puis déclarez la référence.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" asChild><a href={orangeMoneyUssdLink()}>Composer {ORANGE_MONEY.ussd}</a></Button>
-              <Button onClick={() => setOpen(true)}>Déclarer mon paiement</Button>
+              {canDeclare && <Button onClick={() => setOpen(true)}>Déclarer mon paiement</Button>}
             </div>
           </>
         )}
@@ -162,19 +130,18 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
           <DialogHeader>
             <DialogTitle>Cotisation de {studentName}</DialogTitle>
             <DialogDescription>
-              Montant : {formatGNF(info.unitPrice)} · Année {info.academicYear}. Indiquez la référence de la
-              transaction Orange Money pour accélérer la vérification.
+              Montant fixe : {formatGNF(info.unitPrice)}. Le serveur contrôlera l'élève, l'école et le montant avant création.
             </DialogDescription>
           </DialogHeader>
-          <div>
-            <Label>Référence de la transaction</Label>
-            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Ex. PP250901.1234.A56789" />
+          <div className="space-y-3">
+            <div><Label>Référence de transaction *</Label><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Référence Orange Money" /></div>
+            <div><Label>Numéro Orange Money utilisé</Label><Input value={payerPhone} onChange={(e) => setPayerPhone(e.target.value)} placeholder="Ex. 62 12 34 56 78" inputMode="tel" /></div>
+            <div><Label>Date du transfert</Label><Input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} /></div>
+            <p className="text-xs text-muted-foreground">La saisie de ces informations ne valide pas le paiement. Une vérification par un utilisateur autorisé est obligatoire.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Annuler</Button>
-            <Button onClick={() => void pay()} disabled={saving}>
-              {saving ? <><Loader2 className="size-4 mr-2 animate-spin" /> Envoi…</> : "Déclarer le paiement"}
-            </Button>
+            <Button onClick={() => void pay()} disabled={saving}>{saving ? <><Loader2 className="size-4 mr-2 animate-spin" /> Envoi…</> : "Déclarer le paiement"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

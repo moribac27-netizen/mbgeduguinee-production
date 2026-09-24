@@ -10,17 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as DefinirMotDePasseRouteImport } from './routes/definir-mot-de-passe'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VerifierRecuNumberRouteImport } from './routes/verifier-recu.$number'
 import { Route as AuthenticatedTransportRouteImport } from './routes/_authenticated/transport'
 import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
-import { Route as AuthenticatedSouscriptionRouteImport } from './routes/_authenticated/souscription'
 import { Route as AuthenticatedSauvegardeRouteImport } from './routes/_authenticated/sauvegarde'
 import { Route as AuthenticatedSalairesRouteImport } from './routes/_authenticated/salaires'
 import { Route as AuthenticatedRapportsRouteImport } from './routes/_authenticated/rapports'
 import { Route as AuthenticatedPresencesRouteImport } from './routes/_authenticated/presences'
-import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
 import { Route as AuthenticatedPersonnalisationRecuRouteImport } from './routes/_authenticated/personnalisation-recu'
 import { Route as AuthenticatedParentRouteImport } from './routes/_authenticated/parent'
 import { Route as AuthenticatedParametresRouteImport } from './routes/_authenticated/parametres'
@@ -52,11 +51,15 @@ import { Route as AuthenticatedBulletinsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedBibliothequeRouteImport } from './routes/_authenticated/bibliotheque'
 import { Route as AuthenticatedAnnoncesRouteImport } from './routes/_authenticated/annonces'
 import { Route as AuthenticatedAffectationsRouteImport } from './routes/_authenticated/affectations'
-import { Route as AuthenticatedAbonnementRouteImport } from './routes/_authenticated/abonnement'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DefinirMotDePasseRoute = DefinirMotDePasseRouteImport.update({
+  id: '/definir-mot-de-passe',
+  path: '/definir-mot-de-passe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -83,12 +86,6 @@ const AuthenticatedSuperAdminRoute = AuthenticatedSuperAdminRouteImport.update({
   path: '/super-admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedSouscriptionRoute =
-  AuthenticatedSouscriptionRouteImport.update({
-    id: '/souscription',
-    path: '/souscription',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedSauvegardeRoute = AuthenticatedSauvegardeRouteImport.update({
   id: '/sauvegarde',
   path: '/sauvegarde',
@@ -107,11 +104,6 @@ const AuthenticatedRapportsRoute = AuthenticatedRapportsRouteImport.update({
 const AuthenticatedPresencesRoute = AuthenticatedPresencesRouteImport.update({
   id: '/presences',
   path: '/presences',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPlansRoute = AuthenticatedPlansRouteImport.update({
-  id: '/plans',
-  path: '/plans',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPersonnalisationRecuRoute =
@@ -278,16 +270,10 @@ const AuthenticatedAffectationsRoute =
     path: '/affectations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAbonnementRoute = AuthenticatedAbonnementRouteImport.update({
-  id: '/abonnement',
-  path: '/abonnement',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/abonnement': typeof AuthenticatedAbonnementRoute
+  '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
   '/bibliotheque': typeof AuthenticatedBibliothequeRoute
@@ -319,12 +305,10 @@ export interface FileRoutesByFullPath {
   '/parametres': typeof AuthenticatedParametresRoute
   '/parent': typeof AuthenticatedParentRoute
   '/personnalisation-recu': typeof AuthenticatedPersonnalisationRecuRoute
-  '/plans': typeof AuthenticatedPlansRoute
   '/presences': typeof AuthenticatedPresencesRoute
   '/rapports': typeof AuthenticatedRapportsRoute
   '/salaires': typeof AuthenticatedSalairesRoute
   '/sauvegarde': typeof AuthenticatedSauvegardeRoute
-  '/souscription': typeof AuthenticatedSouscriptionRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/transport': typeof AuthenticatedTransportRoute
   '/verifier-recu/$number': typeof VerifierRecuNumberRoute
@@ -332,7 +316,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/abonnement': typeof AuthenticatedAbonnementRoute
+  '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
   '/bibliotheque': typeof AuthenticatedBibliothequeRoute
@@ -364,12 +348,10 @@ export interface FileRoutesByTo {
   '/parametres': typeof AuthenticatedParametresRoute
   '/parent': typeof AuthenticatedParentRoute
   '/personnalisation-recu': typeof AuthenticatedPersonnalisationRecuRoute
-  '/plans': typeof AuthenticatedPlansRoute
   '/presences': typeof AuthenticatedPresencesRoute
   '/rapports': typeof AuthenticatedRapportsRoute
   '/salaires': typeof AuthenticatedSalairesRoute
   '/sauvegarde': typeof AuthenticatedSauvegardeRoute
-  '/souscription': typeof AuthenticatedSouscriptionRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/transport': typeof AuthenticatedTransportRoute
   '/verifier-recu/$number': typeof VerifierRecuNumberRoute
@@ -379,7 +361,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/abonnement': typeof AuthenticatedAbonnementRoute
+  '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/_authenticated/affectations': typeof AuthenticatedAffectationsRoute
   '/_authenticated/annonces': typeof AuthenticatedAnnoncesRoute
   '/_authenticated/bibliotheque': typeof AuthenticatedBibliothequeRoute
@@ -411,12 +393,10 @@ export interface FileRoutesById {
   '/_authenticated/parametres': typeof AuthenticatedParametresRoute
   '/_authenticated/parent': typeof AuthenticatedParentRoute
   '/_authenticated/personnalisation-recu': typeof AuthenticatedPersonnalisationRecuRoute
-  '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/presences': typeof AuthenticatedPresencesRoute
   '/_authenticated/rapports': typeof AuthenticatedRapportsRoute
   '/_authenticated/salaires': typeof AuthenticatedSalairesRoute
   '/_authenticated/sauvegarde': typeof AuthenticatedSauvegardeRoute
-  '/_authenticated/souscription': typeof AuthenticatedSouscriptionRoute
   '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/transport': typeof AuthenticatedTransportRoute
   '/verifier-recu/$number': typeof VerifierRecuNumberRoute
@@ -426,7 +406,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
-    | '/abonnement'
+    | '/definir-mot-de-passe'
     | '/affectations'
     | '/annonces'
     | '/bibliotheque'
@@ -458,12 +438,10 @@ export interface FileRouteTypes {
     | '/parametres'
     | '/parent'
     | '/personnalisation-recu'
-    | '/plans'
     | '/presences'
     | '/rapports'
     | '/salaires'
     | '/sauvegarde'
-    | '/souscription'
     | '/super-admin'
     | '/transport'
     | '/verifier-recu/$number'
@@ -471,7 +449,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
-    | '/abonnement'
+    | '/definir-mot-de-passe'
     | '/affectations'
     | '/annonces'
     | '/bibliotheque'
@@ -503,12 +481,10 @@ export interface FileRouteTypes {
     | '/parametres'
     | '/parent'
     | '/personnalisation-recu'
-    | '/plans'
     | '/presences'
     | '/rapports'
     | '/salaires'
     | '/sauvegarde'
-    | '/souscription'
     | '/super-admin'
     | '/transport'
     | '/verifier-recu/$number'
@@ -517,7 +493,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
-    | '/_authenticated/abonnement'
+    | '/definir-mot-de-passe'
     | '/_authenticated/affectations'
     | '/_authenticated/annonces'
     | '/_authenticated/bibliotheque'
@@ -549,18 +525,17 @@ export interface FileRouteTypes {
     | '/_authenticated/parametres'
     | '/_authenticated/parent'
     | '/_authenticated/personnalisation-recu'
-    | '/_authenticated/plans'
     | '/_authenticated/presences'
     | '/_authenticated/rapports'
     | '/_authenticated/salaires'
     | '/_authenticated/sauvegarde'
-    | '/_authenticated/souscription'
     | '/_authenticated/super-admin'
     | '/_authenticated/transport'
     | '/verifier-recu/$number'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  DefinirMotDePasseRoute: typeof DefinirMotDePasseRoute
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
@@ -569,6 +544,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/definir-mot-de-passe': {
+      id: '/definir-mot-de-passe'
+      path: '/definir-mot-de-passe'
+      fullPath: '/definir-mot-de-passe'
+      preLoaderRoute: typeof DefinirMotDePasseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -611,13 +593,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSuperAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/souscription': {
-      id: '/_authenticated/souscription'
-      path: '/souscription'
-      fullPath: '/souscription'
-      preLoaderRoute: typeof AuthenticatedSouscriptionRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/sauvegarde': {
       id: '/_authenticated/sauvegarde'
       path: '/sauvegarde'
@@ -644,13 +619,6 @@ declare module '@tanstack/react-router' {
       path: '/presences'
       fullPath: '/presences'
       preLoaderRoute: typeof AuthenticatedPresencesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/plans': {
-      id: '/_authenticated/plans'
-      path: '/plans'
-      fullPath: '/plans'
-      preLoaderRoute: typeof AuthenticatedPlansRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/personnalisation-recu': {
@@ -870,18 +838,10 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAffectationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/abonnement': {
-      id: '/_authenticated/abonnement'
-      path: '/abonnement'
-      fullPath: '/abonnement'
-      preLoaderRoute: typeof AuthenticatedAbonnementRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAbonnementRoute: typeof AuthenticatedAbonnementRoute
   AuthenticatedAffectationsRoute: typeof AuthenticatedAffectationsRoute
   AuthenticatedAnnoncesRoute: typeof AuthenticatedAnnoncesRoute
   AuthenticatedBibliothequeRoute: typeof AuthenticatedBibliothequeRoute
@@ -913,18 +873,16 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedParametresRoute: typeof AuthenticatedParametresRoute
   AuthenticatedParentRoute: typeof AuthenticatedParentRoute
   AuthenticatedPersonnalisationRecuRoute: typeof AuthenticatedPersonnalisationRecuRoute
-  AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedPresencesRoute: typeof AuthenticatedPresencesRoute
   AuthenticatedRapportsRoute: typeof AuthenticatedRapportsRoute
   AuthenticatedSalairesRoute: typeof AuthenticatedSalairesRoute
   AuthenticatedSauvegardeRoute: typeof AuthenticatedSauvegardeRoute
-  AuthenticatedSouscriptionRoute: typeof AuthenticatedSouscriptionRoute
   AuthenticatedSuperAdminRoute: typeof AuthenticatedSuperAdminRoute
   AuthenticatedTransportRoute: typeof AuthenticatedTransportRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAbonnementRoute: AuthenticatedAbonnementRoute,
+
   AuthenticatedAffectationsRoute: AuthenticatedAffectationsRoute,
   AuthenticatedAnnoncesRoute: AuthenticatedAnnoncesRoute,
   AuthenticatedBibliothequeRoute: AuthenticatedBibliothequeRoute,
@@ -957,12 +915,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedParentRoute: AuthenticatedParentRoute,
   AuthenticatedPersonnalisationRecuRoute:
     AuthenticatedPersonnalisationRecuRoute,
-  AuthenticatedPlansRoute: AuthenticatedPlansRoute,
+
   AuthenticatedPresencesRoute: AuthenticatedPresencesRoute,
   AuthenticatedRapportsRoute: AuthenticatedRapportsRoute,
   AuthenticatedSalairesRoute: AuthenticatedSalairesRoute,
   AuthenticatedSauvegardeRoute: AuthenticatedSauvegardeRoute,
-  AuthenticatedSouscriptionRoute: AuthenticatedSouscriptionRoute,
+
   AuthenticatedSuperAdminRoute: AuthenticatedSuperAdminRoute,
   AuthenticatedTransportRoute: AuthenticatedTransportRoute,
 }
@@ -971,6 +929,7 @@ const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  DefinirMotDePasseRoute: DefinirMotDePasseRoute,
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,

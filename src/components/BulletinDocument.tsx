@@ -6,6 +6,7 @@ import { StudentPhoto } from "@/components/StudentPhoto";
 import { BulletinAnalytics } from "@/components/BulletinAnalytics";
 import { SchoolLetterhead, SchoolPrintFooter } from "@/components/print/SchoolLetterhead";
 import { useSchool } from "@/hooks/useSchool";
+import { newDocumentReference } from "@/lib/reports";
 
 export const BULLETIN_PERIODS = [
   { v: "T1", l: "1er Trimestre" },
@@ -16,7 +17,7 @@ export const BULLETIN_PERIODS = [
   { v: "ANNUAL", l: "Année complète" },
 ];
 
-export const SCHOOL_YEAR = "2025-2026";
+export const SCHOOL_YEAR = "—";
 
 export function periodLabel(period: string) {
   return BULLETIN_PERIODS.find((p) => p.v === period)?.l ?? period;
@@ -65,6 +66,7 @@ interface Props {
  */
 export function BulletinDocument({ studentId, classId, period, paged = false }: Props) {
   const { school, logoUrl } = useSchool();
+  const documentRef = useMemo(() => newDocumentReference("BUL"), []);
 
   const { data: cls } = useQuery({
     queryKey: ["bd-class", classId],
@@ -130,7 +132,7 @@ export function BulletinDocument({ studentId, classId, period, paged = false }: 
   }
 
   const inner = (
-    <div className={`bulletin bg-white text-black ${paged ? "p-[12mm]" : "p-8 rounded-lg border shadow-sm max-w-4xl mx-auto"}`}>
+    <div className={`bulletin bg-white text-black ${paged ? "p-[12mm]" : "p-8 rounded-2xl border border-slate-200 shadow-sm max-w-5xl mx-auto"}`}>
       {/* En-tête officiel de l'école (dynamique, multi-tenant) */}
       <SchoolLetterhead
         school={school}
@@ -139,17 +141,22 @@ export function BulletinDocument({ studentId, classId, period, paged = false }: 
         subtitle={periodLabel(period)}
       />
 
-      <div className="text-center mb-4">
-        <h2 className="font-bold text-xl uppercase">Bulletin de notes</h2>
+      <div className="mbg-document-heading print-avoid-break">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-semibold">Document scolaire officiel</div>
+          <h2 className="font-bold text-2xl uppercase text-slate-900 mt-1">Bulletin de notes</h2>
+          <div className="text-xs text-slate-500 mt-1">{periodLabel(period)} · Réf. {documentRef}</div>
+        </div>
+        <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-semibold text-emerald-800">Document généré</div>
       </div>
 
       {/* Student info */}
-      <div className="flex gap-4 mb-4 border border-black p-3">
+      <div className="flex gap-4 mb-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 print-avoid-break">
         <StudentPhoto
           path={selected.student.photo_url}
           name={selected.student.full_name}
           size="lg"
-          className="rounded-md ring-0 border border-black"
+          className="rounded-xl ring-0 border border-slate-200 shadow-sm"
         />
         <div className="grid grid-cols-2 gap-2 text-sm flex-1">
           <div><span className="font-semibold">Nom & Prénom :</span> {selected.student.full_name}</div>
@@ -162,51 +169,51 @@ export function BulletinDocument({ studentId, classId, period, paged = false }: 
       </div>
 
       {/* Grades table */}
-      <table className="w-full text-xs border border-black border-collapse mb-4">
-        <thead className="bg-gray-200">
+      <table className="w-full text-xs border border-slate-200 border-collapse mb-4 overflow-hidden rounded-xl">
+        <thead className="bg-emerald-800 text-white">
           <tr>
-            <th className="border border-black p-2 text-left">Matière</th>
-            <th className="border border-black p-2">Moy.</th>
-            <th className="border border-black p-2">Coef.</th>
-            <th className="border border-black p-2">Moy. × Coef.</th>
-            <th className="border border-black p-2 text-left">Appréciation</th>
+            <th className="border border-white/20 p-2 text-left">Matière</th>
+            <th className="border border-white/20 p-2">Moy.</th>
+            <th className="border border-white/20 p-2">Coef.</th>
+            <th className="border border-white/20 p-2">Moy. × Coef.</th>
+            <th className="border border-white/20 p-2 text-left">Appréciation</th>
           </tr>
         </thead>
         <tbody>
           {selected.perSubject.map((r: any) => (
             <tr key={r.subject.id}>
-              <td className="border border-black p-2">{r.subject.name}</td>
-              <td className="border border-black p-2 text-center">{r.avg != null ? r.avg.toFixed(2) : "—"}</td>
-              <td className="border border-black p-2 text-center">{r.subject.coefficient}</td>
-              <td className="border border-black p-2 text-center">{r.avg != null ? (r.avg * r.subject.coefficient).toFixed(2) : "—"}</td>
-              <td className="border border-black p-2">{r.appreciation}</td>
+              <td className="border border-slate-200 p-2">{r.subject.name}</td>
+              <td className="border border-slate-200 p-2 text-center">{r.avg != null ? r.avg.toFixed(2) : "—"}</td>
+              <td className="border border-slate-200 p-2 text-center">{r.subject.coefficient}</td>
+              <td className="border border-slate-200 p-2 text-center">{r.avg != null ? (r.avg * r.subject.coefficient).toFixed(2) : "—"}</td>
+              <td className="border border-slate-200 p-2">{r.appreciation}</td>
             </tr>
           ))}
-          <tr className="font-bold bg-gray-100">
-            <td className="border border-black p-2">TOTAL</td>
-            <td className="border border-black p-2"></td>
-            <td className="border border-black p-2 text-center">{selected.totalC}</td>
-            <td className="border border-black p-2 text-center">{selected.totalW.toFixed(2)}</td>
-            <td className="border border-black p-2"></td>
+          <tr className="font-bold bg-slate-50">
+            <td className="border border-slate-200 p-2">TOTAL</td>
+            <td className="border border-slate-200 p-2"></td>
+            <td className="border border-slate-200 p-2 text-center">{selected.totalC}</td>
+            <td className="border border-slate-200 p-2 text-center">{selected.totalW.toFixed(2)}</td>
+            <td className="border border-slate-200 p-2"></td>
           </tr>
         </tbody>
       </table>
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-        <div className="border border-black p-3 space-y-1">
+        <div className="rounded-xl border border-slate-200 p-4 space-y-2 bg-white print-avoid-break">
           <div className="flex justify-between"><span className="font-semibold">Moyenne générale :</span> <span className="font-bold text-base">{selected.avg != null ? selected.avg.toFixed(2) : "—"} / {maxScore}</span></div>
           <div className="flex justify-between"><span className="font-semibold">Rang :</span> <span>{selected.rank ?? "—"} / {withRank.length}</span></div>
           <div className="flex justify-between"><span className="font-semibold">Appréciation :</span> <span>{appreciation(selected.avg, maxScore)}</span></div>
         </div>
-        <div className="border border-black p-3 space-y-1">
+        <div className="rounded-xl border border-slate-200 p-4 space-y-2 bg-white print-avoid-break">
           <div className="flex justify-between"><span className="font-semibold">Moyenne de classe :</span> <span>{classAvg != null ? classAvg.toFixed(2) : "—"}</span></div>
           <div className="flex justify-between"><span className="font-semibold">Plus forte moyenne :</span> <span>{topAvg?.toFixed(2) ?? "—"}</span></div>
           <div className="flex justify-between"><span className="font-semibold">Plus faible moyenne :</span> <span>{lowAvg?.toFixed(2) ?? "—"}</span></div>
         </div>
       </div>
 
-      <div className="border border-black p-3 text-sm mb-6">
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm mb-6 print-avoid-break">
         <span className="font-semibold">Décision du conseil de classe : </span>
         <span className="font-bold">{decision(selected.avg, cls.level, maxScore)}</span>
       </div>
@@ -233,8 +240,8 @@ export function BulletinDocument({ studentId, classId, period, paged = false }: 
 
       <SchoolPrintFooter school={school} />
 
-      <div className="text-[10px] text-center mt-2 text-gray-600">
-        Bulletin généré par MBGEduGuinée — {new Date().toLocaleDateString("fr-FR")}
+      <div className="text-[9px] text-center mt-2 text-slate-500">
+        Réf. {documentRef} · Bulletin généré par MBGEduGuinée — {new Date().toLocaleDateString("fr-FR")}
       </div>
     </div>
   );

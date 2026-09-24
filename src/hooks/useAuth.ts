@@ -64,19 +64,35 @@ export function useRoles() {
   const { user, loading: authLoading } = useAuth();
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   useEffect(() => {
     if (authLoading) { setLoading(true); return; }
-    if (!user) { setRoles([]); setLoading(false); return; }
+    if (!user) {
+      setRoles([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    supabase.from("user_roles").select("role").eq("user_id", user.id).then(({ data }) => {
-      setRoles((data ?? []).map((r: any) => r.role));
+    setError(null);
+    supabase.from("user_roles").select("role").eq("user_id", user.id).then(({ data, error: queryError }) => {
+      if (queryError) {
+        setRoles([]);
+        setError(new Error(queryError.message));
+      } else {
+        setRoles((data ?? []).map((r: any) => r.role));
+      }
       setLoading(false);
     });
   }, [user?.id, authLoading]);
-  return { roles, loading };
+  return { roles, loading, error };
 }
 
-const STAFF_ROLES: AppRole[] = ["admin", "directeur", "directeur_etudes", "proviseur", "comptable", "enseignant", "surveillant"];
+const STAFF_ROLES: AppRole[] = [
+  "admin", "directeur", "directeur_etudes", "proviseur", "comptable", "enseignant",
+  "surveillant", "secretariat", "bibliothecaire", "infirmerie", "educatrice_maternelle",
+  "responsable_transport", "responsable_cantine", "rh",
+];
 
 export function primaryRole(roles: AppRole[]): AppRole | null {
   if (roles.length === 0) return null;
@@ -89,6 +105,13 @@ export function primaryRole(roles: AppRole[]): AppRole | null {
 export function homeForRole(role: AppRole | null): string {
   if (role === "parent") return "/parent";
   if (role === "eleve") return "/eleve";
+  if (role === "directeur_etudes" || role === "proviseur") return "/direction-etudes";
+  if (role === "rh") return "/salaires";
+  if (role === "secretariat") return "/eleves";
+  if (role === "bibliothecaire") return "/bibliotheque";
+  if (role === "infirmerie") return "/infirmerie";
+  if (role === "responsable_transport") return "/transport";
+  if (role === "responsable_cantine") return "/cantine";
   return "/dashboard";
 }
 

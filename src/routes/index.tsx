@@ -1,597 +1,229 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
-  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
-  School, Users, GraduationCap, BookOpen, ClipboardList, CalendarClock,
-  CalendarCheck, CreditCard, Wallet, UtensilsCrossed, Library, Bus,
-  Megaphone, Check, X, ArrowRight, Sparkles, Loader2,
-  UserPlus, ShieldCheck, Receipt, Wallet as WalletIcon, TrendingUp, AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  Bus,
+  CalendarCheck,
+  CalendarClock,
+  Check,
+  ChevronRight,
+  ClipboardList,
+  CreditCard,
+  GraduationCap,
+  LayoutDashboard,
+  Library,
+  LockKeyhole,
+  Megaphone,
+  Receipt,
+  School,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  Users,
+  UtensilsCrossed,
+  Wallet,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { SubscriptionHistory } from "@/components/SubscriptionHistory";
-import { toast } from "sonner";
-
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MBGEduGuinée — Gestion scolaire numérique en Guinée" },
-      { name: "description", content: "Plateforme complète pour écoles primaires, collèges, lycées et centres de formation. Élèves, notes, paiements, communication." },
-      { property: "og:title", content: "MBGEduGuinée — Gestion scolaire numérique" },
-      { property: "og:description", content: "Digitalisez votre établissement scolaire en Guinée." },
+      { title: "MBGEduGuinée — Gestion scolaire numérique" },
+      {
+        name: "description",
+        content:
+          "MBGEduGuinée centralise la gestion des établissements, des élèves, des notes, des présences, des paiements et de la communication en Guinée.",
+      },
     ],
   }),
   component: Landing,
 });
 
-const FEATURES = [
-  { icon: Users, title: "Gestion des élèves", desc: "Inscriptions, dossiers, classes, photos." },
-  { icon: GraduationCap, title: "Enseignants", desc: "Matières, emploi du temps, salaires." },
-  { icon: BookOpen, title: "Classes", desc: "Organisation, effectifs, niveaux." },
-  { icon: ClipboardList, title: "Notes & bulletins", desc: "Moyennes, classement, bulletins PDF." },
-  { icon: CalendarClock, title: "Emploi du temps", desc: "Planning par classe et enseignant." },
-  { icon: CalendarCheck, title: "Présences", desc: "Appel quotidien, retards, absences." },
-  { icon: CreditCard, title: "Paiements", desc: "Frais, reçus, relances automatiques." },
-  { icon: Wallet, title: "Comptabilité", desc: "Dépenses, solde, rapports financiers." },
-  { icon: UtensilsCrossed, title: "Cantine", desc: "Suivi des repas et inscriptions." },
-  { icon: Library, title: "Bibliothèque", desc: "Gestion des ouvrages et emprunts." },
-  { icon: Bus, title: "Transport", desc: "Suivi des circuits scolaires." },
-  { icon: Megaphone, title: "Communication", desc: "Annonces, notifications aux parents." },
+const FEATURE_GROUPS = [
+  {
+    title: "Pédagogie & suivi",
+    desc: "Les outils du quotidien pour suivre la scolarité et organiser les équipes.",
+    items: [
+      { icon: Users, title: "Gestion des élèves", desc: "Inscriptions, dossiers, classes et photos." },
+      { icon: GraduationCap, title: "Enseignants", desc: "Matières, emplois du temps et salaires." },
+      { icon: BookOpen, title: "Classes", desc: "Organisation, niveaux et effectifs." },
+      { icon: ClipboardList, title: "Notes & bulletins", desc: "Moyennes, classements et bulletins PDF." },
+      { icon: CalendarClock, title: "Emploi du temps", desc: "Planning par classe et enseignant." },
+      { icon: CalendarCheck, title: "Présences", desc: "Appel quotidien, retards et absences." },
+    ],
+  },
+  {
+    title: "Administration & finances",
+    desc: "Une vision plus claire des opérations administratives et financières.",
+    items: [
+      { icon: CreditCard, title: "Cotisations", desc: "Cotisation annuelle de 50 000 GNF par élève." },
+      { icon: Wallet, title: "Comptabilité", desc: "Dépenses, soldes et rapports financiers." },
+      { icon: Receipt, title: "Suivi des paiements", desc: "Déclarations, validations et contrôle des accès." },
+      { icon: LockKeyhole, title: "Accès par rôle", desc: "Chaque espace est adapté à la fonction de l'utilisateur." },
+    ],
+  },
+  {
+    title: "Vie scolaire",
+    desc: "Les services qui prolongent l'expérience de l'établissement.",
+    items: [
+      { icon: UtensilsCrossed, title: "Cantine", desc: "Suivi des repas et inscriptions." },
+      { icon: Library, title: "Bibliothèque", desc: "Gestion des ouvrages et emprunts." },
+      { icon: Bus, title: "Transport", desc: "Suivi des circuits scolaires." },
+      { icon: Megaphone, title: "Communication", desc: "Annonces et notifications aux parents." },
+    ],
+  },
+];
+
+const AUDIENCES = [
+  { icon: School, title: "Direction", desc: "Pilotez l'établissement avec une vue centralisée des élèves, équipes, activités et finances." },
+  { icon: GraduationCap, title: "Enseignants", desc: "Retrouvez les classes, notes, présences et emplois du temps dans un même environnement." },
+  { icon: Wallet, title: "Secrétariat & comptabilité", desc: "Structurez les dossiers, paiements, cotisations et opérations administratives." },
+  { icon: Users, title: "Parents & élèves", desc: "Accédez aux espaces scolaires prévus pour suivre la scolarité et les informations disponibles." },
 ];
 
 const STEPS = [
-  { icon: UserPlus, title: "Créez votre établissement", desc: "Inscription en quelques minutes, sans carte bancaire." },
-  { icon: Users, title: "Ajoutez vos élèves", desc: "Import ou saisie manuelle, classes et informations complètes." },
-  { icon: CreditCard, title: "Vos élèves/parents paient", desc: "Paiement individuel ou groupé, en toute transparence." },
-  { icon: ShieldCheck, title: "Accès complet débloqué", desc: "Dès le seuil atteint, toutes les fonctionnalités s'activent." },
-];
-
-const PREVIEW_STATS = [
-  { icon: Users, label: "Élèves inscrits", value: "482" },
-  { icon: GraduationCap, label: "Enseignants", value: "24" },
-  { icon: BookOpen, label: "Classes", value: "18" },
-  { icon: Receipt, label: "Paiements du jour", value: "1 250 000 GNF" },
-  { icon: WalletIcon, label: "Solde actuel", value: "8 430 000 GNF" },
-  { icon: CalendarCheck, label: "Présence aujourd'hui", value: "96%" },
+  { icon: UserPlus, title: "Créez votre établissement", desc: "Inscription et configuration de votre école ou centre de formation." },
+  { icon: Users, title: "Ajoutez vos élèves", desc: "Import ou saisie manuelle des élèves et de leurs classes." },
+  { icon: CreditCard, title: "Déclarez les cotisations", desc: "50 000 GNF par élève et par année scolaire, individuellement ou en groupe." },
+  { icon: ShieldCheck, title: "Suivez l'accès", desc: "20 cotisations VALIDATED activent le mode FULL de l'établissement." },
 ];
 
 const FAQ = [
-  { q: "Comment fonctionne le plan par élève ?", a: "Aucun abonnement mensuel fixe. Chaque élève inscrit règle un tarif annuel, individuellement ou via l'école. Votre école touche une part sur chaque élève payé, et l'accès complet s'active dès qu'un seuil d'élèves payés est atteint. Créez votre compte pour voir le détail exact." },
-  { q: "Quels moyens de paiement acceptez-vous ?", a: "Nous préparons l'intégration Orange Money, Mobile Money (MTN/Moov), Stripe (carte bancaire) et PayPal. Vous pouvez actuellement souscrire depuis votre espace et notre équipe vous accompagne pour la première facturation." },
-  { q: "Que se passe-t-il avant que le seuil d'élèves payés soit atteint ?", a: "Vous pouvez créer votre établissement, configurer votre école et commencer à enregistrer vos élèves immédiatement. L'accès complet aux modules se débloque automatiquement une fois le seuil de paiements atteint." },
-  { q: "Mes données sont-elles sécurisées ?", a: "Chaque école est isolée par des politiques strictes (multi-tenant + RLS). Les sauvegardes sont automatiques et chiffrées." },
-  { q: "Proposez-vous une formation ?", a: "Oui. La souscription inclut une prise en main et un accompagnement personnalisé pour votre équipe." },
+  { q: "Quel est le modèle financier ?", a: "Le modèle unique est la cotisation annuelle de 50 000 GNF par élève et par année scolaire. Aucun abonnement fixe d'établissement n'est requis dans ce modèle." },
+  { q: "Comment fonctionne le seuil de 20 ?", a: "Le compteur global utilise uniquement les cotisations au statut VALIDATED. De 0 à 19, l'établissement reste en mode RESTRICTED ; à partir de 20, il passe en mode FULL." },
+  { q: "Un élève est-il automatiquement débloqué à 20 cotisations ?", a: "Non. Le seuil global et le dossier individuel sont indépendants. Le dossier d'un élève reste verrouillé tant que sa propre cotisation n'est pas VALIDATED." },
+  { q: "Comment payer avec Orange Money ?", a: "Le transfert se fait vers le 628 49 98 12, bénéficiaire MBGEduGuinée, via #144#. La référence déclarée est ensuite contrôlée ; elle ne constitue pas à elle seule une preuve automatique de paiement." },
+  { q: "Qui peut utiliser MBGEduGuinée ?", a: "La plateforme est conçue pour la Maternelle, les écoles primaires, collèges, lycées et centres de formation, avec des espaces adaptés aux différents rôles." },
+  { q: "Les données des établissements sont-elles séparées ?", a: "L'application prévoit une séparation des données par établissement, des contrôles d'accès par rôle et des vérifications côté serveur pour les opérations sensibles." },
 ];
 
-type Plan = {
-  id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  price_monthly: number;
-  price_yearly?: number | null;
-  currency: string;
-  student_limit: number | null;
-  features: string[];
-  is_popular: boolean;
-  display_order: number;
-};
-
-type CurrentSub = {
-  id: string;
-  status: string;
-  trial_ends_at: string | null;
-  current_period_end: string;
-  plan: { name: string; code: string } | null;
-} | null;
-
-function formatPrice(v: number) {
-  return new Intl.NumberFormat("fr-FR").format(v);
+function LoginChoice({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="login-choice-title">
+      <button className="absolute inset-0 cursor-default" aria-label="Fermer" onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-2xl sm:p-7">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+            <School className="size-6" />
+          </div>
+          <h2 id="login-choice-title" className="font-display text-2xl font-bold">Accéder à MBGEduGuinée</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Choisissez votre espace</p>
+        </div>
+        <div className="grid gap-3">
+          <Link to="/auth" onClick={onClose} className="group rounded-xl border p-4 transition hover:border-primary/40 hover:bg-muted/40">
+            <div className="flex items-center gap-4"><span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><School className="size-5" /></span><span className="min-w-0 flex-1"><strong className="block">Établissement</strong><span className="text-sm text-muted-foreground">Direction, enseignants et personnel</span></span><ChevronRight className="size-5 text-muted-foreground transition group-hover:translate-x-1" /></div>
+          </Link>
+          <Link to="/auth" onClick={onClose} className="group rounded-xl border p-4 transition hover:border-primary/40 hover:bg-muted/40">
+            <div className="flex items-center gap-4"><span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-secondary-foreground"><Users className="size-5" /></span><span className="min-w-0 flex-1"><strong className="block">Parent / Tuteur</strong><span className="text-sm text-muted-foreground">Suivre la scolarité de vos enfants</span></span><ChevronRight className="size-5 text-muted-foreground transition group-hover:translate-x-1" /></div>
+          </Link>
+          <Link to="/auth" onClick={onClose} className="group rounded-xl border p-4 transition hover:border-primary/40 hover:bg-muted/40">
+            <div className="flex items-center gap-4"><span className="flex size-11 items-center justify-center rounded-xl bg-muted text-primary"><GraduationCap className="size-5" /></span><span className="min-w-0 flex-1"><strong className="block">Élève</strong><span className="text-sm text-muted-foreground">Accéder à votre espace scolaire</span></span><ChevronRight className="size-5 text-muted-foreground transition group-hover:translate-x-1" /></div>
+          </Link>
+        </div>
+        <div className="mt-6 border-t pt-5 text-center text-sm">
+          <Link to="/auth" onClick={onClose} className="font-medium text-primary hover:underline">Vous n'avez pas encore accès ? Demander un accès</Link>
+        </div>
+        <button onClick={onClose} className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-muted" aria-label="Fermer">×</button>
+      </div>
+    </div>
+  );
 }
-function formatDate(v: string | null) {
-  if (!v) return "—";
-  return new Date(v).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+
+function DashboardPreview() {
+  return (
+    <div className="relative mx-auto w-full max-w-2xl">
+      <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-primary/10 blur-3xl" />
+      <div className="overflow-hidden rounded-2xl border bg-card shadow-2xl ring-1 ring-black/5">
+        <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-3">
+          <div className="flex items-center gap-2"><div className="size-2 rounded-full bg-destructive/60" /><div className="size-2 rounded-full bg-warning/70" /><div className="size-2 rounded-full bg-success/70" /></div>
+          <div className="text-xs font-medium text-muted-foreground">Aperçu de votre espace</div>
+          <LayoutDashboard className="size-4 text-primary" />
+        </div>
+        <div className="grid md:grid-cols-[180px_1fr]">
+          <div className="hidden border-r bg-muted/20 p-4 md:block">
+            <div className="mb-5 flex items-center gap-2 font-semibold"><span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"><School className="size-4" /></span> MBGEduGuinée</div>
+            <div className="space-y-2 text-xs text-muted-foreground">
+              {['Tableau de bord', 'Élèves', 'Classes', 'Notes', 'Présences', 'Paiements'].map((item, index) => <div key={item} className={`rounded-lg px-3 py-2 ${index === 0 ? 'bg-primary/10 font-medium text-primary' : ''}`}>{item}</div>)}
+            </div>
+          </div>
+          <div className="p-4 sm:p-5">
+            <div className="mb-5 flex items-center justify-between"><div><div className="text-xs text-muted-foreground">Tableau de bord</div><div className="font-display text-xl font-bold">Vue de l'établissement</div></div><Badge variant="secondary">Espace sécurisé</Badge></div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[{ label: 'Élèves', icon: Users }, { label: 'Classes', icon: School }, { label: 'Notes', icon: ClipboardList }, { label: 'Paiements', icon: CreditCard }].map(({ label, icon: Icon }) => <div key={label} className="rounded-xl border p-3"><Icon className="mb-2 size-4 text-primary" /><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 h-2 w-14 rounded bg-muted" /></div>)}
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border p-4 sm:col-span-2"><div className="mb-4 flex items-center justify-between"><span className="font-semibold">Suivi scolaire</span><span className="text-xs text-muted-foreground">Cette année</span></div><div className="space-y-3">{['Élèves et classes', 'Présences', 'Notes & bulletins'].map((item) => <div key={item} className="flex items-center gap-3"><div className="size-2 rounded-full bg-primary" /><span className="text-sm">{item}</span><div className="ml-auto h-2 w-20 rounded bg-muted" /></div>)}</div></div>
+              <div className="rounded-xl border bg-primary/[0.04] p-4"><Receipt className="mb-3 size-5 text-primary" /><div className="text-xs text-muted-foreground">Cotisation annuelle</div><div className="mt-1 font-display text-lg font-bold">50 000 GNF</div><div className="mt-2 text-xs text-muted-foreground">par élève / an</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Landing() {
-  const navigate = useNavigate();
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [schoolId, setSchoolId] = useState<string | null>(null);
-  const [currentSub, setCurrentSub] = useState<CurrentSub>(null);
-  const [renewOpen, setRenewOpen] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [renewPlanId, setRenewPlanId] = useState<string>("");
-  const [renewCycle, setRenewCycle] = useState<"monthly" | "yearly">("monthly");
-  const [renewing, setRenewing] = useState(false);
-  const [renewError, setRenewError] = useState<string | null>(null);
-  const [historyKey, setHistoryKey] = useState(0);
-  const [publicCycle, setPublicCycle] = useState<"monthly" | "yearly">("monthly");
-
-  async function refreshSubscription(sid: string) {
-    const { data: sub } = await (supabase as any)
-      .from("school_subscriptions")
-      .select("id,status,trial_ends_at,current_period_end,plan:subscription_plans(name,code)")
-      .eq("school_id", sid)
-      .maybeSingle();
-    setCurrentSub(sub ?? null);
-    return sub ?? null;
-  }
-
-  async function confirmRenew() {
-    if (!renewPlanId) return;
-    setRenewing(true);
-    setRenewError(null);
-    try {
-      const code = plans.find((p) => p.id === renewPlanId)?.code;
-      setConfirmOpen(false);
-      setRenewOpen(false);
-      toast.info("Réglez votre abonnement par Orange Money pour l'activer.");
-      navigate({ to: "/souscription", search: code ? { plan: code } : {} });
-    } finally {
-      setRenewing(false);
-    }
-  }
-
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await (supabase as any)
-        .from("subscription_plans")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order", { ascending: true });
-      setPlans(
-        (data ?? []).map((p: any) => ({
-          ...p,
-          features: Array.isArray(p.features) ? p.features : [],
-        })),
-      );
-      setLoading(false);
-    })();
-
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      setUserId(u.user.id);
-      const { data: prof } = await supabase
-        .from("profiles").select("school_id").eq("id", u.user.id).maybeSingle();
-      if (!prof?.school_id) return;
-      setSchoolId(prof.school_id);
-      await refreshSubscription(prof.school_id);
-    })();
-  }, []);
-
-
-  function handleChoose(planCode: string) {
-    const search = { plan: planCode, cycle: publicCycle } as any;
-    if (userId) {
-      navigate({ to: "/souscription", search });
-    } else {
-      navigate({ to: "/auth", search });
-    }
-  }
-
-  // Build comparison rows: union of features across plans
-  const allFeatures = Array.from(
-    new Set(plans.flatMap((p) => p.features)),
-  );
+  const [loginOpen, setLoginOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
-              <School className="size-5" />
-            </div>
-            <div>
-              <div className="font-display font-bold text-lg leading-none">MBGEduGuinée</div>
-              <div className="text-xs text-muted-foreground mt-1">Gestion scolaire</div>
-            </div>
-          </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm">
-            <a href="#fonctionnalites" className="text-muted-foreground hover:text-foreground">Fonctionnalités</a>
-            <a href="#tarifs" className="text-muted-foreground hover:text-foreground">Tarifs</a>
-            <a href="#faq" className="text-muted-foreground hover:text-foreground">FAQ</a>
-          </nav>
-          <div className="flex items-center gap-2">
-            {userId ? (
-              <Link to="/dashboard"><Button size="sm">Mon espace</Button></Link>
-            ) : (
-              <>
-                <Link to="/auth"><Button variant="ghost" size="sm">Connexion</Button></Link>
-                <Link to="/auth"><Button size="sm">Commencer</Button></Link>
-              </>
-            )}
-          </div>
+      <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:px-8">
+          <Link to="/" className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><School className="size-5" /></div><div><div className="font-display font-bold leading-none">MBGEduGuinée</div><div className="mt-1 text-xs text-muted-foreground">Gestion scolaire</div></div></Link>
+          <nav className="hidden items-center gap-6 text-sm font-medium text-muted-foreground lg:flex"><a href="#fonctionnalites" className="hover:text-foreground">Fonctionnalités</a><a href="#comment-ca-marche" className="hover:text-foreground">Comment ça marche</a><a href="#tarifs" className="hover:text-foreground">Tarifs</a><a href="#faq" className="hover:text-foreground">FAQ</a></nav>
+          <div className="flex items-center gap-2"><Button variant="ghost" onClick={() => setLoginOpen(true)}>Connexion</Button><Button asChild className="hidden sm:inline-flex"><Link to="/auth">Créer mon établissement <ArrowRight className="ml-2 size-4" /></Link></Button></div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/10 pointer-events-none" />
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 py-20 lg:py-28 relative">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/20 text-sm font-medium mb-6">
-              <span className="size-2 rounded-full bg-accent" />
-              Conçu pour les écoles guinéennes
+      <main>
+        <section className="overflow-hidden border-b bg-gradient-to-b from-primary/[0.07] via-background to-background">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 lg:grid-cols-[0.92fr_1.08fr] lg:px-8 lg:py-24">
+            <div>
+              <Badge variant="secondary" className="mb-5 gap-2 px-3 py-1.5"><Sparkles className="size-3.5 text-primary" /> Une plateforme pensée pour l'école</Badge>
+              <h1 className="max-w-2xl font-display text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">La gestion scolaire qui <span className="text-primary">simplifie</span> le quotidien de votre établissement.</h1>
+              <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">MBGEduGuinée digitalise inscriptions, notes, paiements, comptabilité et communication. La Maternelle, écoles primaires, collèges, lycées et centres de formation.</p>
+              <div className="mt-8 flex flex-wrap gap-3"><Button size="lg" asChild><Link to="/auth">Créer mon établissement <ArrowRight className="ml-2 size-4" /></Link></Button><Button size="lg" variant="outline" onClick={() => setLoginOpen(true)}>Accéder à mon espace</Button></div>
+              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground"><span className="flex items-center gap-2"><Check className="size-4 text-primary" /> Maternelle à formation</span><span className="flex items-center gap-2"><Check className="size-4 text-primary" /> Paiements contrôlés</span><span className="flex items-center gap-2"><Check className="size-4 text-primary" /> Accès par rôle</span></div>
             </div>
-            <h1 className="font-display text-4xl md:text-6xl font-bold tracking-tight">
-              La gestion scolaire qui simplifie le quotidien de votre établissement.
-            </h1>
-            <p className="mt-6 text-lg text-muted-foreground max-w-2xl">
-              MBGEduGuinée digitalise inscriptions, notes, paiements, comptabilité et communication.
-              Écoles primaires, collèges, lycées et centres de formation.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/auth">
-                <Button size="lg" className="gap-2">Commencer maintenant <ArrowRight className="size-4" /></Button>
-              </Link>
-              <a href="#tarifs"><Button size="lg" variant="outline">Voir les tarifs</Button></a>
-            </div>
+            <DashboardPreview />
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Features */}
-      <section id="fonctionnalites" className="py-20 border-t">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6">
-          <div className="max-w-2xl mb-12">
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Tout votre établissement, en un seul endroit.</h2>
-            <p className="mt-4 text-muted-foreground">Des outils pensés pour les directeurs, enseignants, parents et élèves.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {FEATURES.map((f) => {
-              const Icon = f.icon;
-              return (
-                <div key={f.title} className="p-6 rounded-xl border bg-card hover:border-primary/40 transition-colors">
-                  <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4"><Icon className="size-5" /></div>
-                  <h3 className="font-display font-semibold text-lg">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{f.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+        <section className="border-b bg-card"><div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:grid-cols-3 lg:px-8"><div className="flex items-center gap-3"><ShieldCheck className="size-5 text-primary" /><div><div className="text-sm font-semibold">Contrôles d'accès</div><div className="text-xs text-muted-foreground">Rôles et vérifications côté serveur</div></div></div><div className="flex items-center gap-3"><School className="size-5 text-primary" /><div><div className="text-sm font-semibold">Pour tous les niveaux</div><div className="text-xs text-muted-foreground">Maternelle, primaire, collège, lycée, formation</div></div></div><div className="flex items-center gap-3"><Receipt className="size-5 text-primary" /><div><div className="text-sm font-semibold">Un modèle simple</div><div className="text-xs text-muted-foreground">50 000 GNF par élève et par an</div></div></div></div></section>
 
-      {/* How it works */}
-      <section className="py-20 border-t bg-muted/30">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Comment ça marche</h2>
-            <p className="mt-4 text-muted-foreground">Démarrez en quelques étapes simples.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {STEPS.map((s, i) => {
-              const Icon = s.icon;
-              return (
-                <div key={s.title} className="relative text-center">
-                  <div className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center mx-auto mb-4 font-display font-bold text-lg">
-                    {i + 1}
-                  </div>
-                  <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3"><Icon className="size-5" /></div>
-                  <h3 className="font-display font-semibold">{s.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{s.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+        <section className="mx-auto max-w-7xl px-4 py-20 lg:px-8" id="fonctionnalites">
+          <div className="max-w-2xl"><Badge variant="outline">Une seule plateforme</Badge><h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Tout ce qu'il faut pour piloter l'école</h2><p className="mt-4 text-muted-foreground">Des modules organisés autour des vrais besoins de l'établissement, sans multiplier les outils.</p></div>
+          <div className="mt-10 space-y-10">{FEATURE_GROUPS.map((group) => <div key={group.title}><div className="mb-5"><h3 className="font-display text-xl font-bold">{group.title}</h3><p className="mt-1 text-sm text-muted-foreground">{group.desc}</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{group.items.map((f) => { const Icon = f.icon; return <Card key={f.title} className="hover-lift border-border/80"><CardContent className="p-5"><div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="size-5" /></div><div className="font-semibold">{f.title}</div><p className="mt-1 text-sm leading-6 text-muted-foreground">{f.desc}</p></CardContent></Card>; })}</div></div>)}</div>
+        </section>
 
-      {/* Product preview */}
-      <section className="py-20 border-t">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Un tableau de bord clair et complet</h2>
-            <p className="mt-4 text-muted-foreground">Toutes les informations de votre établissement, en un coup d'œil.</p>
-          </div>
-          <div className="rounded-2xl border bg-card p-4 sm:p-8 shadow-lg max-w-4xl mx-auto">
-            <div className="flex items-center gap-2 mb-6">
-              <span className="size-3 rounded-full bg-destructive/60" />
-              <span className="size-3 rounded-full bg-accent/60" />
-              <span className="size-3 rounded-full bg-primary/60" />
-              <div className="ml-4 flex-1 h-6 rounded bg-muted flex items-center px-3">
-                <span className="text-xs text-muted-foreground">mbgeduguinee-production-n44w.vercel.app/dashboard</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 mb-6 p-4 rounded-xl bg-muted/40">
-              <div className="size-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-display font-bold text-lg">É</div>
-              <div>
-                <div className="font-display font-semibold">École Les Palmiers</div>
-                <div className="text-xs text-muted-foreground">Conakry, Guinée</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-              {PREVIEW_STATS.map((s) => {
-                const Icon = s.icon;
-                return (
-                  <div key={s.label} className="p-4 rounded-xl bg-muted/60">
-                    <Icon className="size-5 text-primary mb-2" />
-                    <div className="text-lg font-bold font-display">{s.value}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 text-xs text-primary font-medium">
-              <span className="flex items-center gap-1"><TrendingUp className="size-3.5" /> Croissance stable des inscriptions ce mois</span>
-              <span className="flex items-center gap-1"><AlertTriangle className="size-3.5" /> 3 retards de paiement à relancer</span>
-            </div>
-          </div>
-          <p className="text-center text-xs text-muted-foreground mt-4">Aperçu illustratif — les données affichées sont des exemples.</p>
-        </div>
-      </section>
+        <section className="border-y bg-muted/30"><div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-20 lg:grid-cols-2 lg:px-8"><div><Badge variant="secondary">Une vision centralisée</Badge><h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Moins de dispersion. Plus de visibilité.</h2><p className="mt-4 max-w-xl leading-7 text-muted-foreground">MBGEduGuinée réunit les informations scolaires, administratives et financières dans des espaces adaptés aux différents utilisateurs de l'établissement.</p><div className="mt-7 space-y-4">{["Une plateforme unique pour les opérations scolaires.", "Des espaces adaptés aux rôles de l'établissement.", "Un suivi structuré des cotisations et des accès.", "Une expérience conçue pour les établissements en Guinée."].map((item) => <div key={item} className="flex gap-3"><span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span><span className="text-sm leading-6">{item}</span></div>)}</div></div><div className="rounded-3xl border bg-card p-4 shadow-lg sm:p-6"><div className="rounded-2xl border bg-muted/30 p-5"><div className="mb-5 flex items-center justify-between"><div><div className="text-xs text-muted-foreground">Organisation</div><div className="font-display text-lg font-bold">Votre établissement</div></div><Badge>Rôles</Badge></div><div className="grid gap-3 sm:grid-cols-2">{AUDIENCES.map((a) => { const Icon=a.icon; return <div key={a.title} className="rounded-xl border bg-card p-4"><Icon className="mb-3 size-5 text-primary" /><div className="font-semibold">{a.title}</div><p className="mt-1 text-xs leading-5 text-muted-foreground">{a.desc}</p></div>; })}</div></div></div></div></section>
 
-      {/* Pricing */}
-      <section id="tarifs" className="py-20 border-t bg-muted/30">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-              <Sparkles className="size-4" /> Aucun abonnement mensuel
-            </div>
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Un tarif juste, basé sur vos élèves</h2>
-            <p className="mt-4 text-muted-foreground">Votre école touche une part sur chaque élève inscrit et payant. Créez votre établissement pour voir le détail complet.</p>
-          </div>
+        <section className="mx-auto max-w-7xl px-4 py-20 lg:px-8"><div className="mb-10 text-center"><Badge variant="outline">Pour chaque utilisateur</Badge><h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Une expérience adaptée à votre rôle</h2><p className="mx-auto mt-3 max-w-2xl text-muted-foreground">Direction, enseignants, administration, parents et élèves n'ont pas les mêmes besoins. La plateforme organise les accès en conséquence.</p></div><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{AUDIENCES.map((a) => { const Icon=a.icon; return <Card key={a.title} className="hover-lift"><CardContent className="p-6"><Icon className="mb-5 size-6 text-primary" /><h3 className="font-display text-lg font-bold">{a.title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{a.desc}</p></CardContent></Card>; })}</div></section>
 
-          {currentSub && (
-            <div className="max-w-3xl mx-auto mb-10 p-5 rounded-xl border bg-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">Votre abonnement actuel</div>
-                <div className="font-display font-semibold text-lg">
-                  {currentSub.plan?.name ?? "—"}{" "}
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary uppercase">
-                    {currentSub.status}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {currentSub.status === "trial"
-                    ? `Essai jusqu'au ${formatDate(currentSub.trial_ends_at)}`
-                    : `Valide jusqu'au ${formatDate(currentSub.current_period_end)}`}
-                </div>
-              </div>
-              <Button
-                onClick={() => {
-                  setRenewPlanId(
-                    plans.find((p) => p.code === currentSub.plan?.code)?.id ?? plans[0]?.id ?? "",
-                  );
-                  setRenewOpen(true);
-                }}
-              >
-                {currentSub.status === "trial" ? "Choisir une offre" : "Renouveler / Changer d'offre"}
-              </Button>
+        <section className="border-y bg-primary/[0.04]" id="comment-ca-marche"><div className="mx-auto max-w-7xl px-4 py-20 lg:px-8"><div className="max-w-2xl"><Badge variant="secondary">Simple à comprendre</Badge><h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Comment ça fonctionne</h2><p className="mt-3 text-muted-foreground">Un parcours clair pour démarrer et suivre le fonctionnement de votre établissement.</p></div><div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">{STEPS.map((s,i)=>{const Icon=s.icon;return <Card key={s.title}><CardContent className="p-6"><div className="mb-5 flex items-center justify-between"><div className="flex size-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">{i+1}</div><Icon className="size-5 text-primary" /></div><div className="font-display font-bold">{s.title}</div><p className="mt-2 text-sm leading-6 text-muted-foreground">{s.desc}</p></CardContent></Card>})}</div></div></section>
 
-            </div>
-          )}
+        <section className="mx-auto max-w-7xl px-4 py-20 lg:px-8" id="tarifs"><div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center"><div><Badge variant="secondary">Tarification claire</Badge><h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Une cotisation. Pas de formule compliquée.</h2><p className="mt-4 leading-7 text-muted-foreground">Le modèle est centré sur une cotisation annuelle par élève, avec une part destinée à l'établissement pour chaque cotisation validée.</p><div className="mt-7 space-y-3 text-sm text-muted-foreground"><div className="flex gap-3"><Check className="mt-0.5 size-4 text-primary" /> 50 000 GNF / élève / année scolaire</div><div className="flex gap-3"><Check className="mt-0.5 size-4 text-primary" /> 15 000 GNF de part école par cotisation VALIDATED</div><div className="flex gap-3"><Check className="mt-0.5 size-4 text-primary" /> 20 cotisations VALIDATED pour le mode FULL</div></div></div><Card className="overflow-hidden border-primary/20 shadow-xl"><CardContent className="p-0"><div className="grid sm:grid-cols-[1.2fr_0.8fr]"><div className="p-7 sm:p-9"><div className="text-sm font-medium text-muted-foreground">Cotisation annuelle</div><div className="mt-2 font-display text-4xl font-bold sm:text-5xl">50 000 <span className="text-xl">GNF</span></div><div className="mt-1 text-sm text-muted-foreground">par élève / an</div><div className="mt-7 rounded-xl bg-muted/60 p-4 text-sm leading-6">À partir de <strong>20 cotisations VALIDATED</strong>, l'établissement passe en mode <strong>FULL</strong>. En dessous, l'accès reste <strong>RESTRICTED</strong>.</div></div><div className="border-t bg-primary p-7 text-primary-foreground sm:border-l sm:border-t-0 sm:p-9"><div className="text-sm opacity-80">Part établissement</div><div className="mt-2 font-display text-3xl font-bold">15 000 GNF</div><div className="mt-1 text-sm opacity-80">par cotisation validée</div><div className="mt-7 border-t border-primary-foreground/20 pt-5 text-sm leading-6">Le seuil global et le déblocage individuel restent deux contrôles distincts.</div></div></div></CardContent></Card></div></section>
 
-          <Dialog open={renewOpen} onOpenChange={setRenewOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Renouveler ou changer d'offre</DialogTitle>
-                <DialogDescription>
-                  Sélectionnez l'offre et le cycle de facturation souhaités.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <div className="text-sm font-medium mb-2">Offre</div>
-                  <Select value={renewPlanId} onValueChange={setRenewPlanId}>
-                    <SelectTrigger><SelectValue placeholder="Choisir une offre" /></SelectTrigger>
-                    <SelectContent>
-                      {plans.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name} — {formatPrice(p.price_monthly)} {p.currency}/mois
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <div className="text-sm font-medium mb-2">Cycle de facturation</div>
-                  <Select value={renewCycle} onValueChange={(v: any) => setRenewCycle(v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Mensuel</SelectItem>
-                      <SelectItem value="yearly">Annuel</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setRenewOpen(false)} disabled={renewing}>
-                  Annuler
-                </Button>
-                <Button
-                  onClick={() => { setRenewError(null); setConfirmOpen(true); }}
-                  disabled={renewing || !renewPlanId || !schoolId}
-                >
-                  Continuer
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <section className="border-y bg-muted/30"><div className="mx-auto max-w-5xl px-4 py-16 text-center lg:px-8"><Badge variant="secondary">Orange Money</Badge><h2 className="mt-4 font-display text-3xl font-bold">Un parcours de paiement simple à déclarer</h2><p className="mx-auto mt-3 max-w-2xl text-muted-foreground">Effectuez le transfert puis déclarez la référence dans la plateforme pour permettre son contrôle.</p><div className="mx-auto mt-8 grid max-w-3xl gap-4 text-left sm:grid-cols-3"><div className="rounded-2xl border bg-card p-5"><div className="text-xs text-muted-foreground">Numéro</div><div className="mt-1 font-display text-xl font-bold">628 49 98 12</div></div><div className="rounded-2xl border bg-card p-5"><div className="text-xs text-muted-foreground">Bénéficiaire</div><div className="mt-1 font-display text-xl font-bold">MBGEduGuinée</div></div><div className="rounded-2xl border bg-card p-5"><div className="text-xs text-muted-foreground">Code</div><div className="mt-1 font-display text-xl font-bold">#144#</div></div></div><p className="mx-auto mt-5 max-w-2xl text-xs text-muted-foreground">La référence déclarée est une déclaration tant qu'elle n'a pas été vérifiée. Aucun montant ou statut ne doit être considéré comme validé sur la seule saisie côté utilisateur.</p></div></section>
 
-          {/* Confirmation récapitulative */}
-          <Dialog open={confirmOpen} onOpenChange={(o) => { if (!renewing) setConfirmOpen(o); }}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Confirmer la modification</DialogTitle>
-                <DialogDescription>
-                  Vérifiez le récapitulatif avant de valider. Cette action met à jour l'abonnement de votre école.
-                </DialogDescription>
-              </DialogHeader>
-              {(() => {
-                const p = plans.find((x) => x.id === renewPlanId);
-                const price = p
-                  ? renewCycle === "yearly"
-                    ? (p as any).price_yearly ?? p.price_monthly * 12
-                    : p.price_monthly
-                  : 0;
-                return (
-                  <div className="rounded-xl border bg-muted/40 p-4 text-sm space-y-2">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Offre</span><span className="font-medium">{p?.name ?? "—"}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Période</span><span className="font-medium">{renewCycle === "yearly" ? "Annuel (yearly)" : "Mensuel (monthly)"}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Montant</span><span className="font-medium">{formatPrice(price)} {p?.currency ?? "GNF"}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Offre actuelle</span><span className="font-medium">{currentSub?.plan?.name ?? "—"}</span></div>
-                  </div>
-                );
-              })()}
-              {renewError && (
-                <div className="text-sm text-destructive">{renewError}</div>
-              )}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={renewing}>
-                  Annuler
-                </Button>
-                <Button onClick={confirmRenew} disabled={renewing || !renewPlanId || !schoolId}>
-                  {renewing && <Loader2 className="size-4 mr-2 animate-spin" />}
-                  {renewing ? "Traitement en cours…" : renewError ? "Réessayer" : "Valider"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <section className="mx-auto max-w-7xl px-4 py-20 lg:px-8"><div className="grid gap-10 lg:grid-cols-2"><div><Badge variant="outline">Sécurité & contrôle</Badge><h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Des accès pensés autour des responsabilités.</h2><p className="mt-4 leading-7 text-muted-foreground">Les opérations sensibles reposent sur des contrôles d'accès et des validations côté serveur afin de limiter les modifications non autorisées.</p></div><div className="grid gap-4 sm:grid-cols-2"><Card><CardContent className="p-6"><ShieldCheck className="mb-4 size-6 text-primary" /><h3 className="font-semibold">Accès par rôle</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">Les espaces sont organisés selon les fonctions de l'utilisateur.</p></CardContent></Card><Card><CardContent className="p-6"><LockKeyhole className="mb-4 size-6 text-primary" /><h3 className="font-semibold">Contrôles serveur</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">Les opérations sensibles ne reposent pas uniquement sur les données envoyées par le navigateur.</p></CardContent></Card><Card><CardContent className="p-6"><School className="mb-4 size-6 text-primary" /><h3 className="font-semibold">Séparation des établissements</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">Les règles d'accès sont conçues pour éviter les accès croisés entre établissements.</p></CardContent></Card><Card><CardContent className="p-6"><Receipt className="mb-4 size-6 text-primary" /><h3 className="font-semibold">Traçabilité des paiements</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">Les déclarations et validations sont distinguées pour garder un contrôle clair du processus.</p></CardContent></Card></div></div></section>
 
-          {schoolId && <SubscriptionHistory schoolId={schoolId} refreshKey={historyKey} />}
+        <section className="border-y bg-primary text-primary-foreground"><div className="mx-auto max-w-5xl px-4 py-20 text-center lg:px-8"><Sparkles className="mx-auto size-7 opacity-80" /><h2 className="mt-5 font-display text-3xl font-bold sm:text-4xl">Prêt à digitaliser votre établissement ?</h2><p className="mx-auto mt-4 max-w-2xl text-primary-foreground/80">Centralisez votre gestion scolaire dans un environnement unique, avec un modèle de cotisation clair et des accès adaptés à chaque utilisateur.</p><div className="mt-8 flex flex-wrap justify-center gap-3"><Button size="lg" variant="secondary" asChild><Link to="/auth">Créer mon établissement <ArrowRight className="ml-2 size-4" /></Link></Button><Button size="lg" variant="outline" className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground" onClick={() => setLoginOpen(true)}>Accéder à mon espace</Button></div></div></section>
 
+        <section className="mx-auto max-w-4xl px-4 py-20 lg:px-8" id="faq"><div className="mb-10 text-center"><Badge variant="outline">FAQ</Badge><h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Questions fréquentes</h2></div><Accordion type="single" collapsible>{FAQ.map((f,i)=><AccordionItem key={f.q} value={`faq-${i}`}><AccordionTrigger className="text-left">{f.q}</AccordionTrigger><AccordionContent className="leading-7 text-muted-foreground">{f.a}</AccordionContent></AccordionItem>)}</Accordion></section>
+      </main>
 
-
-          <div className="grid md:grid-cols-1 max-w-md mx-auto gap-6">
-            {loading && (
-              <div className="p-8 rounded-2xl border bg-card animate-pulse h-80" />
-            )}
-            {!loading && plans.map((p) => {
-              const perStudent = (p as any).billing_model === "per_student";
-              const unit = Number((p as any).price_per_student ?? 0);
-              const share = Number((p as any).school_share_per_student ?? 0);
-              const threshold = Number((p as any).access_threshold_students ?? 20);
-              return (
-              <div key={p.id} className={"p-8 rounded-2xl border bg-card relative " + (p.is_popular ? "border-primary shadow-lg ring-1 ring-primary/20" : "")}>
-                {p.is_popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">Recommandé</div>}
-                <h3 className="font-display text-2xl font-bold">{p.name}</h3>
-                {p.description && <p className="text-sm text-muted-foreground mt-2">{p.description}</p>}
-
-                <div className="mt-4">
-                  {perStudent && !userId ? (
-                    <p className="text-sm font-medium">Créez votre établissement pour voir le tarif exact.</p>
-                  ) : perStudent ? (
-                    <p className="text-sm text-muted-foreground">
-                      <span className="text-3xl font-bold text-foreground">{formatPrice(unit)}</span> {p.currency}/élève/an, dont {formatPrice(share)} {p.currency} reversés à l'école. Accès complet dès {threshold} élèves payés.
-                    </p>
-                  ) : (
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold">{formatPrice(publicCycle === "yearly" ? (p.price_yearly ?? p.price_monthly * 12) : p.price_monthly)}</span>
-                      <span className="text-muted-foreground">{p.currency}/{publicCycle === "yearly" ? "an" : "mois"}</span>
-                    </div>
-                  )}
-                </div>
-
-                <ul className="mt-6 space-y-2 text-sm">
-                  {(perStudent && !userId
-                    ? [
-                        "Paiement groupé (école) ou individuel (parent/élève)",
-                        "Reçu imprimable par élève",
-                        "Accompagnement à la mise en place",
-                      ]
-                    : p.features
-                  ).map((f) => (
-                    <li key={f} className="flex gap-2"><Check className="size-4 text-primary mt-0.5 shrink-0" />{f}</li>
-                  ))}
-                </ul>
-
-                <Button
-                  className="w-full mt-6"
-                  variant={p.is_popular ? "default" : "outline"}
-                  onClick={() => handleChoose(p.code)}
-                >
-                  Choisir {p.name}
-                </Button>
-              </div>
-              );
-            })}
-
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="py-20 border-t">
-        <div className="max-w-3xl mx-auto px-4 lg:px-6">
-          <div className="text-center mb-10">
-            <h2 className="font-display text-3xl md:text-4xl font-bold">Questions fréquentes</h2>
-            <p className="mt-4 text-muted-foreground">Tout ce qu'il faut savoir avant de vous lancer.</p>
-          </div>
-          <Accordion type="single" collapsible className="w-full">
-            {FAQ.map((item, i) => (
-              <AccordionItem key={i} value={`item-${i}`}>
-                <AccordionTrigger className="text-left">{item.q}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-20 border-t bg-primary text-primary-foreground">
-        <div className="max-w-3xl mx-auto px-4 lg:px-6 text-center">
-          <h2 className="font-display text-3xl md:text-4xl font-bold">Prêt à digitaliser votre établissement ?</h2>
-          <p className="mt-4 text-primary-foreground/80">Créez votre compte en quelques minutes, sans engagement.</p>
-          <div className="mt-8">
-            <Link to="/auth">
-              <Button size="lg" variant="secondary" className="gap-2">Commencer maintenant <ArrowRight className="size-4" /></Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t py-12">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"><School className="size-4" /></div>
-              <span className="font-display font-bold">MBGEduGuinée</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Gestion scolaire numérique pour les écoles guinéennes.</p>
-          </div>
-          <div>
-            <h4 className="font-display font-semibold text-sm mb-3">Navigation</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#fonctionnalites" className="hover:text-foreground">Fonctionnalités</a></li>
-              <li><a href="#tarifs" className="hover:text-foreground">Tarifs</a></li>
-              <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-display font-semibold text-sm mb-3">Légal</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Conditions d'utilisation</li>
-              <li>Politique de confidentialité</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-display font-semibold text-sm mb-3">Contact</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Conakry, Guinée</li>
-              <li>contact@eduguinee.gn</li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 mt-10 pt-6 border-t text-sm text-muted-foreground">
-          © 2026 MBGEduGuinée. Conçu en Guinée pour les écoles guinéennes.
-        </div>
-      </footer>
+      <footer className="border-t bg-muted/20"><div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-2 lg:grid-cols-4 lg:px-8"><div className="sm:col-span-2"><Link to="/" className="flex items-center gap-3"><div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground"><School className="size-4" /></div><span className="font-display font-bold">MBGEduGuinée</span></Link><p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">Une plateforme de gestion scolaire pensée pour les établissements en Guinée.</p></div><div><div className="font-semibold">Plateforme</div><div className="mt-4 space-y-2 text-sm text-muted-foreground"><a href="#fonctionnalites" className="block hover:text-foreground">Fonctionnalités</a><a href="#tarifs" className="block hover:text-foreground">Tarifs</a><a href="#comment-ca-marche" className="block hover:text-foreground">Comment ça marche</a></div></div><div><div className="font-semibold">Accès</div><div className="mt-4 space-y-2 text-sm text-muted-foreground"><button onClick={() => setLoginOpen(true)} className="block hover:text-foreground">Connexion</button><Link to="/auth" className="block hover:text-foreground">Créer un établissement</Link><a href="#faq" className="block hover:text-foreground">FAQ</a></div></div></div><div className="border-t"><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 text-xs text-muted-foreground lg:px-8"><span>© {new Date().getFullYear()} MBGEduGuinée</span><span>Gestion scolaire numérique</span></div></div></footer>
+      {loginOpen && <LoginChoice onClose={() => setLoginOpen(false)} />}
     </div>
   );
 }

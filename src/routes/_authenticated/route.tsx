@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
-import { SubscriptionGuard } from "@/components/SubscriptionGuard";
+import { AnnualContributionGuard } from "@/components/AnnualContributionGuard";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated")({
   component: () => (
     <AppShell>
       <RoleGuard />
-      <SubscriptionGuard />
+      <AnnualContributionGuard />
       <Outlet />
     </AppShell>
   ),

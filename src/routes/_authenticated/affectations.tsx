@@ -18,14 +18,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { useSchool } from "@/hooks/useSchool";
+import { getAcademicYearOptions, getCurrentAcademicYear } from "@/lib/academic-year";
 
 export const Route = createFileRoute("/_authenticated/affectations")({
   head: () => ({ meta: [{ title: "Affectations — MBGEduGuinée" }] }),
   component: AssignmentsPage,
 });
 
-const CURRENT_YEAR = "2025-2026";
-const YEARS = ["2024-2025", "2025-2026", "2026-2027"];
 
 type Row = {
   id: string;
@@ -38,6 +38,9 @@ type Row = {
 
 function AssignmentsPage() {
   const qc = useQueryClient();
+  const { school } = useSchool();
+  const CURRENT_YEAR = getCurrentAcademicYear();
+  const YEARS = getAcademicYearOptions(CURRENT_YEAR);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [yearFilter, setYearFilter] = useState<string>(CURRENT_YEAR);

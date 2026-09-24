@@ -9,7 +9,7 @@ const LEVEL_STYLE: Record<string, { label: string; icon: string; color: string }
   a_travailler: { label: "À travailler", icon: "★☆☆", color: "#c0392b" },
 };
 
-function header(meta: PdfMeta, title: string, subtitle?: string) {
+function header(meta: PdfMeta, title: string, subtitle?: string, reference?: string) {
   const accent = meta.accent || "#1f6f5c";
   return `<header>
   ${meta.logoUrl ? `<img src="${esc(meta.logoUrl)}" alt="" />` : ""}
@@ -29,26 +29,30 @@ function header(meta: PdfMeta, title: string, subtitle?: string) {
 function styles(meta: PdfMeta) {
   const accent = meta.accent || "#1f6f5c";
   return `<style>
-  @page { size: A4 portrait; margin: 14mm; }
+  @page { size: A4 portrait; margin: 12mm; }
   * { box-sizing:border-box; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:#1c1a17; margin:0; }
-  header { display:flex; align-items:center; gap:14px; border-bottom:3px solid ${accent}; padding-bottom:10px; margin-bottom:16px; }
-  header img { height:56px; width:auto; object-fit:contain; }
-  .school { font-size:16px; font-weight:700; }
-  .addr { font-size:11px; color:#6b6560; }
-  h1 { font-size:17px; margin:0; }
-  .sub { font-size:11px; color:#6b6560; margin-top:2px; }
-  .idbox { display:flex; gap:24px; background:#faf8f5; border:1px solid #e6e1da; border-radius:10px; padding:10px 14px; font-size:12px; margin-bottom:14px; }
-  .idbox b { display:block; font-size:10px; color:#6b6560; font-weight:600; }
-  h2 { font-size:13px; margin:16px 0 6px; color:${accent}; }
-  table { width:100%; border-collapse:collapse; font-size:11.5px; }
-  th { background:${accent}; color:#fff; text-align:left; padding:6px 8px; }
-  td { padding:6px 8px; border-bottom:1px solid #e6e1da; vertical-align:top; }
-  .lvl { font-weight:700; white-space:nowrap; }
-  .legend { margin-top:14px; font-size:10.5px; color:#6b6560; }
-  .sign { margin-top:28px; display:flex; justify-content:space-between; font-size:11px; }
-  .sign div { width:45%; border-top:1px solid #cfc9c1; padding-top:6px; }
-  footer { margin-top:18px; font-size:10px; color:#6b6560; text-align:center; }
+  body { font-family: Inter, "Segoe UI", Arial, sans-serif; color:#18211d; margin:0; background:#fff; }
+  header { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:14px; border-bottom:2px solid ${accent}; padding-bottom:10px; margin-bottom:15px; position:relative; }
+  header:after { content:""; position:absolute; left:0; bottom:-2px; width:65px; height:3px; background:#c99a3d; }
+  header img { width:56px; height:56px; object-fit:contain; }
+  .school { font-size:15px; font-weight:800; text-transform:uppercase; }
+  .addr { font-size:9px; color:#68716b; line-height:1.35; }
+  .country { font-size:8px; color:#18211d; font-weight:800; }
+  h1 { font-size:16px; margin:3px 0 0; text-transform:uppercase; }
+  .sub, .ref { font-size:9px; color:#68716b; margin-top:2px; }
+  .idbox { display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; background:#f7f9f8; border:1px solid #d9dfda; border-radius:10px; padding:10px 12px; font-size:10.5px; margin-bottom:14px; }
+  .idbox b { display:block; font-size:8px; color:#68716b; text-transform:uppercase; letter-spacing:.04em; font-weight:700; margin-bottom:2px; }
+  h2 { font-size:11px; margin:15px 0 6px; color:${accent}; text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:separate; border-spacing:0; border:1px solid #d9dfda; border-radius:8px; overflow:hidden; font-size:9.5px; }
+  th { background:${accent}; color:#fff; text-align:left; padding:7px 8px; }
+  td { padding:6px 8px; border-top:1px solid #e7ebe8; vertical-align:top; }
+  tbody tr:nth-child(even) td { background:#f8faf9; }
+  .lvl { font-weight:800; white-space:nowrap; }
+  .legend { margin-top:12px; font-size:9px; color:#68716b; }
+  .sign { margin-top:28px; display:flex; justify-content:space-between; gap:24px; font-size:10px; break-inside:avoid; }
+  .sign div { width:45%; border-top:1px solid #b9c3bd; padding-top:6px; }
+  footer { margin-top:16px; padding-top:7px; border-top:1px solid #d9dfda; font-size:8.5px; color:#68716b; display:flex; justify-content:space-between; }
+  @media print { thead{display:table-header-group} tr{break-inside:avoid} *{-webkit-print-color-adjust:exact;print-color-adjust:exact} }
 </style>`;
 }
 
@@ -84,6 +88,7 @@ export function printNurseryBulletin(opts: {
   teacherComment?: string | null;
 }) {
   const { meta, childName, sectionName, period, rows } = opts;
+  const reference = `MAT-${new Date().getFullYear()}-${((globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000").replace(/-/g, "").slice(0, 6)).toUpperCase()}`;
   const byDomain = new Map<string, NurseryEvaluationRow[]>();
   rows.forEach((r) => {
     const d = r.nursery_competencies?.domain ?? "autres";
@@ -107,7 +112,7 @@ export function printNurseryBulletin(opts: {
 
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8" />
 <title>Bulletin maternelle — ${esc(childName)}</title>${styles(meta)}</head><body>
-${header(meta, "Bulletin maternelle", `${esc(period)} · Généré le ${new Date().toLocaleDateString("fr-FR")}`)}
+${header(meta, "Bulletin maternelle", `${esc(period)} · Généré le ${new Date().toLocaleDateString("fr-FR")}`, reference)}
 <div class="idbox">
   <div><b>Enfant</b>${esc(childName)}</div>
   <div><b>Section</b>${esc(sectionName || "—")}</div>
@@ -133,9 +138,10 @@ export function printDailyLog(opts: {
   parentComment?: string | null;
 }) {
   const { meta, childName, sectionName, date, items } = opts;
+  const reference = `SUI-${new Date().getFullYear()}-${((globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000").replace(/-/g, "").slice(0, 6)).toUpperCase()}`;
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8" />
 <title>Suivi quotidien — ${esc(childName)}</title>${styles(meta)}</head><body>
-${header(meta, "Suivi quotidien", `Journée du ${esc(date)}`)}
+${header(meta, "Suivi quotidien", `Journée du ${esc(date)}`, reference)}
 <div class="idbox">
   <div><b>Enfant</b>${esc(childName)}</div>
   <div><b>Section</b>${esc(sectionName || "—")}</div>

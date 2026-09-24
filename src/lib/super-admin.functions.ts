@@ -120,16 +120,6 @@ export const notifySchools = createServerFn({ method: "POST" })
     return { sent: rows.length };
   });
 
-// --- Auto suspend expired ---
-export const runAutoSuspendExpired = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertSuperAdmin(context);
-    const { data, error } = await (context.supabase as any).rpc("auto_suspend_expired_subscriptions");
-    if (error) throw new Error(error.message);
-    return { suspended: data ?? 0 };
-  });
-
 // --- Storage usage per school ---
 export const getStorageUsage = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

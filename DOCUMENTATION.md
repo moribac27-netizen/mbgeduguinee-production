@@ -102,3 +102,20 @@ Variables client : `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Variabl
 - [ ] Impressions vérifiées (bulletins, reçus, cartes, paie)
 - [ ] Sauvegarde manuelle testée et restaurée
 - [ ] Rôles testés un par un (redirections et menus)
+
+## Stabilisation documentaire — 22/09/2026
+
+Cette version consolide le système documentaire sans modifier le modèle métier de cotisation annuelle.
+
+### Nouveautés
+- Système commun de présentation A4 : en-tête institutionnel, métadonnées, cartes de synthèse, tableaux, signatures et pied de page.
+- Nouvelle **Fiche de sortie scolaire** accessible depuis le menu « Fiches de sortie ».
+- La fiche de sortie intègre, lorsque le dossier est accessible : identité/photo, matricule, classe, situation administrative, statut financier VALIDATED, référence de paiement, moyenne, résultats, décision, observations, signatures et courbe de progression lorsqu'au moins deux périodes sont disponibles.
+- La fiche est volontairement verrouillée côté interface si la cotisation annuelle de l'élève n'est pas VALIDATED.
+- L'année scolaire affichée dans l'application et les affectations est maintenant tirée des paramètres de l'établissement au lieu d'une année codée en dur.
+- La liste de sauvegarde couvre également le registre de cotisations annuelles et plusieurs modules métier récents.
+- Le document racine utilise `lang="fr"`.
+
+### Validation effectuée
+- Transpilation TypeScript/JSX des fichiers modifiés et de la landing page avec TypeScript 5.x : aucune erreur de syntaxe détectée.
+- Les tests/build complets restent dépendants de l'installation locale des dépendances npm et doivent être exécutés dans l'environnement de déploiement avant mise en production.

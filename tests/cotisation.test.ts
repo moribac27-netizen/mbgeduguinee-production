@@ -1,61 +1,25 @@
-import { describe, it, expect, vi } from 'vitest';
-import { registerStudentPayment } from '@/lib/cotisation';
-import { PER_STUDENT_SCHOOL_SHARE_GNF } from '@/lib/pricing';
+import { describe, it, expect, vi } from "vitest";
+import { registerStudentPayment } from "@/lib/cotisation";
+import { PER_STUDENT_ACCESS_THRESHOLD, PER_STUDENT_PLATFORM_SHARE_GNF, PER_STUDENT_SCHOOL_SHARE_GNF, PER_STUDENT_UNIT_PRICE_GNF } from "@/lib/pricing";
 
-function makeFakeSupabase(existing: any = null) {
-  const builder = {
-    eq: (_k: string, _v: any) => builder,
-    maybeSingle: async () => ({ data: existing }),
-    select: () => ({ maybeSingle: async () => ({ data: existing }) }),
-  };
-
-  return {
-    from: (_table: string) => ({
-      select: () => builder,
-      update: (payload: any) => ({
-        eq: (_k: string, _v: any) => ({
-          select: () => ({
-            maybeSingle: async () => ({ data: { ...existing, ...payload } }),
-          }),
-        }),
-      }),
-      insert: (payload: any) => ({
-        select: () => ({
-          maybeSingle: async () => ({ data: { ...payload, id: 'new-id' } }),
-        }),
-      }),
-    }),
-    auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
-  } as any;
+function makeFakeSupabase() {
+  return { rpc: vi.fn(async () => ({ data: { id: "payment-1", status: "AWAITING_VALIDATION", amount: 50000, school_share: 15000 }, error: null })) } as any;
 }
 
-describe('registerStudentPayment', () => {
-  it('uses a single centralized school reversement of 15000 GNF per student', () => {
+describe("cotisation annuelle unique", () => {
+  it("fixe le tarif officiel", () => {
+    expect(PER_STUDENT_UNIT_PRICE_GNF).toBe(50000);
     expect(PER_STUDENT_SCHOOL_SHARE_GNF).toBe(15000);
+    expect(PER_STUDENT_PLATFORM_SHARE_GNF).toBe(35000);
+    expect(PER_STUDENT_ACCESS_THRESHOLD).toBe(20);
   });
 
-  it('returns already_paid when existing row is paid', async () => {
-    const existing = { id: 'p1', status: 'paye', student_id: 's1', academic_year: '2026' };
-    const sup = makeFakeSupabase(existing);
-    const res = await registerStudentPayment({ studentId: 's1', schoolId: 'sch', academicYear: '2026', amount: 100000, schoolShare: PER_STUDENT_SCHOOL_SHARE_GNF, supabase: sup });
-    expect(res.status).toBe('already_paid');
-    expect((res as any).row.id).toBe('p1');
-  });
-
-  it('updates existing unpaid row', async () => {
-    const existing = { id: 'p2', status: 'en_attente', student_id: 's2', academic_year: '2026' };
-    const sup = makeFakeSupabase(existing);
-    const res = await registerStudentPayment({ studentId: 's2', schoolId: 'sch', academicYear: '2026', amount: 100000, schoolShare: PER_STUDENT_SCHOOL_SHARE_GNF, reference: 'ref1', paidBy: 'u1', supabase: sup });
-    expect(res.status).toBe('updated');
-    expect((res as any).row.status).toBe('paye');
-    expect((res as any).row.reference).toBe('ref1');
-  });
-
-  it('creates when no existing row', async () => {
-    const sup = makeFakeSupabase(null);
-    const res = await registerStudentPayment({ studentId: 's3', schoolId: 'sch', academicYear: '2026', amount: 100000, schoolShare: PER_STUDENT_SCHOOL_SHARE_GNF, reference: 'ref2', paidBy: 'u1', supabase: sup });
-    expect(res.status).toBe('created');
-    expect((res as any).row.id).toBe('new-id');
-    expect((res as any).row.receipt_number).toBeDefined();
+  it("déclare le paiement via la fonction serveur sans accepter un montant du navigateur", async () => {
+    const sup = makeFakeSupabase();
+    const res = await registerStudentPayment({ studentId: "s1", reference: "OM-123", transferDate: "2026-09-21T12:00:00.000Z", payerPhone: "621234567", supabase: sup });
+    expect(res.status).toBe("created");
+    expect(sup.rpc).toHaveBeenCalledWith("declare_cotisation_payment", {
+      _student_id: "s1", _reference: "OM-123", _transfer_date: "2026-09-21T12:00:00.000Z", _payer_phone: "621234567",
+    });
   });
 });

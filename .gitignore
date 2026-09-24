@@ -30,3 +30,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.env
+
+.env.*
+
+!.env.example
+
+definir-mot-de-passe.mjs
+
+supabase/.temp/

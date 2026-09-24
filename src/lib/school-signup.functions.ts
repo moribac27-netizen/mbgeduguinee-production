@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const schema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(12),
   fullName: z.string().min(1),
   phone: z.string().optional().nullable(),
   schoolName: z.string().min(1),

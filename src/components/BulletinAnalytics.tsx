@@ -196,22 +196,19 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
       </h3>
 
       {/* Statistiques rapides */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center">
-        <QuickStat label="Moyenne" value={`${last?.eleve?.toFixed(2) ?? "—"}/${maxScore}`} icon={<BarChart3 className="size-3" />} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center print-avoid-break">
+        <QuickStat label="Moyenne actuelle" value={`${last?.eleve?.toFixed(2) ?? "—"}/${maxScore}`} icon={<BarChart3 className="size-3" />} />
+        <QuickStat label="Moyenne précédente" value={analysis.prev?.eleve != null ? `${analysis.prev.eleve.toFixed(2)}/${maxScore}` : "—"} />
+        <QuickStat label="Évolution" value={delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`} icon={delta == null ? <Minus className="size-3" /> : delta > 0 ? <TrendingUp className="size-3" /> : delta < 0 ? <TrendingDown className="size-3" /> : <Minus className="size-3" />} />
         <QuickStat label="Rang" value={last?.rang ? `${last.rang}/${last.effectif}` : "—"} icon={<Award className="size-3" />} />
+        <QuickStat label="Matières" value={`${radar.length}`} />
         <QuickStat label="Matières validées" value={`${validated}/${radar.length}`} icon={<Target className="size-3" />} />
         <QuickStat label="Meilleure note" value={best ? `${best.note.toFixed(2)}` : "—"} sub={best?.matiere} />
-        <QuickStat label="Plus faible" value={worst ? `${worst.note.toFixed(2)}` : "—"} sub={worst?.matiere} />
         <QuickStat label="Taux de réussite" value={`${successRate}%`} />
-        <QuickStat
-          label="Évolution"
-          value={delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`}
-          icon={delta == null ? <Minus className="size-3" /> : delta > 0 ? <TrendingUp className="size-3" /> : delta < 0 ? <TrendingDown className="size-3" /> : <Minus className="size-3" />}
-        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 break-inside-avoid">
-        <ChartBox title="Progression de la moyenne générale">
+        {analysis.filled.length >= 2 ? <ChartBox title="Évolution de la moyenne générale">
           <ResponsiveContainer width="100%" height={chartH}>
             <LineChart data={timeline} margin={{ top: 16, right: 12, left: -18, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
@@ -223,7 +220,7 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
               </Line>
             </LineChart>
           </ResponsiveContainer>
-        </ChartBox>
+        </ChartBox> : null}
 
         <ChartBox title="Évolution du rang (1 = meilleur)">
           <ResponsiveContainer width="100%" height={chartH}>
@@ -266,7 +263,7 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
         </ChartBox>
       </div>
 
-      <div className="border border-black/50 rounded-sm p-3 text-[11px] leading-relaxed break-inside-avoid">
+      <div className="border border-black/20 rounded-lg p-3 text-[11px] leading-relaxed break-inside-avoid bg-slate-50/60">
         <div className="font-bold uppercase mb-1">Analyse automatique</div>
         <ul className="list-disc pl-4 space-y-0.5">
           {notes.map((n, i) => (

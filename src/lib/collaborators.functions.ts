@@ -45,8 +45,10 @@ async function assertTargetIsManageableStaff(supabaseAdmin: any, userId: string,
 function genTempPassword() {
   // Lisible, mais suffisamment robuste pour un mot de passe temporaire à changer à la première connexion.
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const values = new Uint32Array(12);
+  globalThis.crypto.getRandomValues(values);
   let out = "";
-  for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < values.length; i++) out += chars[values[i] % chars.length];
   return out;
 }
 
@@ -120,6 +122,7 @@ export const addCollaborator = createServerFn({ method: "POST" })
       // via des écritures admin explicites qui, elles, contournent la RLS en toute confiance.
       const { data: res, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
         data: { full_name: data.fullName, phone: data.phone ?? null },
+        options: { redirectTo: `${process.env.APP_URL ?? process.env.VITE_APP_URL ?? "http://localhost:3000"}/definir-mot-de-passe` },
       });
       if (error || !res.user) {
         const msg = error?.message ?? "erreur inconnue";
@@ -128,11 +131,25 @@ export const addCollaborator = createServerFn({ method: "POST" })
         }
         return { ok: false as const, error: `Invitation impossible : ${msg}` };
       }
-      await supabaseAdmin.auth.admin.updateUserById(res.user.id, {
+      const { error: metaErr } = await supabaseAdmin.auth.admin.updateUserById(res.user.id, {
         app_metadata: { school_id: schoolId, role: data.role },
       } as any);
-      await supabaseAdmin.from("profiles").update({ school_id: schoolId }).eq("id", res.user.id);
-      await supabaseAdmin.from("user_roles").insert({ user_id: res.user.id, role: data.role });
+      if (metaErr) throw new Error(`Impossible de rattacher l'invitation : ${metaErr.message}`);
+
+      const { data: updatedProfile, error: profileErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ full_name: data.fullName, phone: data.phone ?? null, school_id: schoolId })
+        .eq("id", res.user.id)
+        .select("id")
+        .maybeSingle();
+      if (profileErr) throw new Error(`Impossible de rattacher le profil : ${profileErr.message}`);
+      if (!updatedProfile) throw new Error("Invitation créée mais profil utilisateur introuvable.");
+
+      const { error: roleErr } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: res.user.id, role: data.role }, { onConflict: "user_id,role" });
+      if (roleErr) throw new Error(`Impossible d'attribuer le rôle : ${roleErr.message}`);
+
       return { ok: true as const, userId: res.user.id, mode: "invite" as const };
     }
 
@@ -151,6 +168,23 @@ export const addCollaborator = createServerFn({ method: "POST" })
       }
       return { ok: false as const, error: `Création impossible : ${msg}` };
     }
+
+    // Ne pas dépendre du trigger handle_new_user : on force les deux rattachements
+    // après createUser(). upsert évite une collision si le trigger a déjà réussi.
+    const { data: updatedProfile, error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .update({ full_name: data.fullName, phone: data.phone ?? null, school_id: schoolId })
+      .eq("id", res.user.id)
+      .select("id")
+      .maybeSingle();
+    if (profileErr) throw new Error(`Compte créé mais profil non rattaché : ${profileErr.message}`);
+    if (!updatedProfile) throw new Error("Compte créé mais profil utilisateur introuvable.");
+
+    const { error: roleErr } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: res.user.id, role: data.role }, { onConflict: "user_id,role" });
+    if (roleErr) throw new Error(`Compte créé mais rôle non rattaché : ${roleErr.message}`);
+
     return { ok: true as const, userId: res.user.id, mode: "direct" as const, tempPassword };
   });
 

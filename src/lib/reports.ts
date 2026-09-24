@@ -55,60 +55,65 @@ export interface PdfMeta {
   accent?: string | null;
 }
 
+export function newDocumentReference(prefix = "DOC") {
+  const year = new Date().getFullYear();
+  const token = (globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000")
+    .replace(/-/g, "").slice(0, 8).toUpperCase();
+  return `${prefix}-${year}-${token}`;
+}
+
+function printStyles(accent: string) {
+  return `
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Inter, "Segoe UI", Arial, sans-serif; color:#18211d; margin:0; background:#fff; }
+  .doc { max-width: 100%; }
+  .letterhead { display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; padding:0 0 12px; margin-bottom:16px; border-bottom:2px solid ${accent}; position:relative; }
+  .letterhead:after { content:""; position:absolute; left:0; bottom:-2px; width:72px; height:3px; background:#c99a3d; }
+  .logo { width:58px; height:58px; object-fit:contain; }
+  .school { font-size:15px; font-weight:800; text-transform:uppercase; line-height:1.15; }
+  .muted { color:#68716b; font-size:9.5px; line-height:1.35; }
+  .docmeta { text-align:right; color:#68716b; font-size:9px; line-height:1.35; }
+  .docmeta strong { color:#18211d; }
+  h1 { font-size:16px; margin:4px 0 0; color:${accent}; text-transform:uppercase; letter-spacing:.02em; }
+  .sub { font-size:10px; color:#68716b; margin-top:2px; }
+  .section-title { display:flex; align-items:center; gap:8px; margin:16px 0 7px; color:${accent}; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+  .section-title:after { content:""; height:1px; flex:1; background:#d9dfda; }
+  .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  .stat { border:1px solid #d9dfda; border-radius:9px; padding:8px 10px; background:#fbfcfb; }
+  .stat-label { font-size:8px; color:#68716b; text-transform:uppercase; letter-spacing:.05em; }
+  .stat-value { margin-top:2px; font-size:13px; font-weight:800; color:#18211d; }
+  table { width:100%; border-collapse:separate; border-spacing:0; font-size:9.5px; overflow:hidden; border:1px solid #d9dfda; border-radius:8px; }
+  th { background:${accent}; color:#fff; text-align:left; padding:7px 8px; font-weight:700; }
+  td { padding:6px 8px; border-top:1px solid #e7ebe8; vertical-align:top; }
+  tbody tr:nth-child(even) td { background:#f7f9f8; }
+  .footer { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #d9dfda; padding-top:7px; margin-top:14px; color:#68716b; font-size:8.5px; }
+  .status { display:inline-block; padding:3px 7px; border-radius:999px; border:1px solid #c9d6cf; font-size:8px; font-weight:700; }
+  .noprint { display:none; }
+  @media print { thead { display:table-header-group; } tr { break-inside:avoid; page-break-inside:avoid; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+  `;
+}
 
 export function exportPDF(title: string, rows: any[], columns: ExportColumn[], meta: PdfMeta = {}) {
   const accent = meta.accent || "#1f6f5c";
-  const esc = (v: any) =>
-    String(v ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m] as string);
-
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8" />
-<title>${esc(title)}</title>
-<style>
-  @page { size: A4 landscape; margin: 12mm; }
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:#1c1a17; margin:0; }
-  header { display:flex; align-items:center; gap:14px; border-bottom:3px solid ${accent}; padding-bottom:10px; margin-bottom:14px; }
-  header img { height:54px; width:auto; object-fit:contain; }
-  .school { font-size:16px; font-weight:700; }
-  .addr { font-size:11px; color:#6b6560; }
-  h1 { font-size:17px; margin:0; color:${accent}; }
-  .sub { font-size:11px; color:#6b6560; margin-top:2px; }
-  table { width:100%; border-collapse:collapse; font-size:10.5px; }
-  th { background:${accent}; color:#fff; text-align:left; padding:6px 7px; font-weight:600; }
-  td { padding:5px 7px; border-bottom:1px solid #e6e1da; }
-  tbody tr:nth-child(even) td { background:#faf8f5; }
-  tfoot td { font-size:10px; color:#6b6560; padding-top:8px; border:0; }
-  @media print { .noprint { display:none; } }
-</style></head><body>
-<header>
-  ${meta.logoUrl ? `<img src="${esc(meta.logoUrl)}" alt="" />` : ""}
-  <div style="flex:1">
-    <div class="school">${esc(meta.schoolName || "MBGEduGuinée")}</div>
-    ${meta.schoolAddress ? `<div class="addr">${esc(meta.schoolAddress)}</div>` : ""}
-    ${meta.schoolContact ? `<div class="addr">${esc(meta.schoolContact)}</div>` : ""}
-    ${meta.academicYear ? `<div class="addr">Année scolaire : ${esc(meta.academicYear)}</div>` : ""}
-  </div>
-  <div style="text-align:right">
-    <h1>${esc(title)}</h1>
-    <div class="sub">${esc(meta.subtitle || "")}${meta.subtitle ? " · " : ""}Généré le ${new Date().toLocaleString("fr-FR")}</div>
-  </div>
-</header>
-<table>
-  <thead><tr>${columns.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead>
-
-  <tbody>${rows
-    .map((r) => `<tr>${columns.map((c) => `<td>${esc(cell(r, c))}</td>`).join("")}</tr>`)
-    .join("")}</tbody>
-  <tfoot><tr><td colspan="${columns.length}">${rows.length} ligne(s) — ${esc(meta.schoolName || "MBGEduGuinée")}${meta.schoolContact ? " — " + esc(meta.schoolContact) : ""} · Document généré par MBGEduGuinée</td></tr></tfoot>
-</table>
-<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 350); };<\/script>
-</body></html>`;
-
+  const reference = newDocumentReference("RPT");
+  const esc = (v: any) => String(v ?? "").replace(/[&<>\"]/g, (m) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" } as any)[m]);
+  const generated = new Date().toLocaleString("fr-FR");
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8" /><title>${esc(title)}</title><style>${printStyles(accent)}</style></head><body>
+  <main class="doc">
+    <header class="letterhead">
+      ${meta.logoUrl ? `<img class="logo" src="${esc(meta.logoUrl)}" alt="Logo" />` : `<div class="logo"></div>`}
+      <div><div class="school">${esc(meta.schoolName || "MBGEduGuinée")}</div>${meta.schoolAddress ? `<div class="muted">${esc(meta.schoolAddress)}</div>` : ""}${meta.schoolContact ? `<div class="muted">${esc(meta.schoolContact)}</div>` : ""}</div>
+      <div class="docmeta"><strong>RÉPUBLIQUE DE GUINÉE</strong><br/>Travail — Justice — Solidarité${meta.academicYear ? `<br/>Année scolaire : ${esc(meta.academicYear)}` : ""}<h1>${esc(title)}</h1><div class="sub">${esc(meta.subtitle || "")}${meta.subtitle ? " · " : ""}${generated}</div></div>
+    </header>
+    <div class="summary"><div class="stat"><div class="stat-label">Document</div><div class="stat-value">${esc(reference)}</div></div><div class="stat"><div class="stat-label">Enregistrements</div><div class="stat-value">${rows.length}</div></div><div class="stat"><div class="stat-label">Établissement</div><div class="stat-value">${esc(meta.schoolName || "MBGEduGuinée")}</div></div><div class="stat"><div class="stat-label">Émis le</div><div class="stat-value">${esc(generated)}</div></div></div>
+    <div class="section-title">Données du rapport</div>
+    <table><thead><tr>${columns.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${columns.map((c) => `<td>${esc(cell(r,c))}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    <footer class="footer"><span>${esc(meta.schoolName || "MBGEduGuinée")}${meta.schoolContact ? ` · ${esc(meta.schoolContact)}` : ""}</span><span>Réf. ${esc(reference)} · Document généré par MBGEduGuinée</span></footer>
+  </main><script>window.onload=function(){setTimeout(function(){window.print();},350)};<\/script></body></html>`;
   const w = window.open("", "_blank", "width=1200,height=800");
   if (!w) return false;
-  w.document.write(html);
-  w.document.close();
-  return true;
+  w.document.write(html); w.document.close(); return true;
 }
 
 function triggerDownload(blob: Blob, filename: string) {
