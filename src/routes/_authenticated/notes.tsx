@@ -161,7 +161,7 @@ function GradeDialog({ students, subjects, period, maxScore, onClose }: any) {
     if (Number.isNaN(score) || score < 0 || score > maxScore) {
       return toast.error(`La note doit être comprise entre 0 et ${maxScore}.`);
     }
-    const { error } = await supabase.from("grades").insert({ ...form, score, period });
+    const { error } = await supabase.from("grades").insert({ ...form, score, period, max_score: maxScore });
     if (error) return toast.error(error.message);
     toast.success("Note enregistrée");
     onClose();
