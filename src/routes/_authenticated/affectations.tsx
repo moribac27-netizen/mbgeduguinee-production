@@ -189,6 +189,7 @@ function AssignmentsPage() {
         classes={classes as any[]}
         subjects={subjects as any[]}
         existing={rows}
+        currentYear={CURRENT_YEAR}
         onSaved={() => qc.invalidateQueries({ queryKey: ["tca"] })}
       />
     </div>
@@ -196,20 +197,22 @@ function AssignmentsPage() {
 }
 
 function AssignmentDialog({
-  open, onOpenChange, editing, teachers, classes, subjects, existing, onSaved,
+  open, onOpenChange, editing, teachers, classes, subjects, existing, currentYear, onSaved,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   editing: Row | null;
   teachers: any[]; classes: any[]; subjects: any[];
   existing: Row[];
+  currentYear: string;
   onSaved: () => void;
 }) {
   const [teacherId, setTeacherId] = useState<string>("");
   const [classIds, setClassIds] = useState<string[]>([]);
   const [subjectIds, setSubjectIds] = useState<string[]>([]);
-  const [year, setYear] = useState<string>(CURRENT_YEAR);
+  const [year, setYear] = useState<string>(currentYear);
   const [saving, setSaving] = useState(false);
+  const YEARS = getAcademicYearOptions(currentYear);
 
   // Reset when opening
   useMemo(() => {
@@ -223,7 +226,7 @@ function AssignmentDialog({
         setTeacherId("");
         setClassIds([]);
         setSubjectIds([]);
-        setYear(CURRENT_YEAR);
+        setYear(currentYear);
       }
     }
   }, [open, editing]);
