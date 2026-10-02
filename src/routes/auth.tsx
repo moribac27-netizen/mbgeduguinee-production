@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { School, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { logLogin } from "@/lib/audit";
-import { resolveUserHome } from "@/lib/auth-redirect";
+import { loadUserContext, resolveUserHome } from "@/lib/auth-redirect";
 
 // Montant fixe configurable (en GNF)
 const STUDENT_FEE = 50000;
@@ -32,6 +32,19 @@ function formatNumber(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n);
 }
 
+type AuthSpace = "etablissement" | "parent" | "eleve";
+type AuthMode = "signin" | "signup";
+
+function readAuthContext(): { space: AuthSpace | null; mode: AuthMode } {
+  if (typeof window === "undefined") return { space: null, mode: "signin" };
+  const params = new URLSearchParams(window.location.search);
+  const rawSpace = params.get("role");
+  const rawMode = params.get("mode");
+  const space = rawSpace === "etablissement" || rawSpace === "parent" || rawSpace === "eleve" ? rawSpace : null;
+  const mode = rawMode === "signup" ? "signup" : "signin";
+  return { space, mode };
+}
+
 export const Route = createFileRoute("/auth")({
   ssr: false,
   beforeLoad: async () => {
@@ -44,15 +57,48 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const authContext = readAuthContext();
+  const authSpace = authContext.space;
+  const [dedicatedMode, setDedicatedMode] = useState<AuthMode>(authContext.mode);
   const [loading, setLoading] = useState(false);
   const [signIn, setSignIn] = useState({ email: "", password: "" });
   const [signUp, setSignUp] = useState(emptySignUp);
-  const [familySignUp, setFamilySignUp] = useState(emptyFamilySignUp);
+  const [familySignUp, setFamilySignUp] = useState({
+    ...emptyFamilySignUp,
+    asRole: authSpace === "eleve" ? "eleve" : "parent",
+  });
   const [familyMode, setFamilyMode] = useState<"signin" | "signup">("signin");
   const [resetLoading, setResetLoading] = useState(false);
   const redeemFn = useServerFn(redeemAccessCodeAndSignUp);
 
+  useEffect(() => {
+    setDedicatedMode(authContext.mode);
+    if (authSpace === "parent" || authSpace === "eleve") {
+      setFamilySignUp((current) => ({ ...current, asRole: authSpace }));
+    }
+  }, [authContext.mode, authSpace]);
+
   const afterAuth = async () => navigate({ to: await resolveUserHome(), replace: true });
+
+  async function ensureSelectedSpace(): Promise<boolean> {
+    if (!authSpace) return true;
+    const ctx = await loadUserContext();
+    if (!ctx) return false;
+
+    const matches =
+      authSpace === "parent"
+        ? ctx.roles.includes("parent")
+        : authSpace === "eleve"
+          ? ctx.roles.includes("eleve")
+          : ctx.isSuperAdmin || ctx.roles.some((role) => role !== "parent" && role !== "eleve");
+
+    if (matches) return true;
+
+    await supabase.auth.signOut();
+    const labels = { etablissement: "Établissement", parent: "Parent / Tuteur", eleve: "Élève" };
+    toast.error(`Ce compte n'est pas associé à l'espace ${labels[authSpace]}.`);
+    return false;
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -78,6 +124,10 @@ function AuthPage() {
       else if (msg.includes("invalid")) return toast.error("Email ou mot de passe incorrect");
       return toast.error(error.message);
     }
+    if (!(await ensureSelectedSpace())) {
+      setLoading(false);
+      return;
+    }
     setUnconfirmedEmail(null);
     toast.success("Connexion réussie");
     void logLogin(signIn.email.trim());
@@ -91,7 +141,7 @@ function AuthPage() {
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: window.location.origin + "/auth" },
+      options: { emailRedirectTo: window.location.origin + (authSpace ? `/auth?role=${authSpace}&mode=signin` : "/auth") },
     });
     setResending(false);
     if (error) return toast.error(error.message);
@@ -112,6 +162,10 @@ function AuthPage() {
       const msg = error.message.toLowerCase();
       if (msg.includes("confirm")) return toast.info("E-mail toujours non confirmé. Réessayez dans un instant.");
       return toast.error(error.message);
+    }
+    if (!(await ensureSelectedSpace())) {
+      setRechecking(false);
+      return;
     }
     setUnconfirmedEmail(null);
     toast.success("E-mail confirmé. Redirection...");
@@ -209,12 +263,14 @@ function AuthPage() {
         toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${formatNumber(STUDENT_FEE)} GNF validé par l'école.`);
         setFamilySignUp(emptyFamilySignUp);
         setFamilyMode("signin");
+        if (authSpace) setDedicatedMode("signin");
         return;
       }
 
       toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${formatNumber(STUDENT_FEE)} GNF validé par l'école.`);
       setFamilySignUp(emptyFamilySignUp);
       setFamilyMode("signin");
+      if (authSpace) setDedicatedMode("signin");
       // Ne pas rediriger immédiatement, laisser le message affiché
       setTimeout(afterAuth, 2000);
     } catch (err: any) {
@@ -224,7 +280,7 @@ function AuthPage() {
   }
 
   async function handleGoogle() {
-    const dest = "/auth";
+    const dest = authSpace ? `/auth?role=${authSpace}&mode=signin` : "/auth";
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin + dest,
     });
@@ -232,6 +288,43 @@ function AuthPage() {
     if (result.redirected) return;
     afterAuth();
   }
+
+  const signInSupport = (
+    <>
+      <Button
+        type="button"
+        variant="link"
+        className="w-full text-xs"
+        disabled={resetLoading}
+        onClick={async () => {
+          const email = signIn.email.trim();
+          if (!email) return toast.error("Saisissez d’abord votre adresse e-mail.");
+          setResetLoading(true);
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/definir-mot-de-passe`,
+          });
+          setResetLoading(false);
+          if (error) return toast.error(`Impossible d’envoyer le lien : ${error.message}`);
+          toast.success("Lien de récupération envoyé. Vérifiez votre boîte e-mail.");
+        }}
+      >
+        {resetLoading ? "Envoi…" : "Mot de passe oublié ?"}
+      </Button>
+      {unconfirmedEmail && (
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+          <p className="mb-2">Votre e-mail <span className="font-medium">{unconfirmedEmail}</span> n'est pas encore confirmé.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleResend} disabled={resending}>
+              {resending ? "Envoi..." : "Renvoyer l'e-mail de confirmation"}
+            </Button>
+            <Button type="button" size="sm" onClick={handleRecheck} disabled={rechecking}>
+              {rechecking ? "Vérification..." : "Vérifier à nouveau"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/10 flex items-center justify-center p-4">
@@ -248,142 +341,236 @@ function AuthPage() {
         <Card>
           <CardHeader>
             <CardTitle>Bienvenue</CardTitle>
-            <CardDescription>Connectez-vous ou créez votre compte établissement</CardDescription>
+            <CardDescription>
+              {authSpace === "etablissement"
+                ? dedicatedMode === "signup"
+                  ? "Créez votre établissement directement depuis cet espace."
+                  : "Connectez-vous à votre compte établissement."
+                : authSpace === "parent"
+                  ? dedicatedMode === "signup"
+                    ? "Créez votre compte Parent / Tuteur avec le code fourni par l'école."
+                    : "Connectez-vous à votre espace Parent / Tuteur."
+                  : authSpace === "eleve"
+                    ? dedicatedMode === "signup"
+                      ? "Créez votre compte Élève avec le code fourni par l'école."
+                      : "Connectez-vous à votre espace Élève."
+                    : "Connectez-vous ou créez votre compte établissement"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin">
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="signin">Connexion</TabsTrigger>
-                <TabsTrigger value="signup">Établissement</TabsTrigger>
-                <TabsTrigger value="family">Parent/Élève</TabsTrigger>
-              </TabsList>
-              <TabsContent value="signin">
-                <form onSubmit={handleSignIn} className="space-y-3">
-                  <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
-                  <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
-                  <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="w-full text-xs"
-                    disabled={resetLoading}
-                    onClick={async () => {
-                      const email = signIn.email.trim();
-                      if (!email) return toast.error("Saisissez d’abord votre adresse e-mail.");
-                      setResetLoading(true);
-                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                        redirectTo: `${window.location.origin}/definir-mot-de-passe`,
-                      });
-                      setResetLoading(false);
-                      if (error) return toast.error(`Impossible d’envoyer le lien : ${error.message}`);
-                      toast.success("Lien de récupération envoyé. Vérifiez votre boîte e-mail.");
-                    }}
-                  >
-                    {resetLoading ? "Envoi…" : "Mot de passe oublié ?"}
-                  </Button>
-                  {unconfirmedEmail && (
-                    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
-                      <p className="mb-2">Votre e-mail <span className="font-medium">{unconfirmedEmail}</span> n'est pas encore confirmé.</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={handleResend} disabled={resending}>
-                          {resending ? "Envoi..." : "Renvoyer l'e-mail de confirmation"}
-                        </Button>
-                        <Button type="button" size="sm" onClick={handleRecheck} disabled={rechecking}>
-                          {rechecking ? "Vérification..." : "Vérifier à nouveau"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </form>
-              </TabsContent>
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
-                  <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
-                  <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>
-                  <div><Label>Téléphone de l'établissement</Label><Input value={signUp.schoolPhone} onChange={(e) => setSignUp({ ...signUp, schoolPhone: e.target.value })} placeholder="+224..." /></div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Administrateur</div>
-                  <div><Label>Nom complet *</Label><Input required value={signUp.fullName} onChange={(e) => setSignUp({ ...signUp, fullName: e.target.value })} /></div>
-                  <div><Label>Téléphone</Label><Input value={signUp.phone} onChange={(e) => setSignUp({ ...signUp, phone: e.target.value })} placeholder="+224..." /></div>
-                  <div><Label>Email *</Label><Input type="email" required value={signUp.email} onChange={(e) => setSignUp({ ...signUp, email: e.target.value })} /></div>
-                  <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={signUp.password} onChange={(e) => setSignUp({ ...signUp, password: e.target.value })} /></div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Création en cours..." : "Créer mon établissement"}
-                  </Button>
-                </form>
-              </TabsContent>
-              <TabsContent value="family">
-                {familyMode === "signin" ? (
+            {authSpace ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-[#0B1F3A]/10 bg-[#F7F9FC] p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[#0B1F3A]/60">Espace sélectionné</div>
+                  <div className="mt-1 text-lg font-display font-bold">{authSpace === "etablissement" ? "Établissement" : authSpace === "parent" ? "Parent / Tuteur" : "Élève"}</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {authSpace === "etablissement"
+                      ? dedicatedMode === "signup"
+                        ? "Créez votre établissement et votre compte administrateur."
+                        : "Connectez-vous à votre espace établissement."
+                      : authSpace === "parent"
+                        ? dedicatedMode === "signup"
+                          ? "Créez votre compte Parent / Tuteur avec le code fourni par l'école."
+                          : "Connectez-vous à votre espace Parent / Tuteur."
+                        : dedicatedMode === "signup"
+                          ? "Créez votre compte Élève avec le code fourni par l'école."
+                          : "Connectez-vous à votre espace Élève."}
+                  </p>
+                </div>
+
+                {authSpace === "etablissement" && dedicatedMode === "signup" ? (
+                  <form onSubmit={handleSignUp} className="space-y-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
+                    <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
+                    <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>
+                    <div><Label>Téléphone de l'établissement</Label><Input value={signUp.schoolPhone} onChange={(e) => setSignUp({ ...signUp, schoolPhone: e.target.value })} placeholder="+224..." /></div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Administrateur</div>
+                    <div><Label>Nom complet *</Label><Input required value={signUp.fullName} onChange={(e) => setSignUp({ ...signUp, fullName: e.target.value })} /></div>
+                    <div><Label>Téléphone</Label><Input value={signUp.phone} onChange={(e) => setSignUp({ ...signUp, phone: e.target.value })} placeholder="+224..." /></div>
+                    <div><Label>Email *</Label><Input type="email" required value={signUp.email} onChange={(e) => setSignUp({ ...signUp, email: e.target.value })} /></div>
+                    <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={signUp.password} onChange={(e) => setSignUp({ ...signUp, password: e.target.value })} /></div>
+                    <Button type="submit" className="w-full" disabled={loading}>{loading ? "Création en cours..." : "Créer mon établissement"}</Button>
+                    <Button type="button" variant="link" className="w-full text-xs" onClick={() => setDedicatedMode("signin")}>J'ai déjà un compte établissement</Button>
+                  </form>
+                ) : authSpace === "etablissement" ? (
                   <form onSubmit={handleSignIn} className="space-y-3">
                     <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
                     <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
                     <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
-                    <Button type="button" variant="link" className="w-full text-xs" onClick={() => setFamilyMode("signup")}>Créer un nouveau compte avec un code d'accès</Button>
+                    {signInSupport}
+                    <Button type="button" variant="link" className="w-full text-xs" onClick={() => setDedicatedMode("signup")}>Créer mon établissement</Button>
                   </form>
                 ) : (
-                  <form onSubmit={handleFamilySignUp} className="space-y-3">
-                    <div>
-                      <Label>Code d'accès *</Label>
-                      <Input
-                        required
-                        className="font-mono tracking-wider uppercase"
-                        placeholder="XXXXX-XXXXX (ex: HZDVS-ZZ4WR)"
-                        value={familySignUp.code}
-                        onChange={(e) => setFamilySignUp({ ...familySignUp, code: e.target.value.toUpperCase() })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Fourni par votre directeur ou informaticien — un code par personne.</p>
-                    </div>
-
-                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3">
-                      <div className="flex gap-2 text-sm">
-                        <HelpCircle className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                        <div className="text-blue-900 dark:text-blue-200">
-                          <p className="font-medium mb-1">Vous avez oublié votre code ?</p>
-                          <p>Contactez le directeur ou l'informaticien de votre école pour obtenir un nouveau code d'accès.</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Vous êtes *</Label>
-                      <RadioGroup
-                        className="flex gap-4 mt-1"
-                        value={familySignUp.asRole}
-                        onValueChange={(v) => setFamilySignUp({ ...familySignUp, asRole: v as "parent" | "eleve" })}
-                      >
-                        <div className="flex items-center gap-2">
-                          <RadioGroupItem value="parent" id="role-parent" />
-                          <Label htmlFor="role-parent" className="font-normal">Parent</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <RadioGroupItem value="eleve" id="role-eleve" />
-                          <Label htmlFor="role-eleve" className="font-normal">Élève</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                    <div><Label>Nom complet *</Label><Input required value={familySignUp.fullName} onChange={(e) => setFamilySignUp({ ...familySignUp, fullName: e.target.value })} /></div>
-                    <div><Label>Téléphone</Label><Input value={familySignUp.phone} onChange={(e) => setFamilySignUp({ ...familySignUp, phone: e.target.value })} placeholder="+224..." /></div>
-                    <div><Label>Email *</Label><Input type="email" required value={familySignUp.email} onChange={(e) => setFamilySignUp({ ...familySignUp, email: e.target.value })} /></div>
-                    <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
-
-                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-900 dark:text-amber-200">
-                      <div className="flex gap-2">
-                        <AlertCircle className="size-4 flex-shrink-0 mt-0.5" />
+                  <>
+                    {dedicatedMode === "signin" ? (
+                      <form onSubmit={handleSignIn} className="space-y-3">
+                        <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
+                        <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
+                        <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
+                        {signInSupport}
+                        <Button type="button" variant="link" className="w-full text-xs" onClick={() => { setFamilySignUp((current) => ({ ...current, asRole: authSpace })); setDedicatedMode("signup"); }}>Créer un compte avec un code d'accès</Button>
+                      </form>
+                    ) : (
+                      <form onSubmit={handleFamilySignUp} className="space-y-3">
                         <div>
-                          <p className="font-medium">Montant à payer : <span className="font-bold">{formatNumber(STUDENT_FEE)} GNF</span></p>
-                          <p className="mt-1">Votre dossier sera accessible une fois ce montant validé par l'école.</p>
+                          <Label>Code d'accès *</Label>
+                          <Input required className="font-mono tracking-wider uppercase" placeholder="XXXXX-XXXXX (ex: HZDVS-ZZ4WR)" value={familySignUp.code} onChange={(e) => setFamilySignUp({ ...familySignUp, code: e.target.value.toUpperCase() })} />
+                          <p className="text-xs text-muted-foreground mt-1">Fourni par votre directeur ou informaticien — un code par personne.</p>
                         </div>
-                      </div>
-                    </div>
-
-                    <Button type="submit" className="w-full" disabled={familyLoading}>
-                      {familyLoading ? "Création en cours..." : "Créer mon compte"}
-                    </Button>
-                    <Button type="button" variant="link" className="w-full text-xs" onClick={() => setFamilyMode("signin")}>Vous avez déjà un compte ?</Button>
-                  </form>
+                        <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3">
+                          <div className="flex gap-2 text-sm"><HelpCircle className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" /><div className="text-blue-900 dark:text-blue-200"><p className="font-medium mb-1">Vous avez oublié votre code ?</p><p>Contactez le directeur ou l'informaticien de votre école pour obtenir un nouveau code d'accès.</p></div></div>
+                        </div>
+                        <div><Label>Vous êtes *</Label><div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm font-medium">{authSpace === "parent" ? "Parent / Tuteur" : "Élève"}</div></div>
+                        <div><Label>Nom complet *</Label><Input required value={familySignUp.fullName} onChange={(e) => setFamilySignUp({ ...familySignUp, fullName: e.target.value })} /></div>
+                        <div><Label>Téléphone</Label><Input value={familySignUp.phone} onChange={(e) => setFamilySignUp({ ...familySignUp, phone: e.target.value })} placeholder="+224..." /></div>
+                        <div><Label>Email *</Label><Input type="email" required value={familySignUp.email} onChange={(e) => setFamilySignUp({ ...familySignUp, email: e.target.value })} /></div>
+                        <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
+                        <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-900 dark:text-amber-200"><div className="flex gap-2"><AlertCircle className="size-4 flex-shrink-0 mt-0.5" /><div><p className="font-medium">Montant à payer : <span className="font-bold">{formatNumber(STUDENT_FEE)} GNF</span></p><p className="mt-1">Votre dossier sera accessible une fois ce montant validé par l'école.</p></div></div></div>
+                        <Button type="submit" className="w-full" disabled={familyLoading}>{familyLoading ? "Création en cours..." : "Créer mon compte"}</Button>
+                        <Button type="button" variant="link" className="w-full text-xs" onClick={() => setDedicatedMode("signin")}>Vous avez déjà un compte ? Se connecter</Button>
+                      </form>
+                    )}
+                  </>
                 )}
-              </TabsContent>
-            </Tabs>
+
+                <Button type="button" variant="ghost" className="w-full text-xs" onClick={() => navigate({ to: "/auth", replace: true })}>Voir les autres espaces</Button>
+              </div>
+            ) : (
+                          <Tabs defaultValue="signin">
+                            <TabsList className="grid grid-cols-3 mb-4">
+                              <TabsTrigger value="signin">Connexion</TabsTrigger>
+                              <TabsTrigger value="signup">Établissement</TabsTrigger>
+                              <TabsTrigger value="family">Parent/Élève</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="signin">
+                              <form onSubmit={handleSignIn} className="space-y-3">
+                                <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
+                                <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
+                                <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
+                                <Button
+                                  type="button"
+                                  variant="link"
+                                  className="w-full text-xs"
+                                  disabled={resetLoading}
+                                  onClick={async () => {
+                                    const email = signIn.email.trim();
+                                    if (!email) return toast.error("Saisissez d’abord votre adresse e-mail.");
+                                    setResetLoading(true);
+                                    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                                      redirectTo: `${window.location.origin}/definir-mot-de-passe`,
+                                    });
+                                    setResetLoading(false);
+                                    if (error) return toast.error(`Impossible d’envoyer le lien : ${error.message}`);
+                                    toast.success("Lien de récupération envoyé. Vérifiez votre boîte e-mail.");
+                                  }}
+                                >
+                                  {resetLoading ? "Envoi…" : "Mot de passe oublié ?"}
+                                </Button>
+                                {unconfirmedEmail && (
+                                  <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+                                    <p className="mb-2">Votre e-mail <span className="font-medium">{unconfirmedEmail}</span> n'est pas encore confirmé.</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button type="button" variant="outline" size="sm" onClick={handleResend} disabled={resending}>
+                                        {resending ? "Envoi..." : "Renvoyer l'e-mail de confirmation"}
+                                      </Button>
+                                      <Button type="button" size="sm" onClick={handleRecheck} disabled={rechecking}>
+                                        {rechecking ? "Vérification..." : "Vérifier à nouveau"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </form>
+                            </TabsContent>
+                            <TabsContent value="signup">
+                              <form onSubmit={handleSignUp} className="space-y-3">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
+                                <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
+                                <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>
+                                <div><Label>Téléphone de l'établissement</Label><Input value={signUp.schoolPhone} onChange={(e) => setSignUp({ ...signUp, schoolPhone: e.target.value })} placeholder="+224..." /></div>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Administrateur</div>
+                                <div><Label>Nom complet *</Label><Input required value={signUp.fullName} onChange={(e) => setSignUp({ ...signUp, fullName: e.target.value })} /></div>
+                                <div><Label>Téléphone</Label><Input value={signUp.phone} onChange={(e) => setSignUp({ ...signUp, phone: e.target.value })} placeholder="+224..." /></div>
+                                <div><Label>Email *</Label><Input type="email" required value={signUp.email} onChange={(e) => setSignUp({ ...signUp, email: e.target.value })} /></div>
+                                <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={signUp.password} onChange={(e) => setSignUp({ ...signUp, password: e.target.value })} /></div>
+                                <Button type="submit" className="w-full" disabled={loading}>
+                                  {loading ? "Création en cours..." : "Créer mon établissement"}
+                                </Button>
+                              </form>
+                            </TabsContent>
+                            <TabsContent value="family">
+                              {familyMode === "signin" ? (
+                                <form onSubmit={handleSignIn} className="space-y-3">
+                                  <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
+                                  <div><Label>Mot de passe</Label><Input type="password" required value={signIn.password} onChange={(e) => setSignIn({ ...signIn, password: e.target.value })} /></div>
+                                  <Button type="submit" className="w-full" disabled={loading}>{loading ? "Connexion..." : "Se connecter"}</Button>
+                                  <Button type="button" variant="link" className="w-full text-xs" onClick={() => setFamilyMode("signup")}>Créer un nouveau compte avec un code d'accès</Button>
+                                </form>
+                              ) : (
+                                <form onSubmit={handleFamilySignUp} className="space-y-3">
+                                  <div>
+                                    <Label>Code d'accès *</Label>
+                                    <Input
+                                      required
+                                      className="font-mono tracking-wider uppercase"
+                                      placeholder="XXXXX-XXXXX (ex: HZDVS-ZZ4WR)"
+                                      value={familySignUp.code}
+                                      onChange={(e) => setFamilySignUp({ ...familySignUp, code: e.target.value.toUpperCase() })}
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">Fourni par votre directeur ou informaticien — un code par personne.</p>
+                                  </div>
+
+                                  <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3">
+                                    <div className="flex gap-2 text-sm">
+                                      <HelpCircle className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                      <div className="text-blue-900 dark:text-blue-200">
+                                        <p className="font-medium mb-1">Vous avez oublié votre code ?</p>
+                                        <p>Contactez le directeur ou l'informaticien de votre école pour obtenir un nouveau code d'accès.</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <Label>Vous êtes *</Label>
+                                    <RadioGroup
+                                      className="flex gap-4 mt-1"
+                                      value={familySignUp.asRole}
+                                      onValueChange={(v) => setFamilySignUp({ ...familySignUp, asRole: v as "parent" | "eleve" })}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <RadioGroupItem value="parent" id="role-parent" />
+                                        <Label htmlFor="role-parent" className="font-normal">Parent</Label>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <RadioGroupItem value="eleve" id="role-eleve" />
+                                        <Label htmlFor="role-eleve" className="font-normal">Élève</Label>
+                                      </div>
+                                    </RadioGroup>
+                                  </div>
+                                  <div><Label>Nom complet *</Label><Input required value={familySignUp.fullName} onChange={(e) => setFamilySignUp({ ...familySignUp, fullName: e.target.value })} /></div>
+                                  <div><Label>Téléphone</Label><Input value={familySignUp.phone} onChange={(e) => setFamilySignUp({ ...familySignUp, phone: e.target.value })} placeholder="+224..." /></div>
+                                  <div><Label>Email *</Label><Input type="email" required value={familySignUp.email} onChange={(e) => setFamilySignUp({ ...familySignUp, email: e.target.value })} /></div>
+                                  <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
+
+                                  <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-900 dark:text-amber-200">
+                                    <div className="flex gap-2">
+                                      <AlertCircle className="size-4 flex-shrink-0 mt-0.5" />
+                                      <div>
+                                        <p className="font-medium">Montant à payer : <span className="font-bold">{formatNumber(STUDENT_FEE)} GNF</span></p>
+                                        <p className="mt-1">Votre dossier sera accessible une fois ce montant validé par l'école.</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <Button type="submit" className="w-full" disabled={familyLoading}>
+                                    {familyLoading ? "Création en cours..." : "Créer mon compte"}
+                                  </Button>
+                                  <Button type="button" variant="link" className="w-full text-xs" onClick={() => setFamilyMode("signin")}>Vous avez déjà un compte ?</Button>
+                                </form>
+                              )}
+                            </TabsContent>
+                          </Tabs>
+
+            )}
             <div className="my-4 flex items-center gap-3">
               <div className="h-px bg-border flex-1" />
               <span className="text-xs text-muted-foreground">ou</span>
@@ -393,7 +580,7 @@ function AuthPage() {
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground mt-4">
-          En créant un compte établissement, vous devenez <span className="font-medium">administrateur</span> de votre établissement.
+          {authSpace === "etablissement" ? "En créant un compte établissement, vous devenez administrateur de votre établissement." : "Les comptes Parent / Tuteur et Élève sont rattachés à leur établissement via un code d'accès."}
         </p>
       </div>
     </div>

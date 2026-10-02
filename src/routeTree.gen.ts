@@ -9,13 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DefinirMotDePasseRouteImport } from './routes/definir-mot-de-passe'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VerifierRecuNumberRouteImport } from './routes/verifier-recu.$number'
 import { Route as AuthenticatedTransportRouteImport } from './routes/_authenticated/transport'
 import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
+import { Route as AuthenticatedSortieEleveRouteImport } from './routes/_authenticated/sortie-eleve'
 import { Route as AuthenticatedSauvegardeRouteImport } from './routes/_authenticated/sauvegarde'
 import { Route as AuthenticatedSalairesRouteImport } from './routes/_authenticated/salaires'
 import { Route as AuthenticatedRapportsRouteImport } from './routes/_authenticated/rapports'
@@ -51,15 +52,16 @@ import { Route as AuthenticatedBulletinsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedBibliothequeRouteImport } from './routes/_authenticated/bibliotheque'
 import { Route as AuthenticatedAnnoncesRouteImport } from './routes/_authenticated/annonces'
 import { Route as AuthenticatedAffectationsRouteImport } from './routes/_authenticated/affectations'
+import { Route as ApiCronBackupsRouteImport } from './routes/api/cron/backups'
 
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DefinirMotDePasseRoute = DefinirMotDePasseRouteImport.update({
   id: '/definir-mot-de-passe',
   path: '/definir-mot-de-passe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -86,6 +88,12 @@ const AuthenticatedSuperAdminRoute = AuthenticatedSuperAdminRouteImport.update({
   path: '/super-admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSortieEleveRoute =
+  AuthenticatedSortieEleveRouteImport.update({
+    id: '/sortie-eleve',
+    path: '/sortie-eleve',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSauvegardeRoute = AuthenticatedSauvegardeRouteImport.update({
   id: '/sauvegarde',
   path: '/sauvegarde',
@@ -270,6 +278,12 @@ const AuthenticatedAffectationsRoute =
     path: '/affectations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiCronBackupsRoute = ApiCronBackupsRouteImport.update({
+  id: '/api/cron/backups',
+  path: '/api/cron/backups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
@@ -309,9 +323,11 @@ export interface FileRoutesByFullPath {
   '/rapports': typeof AuthenticatedRapportsRoute
   '/salaires': typeof AuthenticatedSalairesRoute
   '/sauvegarde': typeof AuthenticatedSauvegardeRoute
+  '/sortie-eleve': typeof AuthenticatedSortieEleveRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/transport': typeof AuthenticatedTransportRoute
   '/verifier-recu/$number': typeof VerifierRecuNumberRoute
+  '/api/cron/backups': typeof ApiCronBackupsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -352,9 +368,11 @@ export interface FileRoutesByTo {
   '/rapports': typeof AuthenticatedRapportsRoute
   '/salaires': typeof AuthenticatedSalairesRoute
   '/sauvegarde': typeof AuthenticatedSauvegardeRoute
+  '/sortie-eleve': typeof AuthenticatedSortieEleveRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/transport': typeof AuthenticatedTransportRoute
   '/verifier-recu/$number': typeof VerifierRecuNumberRoute
+  '/api/cron/backups': typeof ApiCronBackupsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -397,9 +415,11 @@ export interface FileRoutesById {
   '/_authenticated/rapports': typeof AuthenticatedRapportsRoute
   '/_authenticated/salaires': typeof AuthenticatedSalairesRoute
   '/_authenticated/sauvegarde': typeof AuthenticatedSauvegardeRoute
+  '/_authenticated/sortie-eleve': typeof AuthenticatedSortieEleveRoute
   '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/transport': typeof AuthenticatedTransportRoute
   '/verifier-recu/$number': typeof VerifierRecuNumberRoute
+  '/api/cron/backups': typeof ApiCronBackupsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -442,9 +462,11 @@ export interface FileRouteTypes {
     | '/rapports'
     | '/salaires'
     | '/sauvegarde'
+    | '/sortie-eleve'
     | '/super-admin'
     | '/transport'
     | '/verifier-recu/$number'
+    | '/api/cron/backups'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -485,9 +507,11 @@ export interface FileRouteTypes {
     | '/rapports'
     | '/salaires'
     | '/sauvegarde'
+    | '/sortie-eleve'
     | '/super-admin'
     | '/transport'
     | '/verifier-recu/$number'
+    | '/api/cron/backups'
   id:
     | '__root__'
     | '/'
@@ -529,17 +553,20 @@ export interface FileRouteTypes {
     | '/_authenticated/rapports'
     | '/_authenticated/salaires'
     | '/_authenticated/sauvegarde'
+    | '/_authenticated/sortie-eleve'
     | '/_authenticated/super-admin'
     | '/_authenticated/transport'
     | '/verifier-recu/$number'
+    | '/api/cron/backups'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  DefinirMotDePasseRoute: typeof DefinirMotDePasseRoute
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  DefinirMotDePasseRoute: typeof DefinirMotDePasseRoute
   VerifierRecuNumberRoute: typeof VerifierRecuNumberRoute
+  ApiCronBackupsRoute: typeof ApiCronBackupsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -591,6 +618,13 @@ declare module '@tanstack/react-router' {
       path: '/super-admin'
       fullPath: '/super-admin'
       preLoaderRoute: typeof AuthenticatedSuperAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sortie-eleve': {
+      id: '/_authenticated/sortie-eleve'
+      path: '/sortie-eleve'
+      fullPath: '/sortie-eleve'
+      preLoaderRoute: typeof AuthenticatedSortieEleveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/sauvegarde': {
@@ -838,6 +872,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAffectationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/cron/backups': {
+      id: '/api/cron/backups'
+      path: '/api/cron/backups'
+      fullPath: '/api/cron/backups'
+      preLoaderRoute: typeof ApiCronBackupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -877,12 +918,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRapportsRoute: typeof AuthenticatedRapportsRoute
   AuthenticatedSalairesRoute: typeof AuthenticatedSalairesRoute
   AuthenticatedSauvegardeRoute: typeof AuthenticatedSauvegardeRoute
+  AuthenticatedSortieEleveRoute: typeof AuthenticatedSortieEleveRoute
   AuthenticatedSuperAdminRoute: typeof AuthenticatedSuperAdminRoute
   AuthenticatedTransportRoute: typeof AuthenticatedTransportRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-
   AuthenticatedAffectationsRoute: AuthenticatedAffectationsRoute,
   AuthenticatedAnnoncesRoute: AuthenticatedAnnoncesRoute,
   AuthenticatedBibliothequeRoute: AuthenticatedBibliothequeRoute,
@@ -915,12 +956,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedParentRoute: AuthenticatedParentRoute,
   AuthenticatedPersonnalisationRecuRoute:
     AuthenticatedPersonnalisationRecuRoute,
-
   AuthenticatedPresencesRoute: AuthenticatedPresencesRoute,
   AuthenticatedRapportsRoute: AuthenticatedRapportsRoute,
   AuthenticatedSalairesRoute: AuthenticatedSalairesRoute,
   AuthenticatedSauvegardeRoute: AuthenticatedSauvegardeRoute,
-
+  AuthenticatedSortieEleveRoute: AuthenticatedSortieEleveRoute,
   AuthenticatedSuperAdminRoute: AuthenticatedSuperAdminRoute,
   AuthenticatedTransportRoute: AuthenticatedTransportRoute,
 }
@@ -929,11 +969,12 @@ const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  DefinirMotDePasseRoute: DefinirMotDePasseRoute,
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  DefinirMotDePasseRoute: DefinirMotDePasseRoute,
   VerifierRecuNumberRoute: VerifierRecuNumberRoute,
+  ApiCronBackupsRoute: ApiCronBackupsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
