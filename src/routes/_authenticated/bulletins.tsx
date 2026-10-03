@@ -24,7 +24,7 @@ function BulletinsPage() {
   const [preview, setPreview] = useState(false);
 
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { paidIds, isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes-list"],
@@ -37,7 +37,7 @@ function BulletinsPage() {
   });
 
   const student = students.find((s: any) => s.id === studentId);
-  const isLocked = !!studentId && planInfo.isPerStudent && !paidIds.has(studentId);
+  const isLocked = !!studentId && planInfo.isPerStudent && !isUnlocked(studentId);
 
   function handlePrint() {
     if (isLocked) return;

@@ -1,5 +1,7 @@
+import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { PER_STUDENT_ACCESS_THRESHOLD, PER_STUDENT_SCHOOL_SHARE_GNF, PER_STUDENT_UNIT_PRICE_GNF } from "@/lib/pricing";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
 
@@ -78,6 +80,7 @@ export function usePerStudentPlan() {
 }
 
 export function usePaidStudentIds(schoolId: string | null, academicYear: string, enabled = true) {
+  const { isSuperAdmin } = useSuperAdmin();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["validated-student-ids", schoolId, academicYear],
     enabled: !!schoolId && !!academicYear && enabled,
@@ -93,5 +96,13 @@ export function usePaidStudentIds(schoolId: string | null, academicYear: string,
       return new Set(((data ?? []) as Array<{ student_id: string }>).map((r) => r.student_id));
     },
   });
-  return { paidIds: data ?? new Set<string>(), loading: isLoading, refetch };
+  const paidIds = data ?? new Set<string>();
+  /**
+   * Déverrouillage d'un élève pour l'accès aux notes, bulletins, cartes, rapports.
+   * Le Super Admin n'est jamais bloqué par le statut de cotisation ; les autres rôles
+   * restent soumis à la cotisation VALIDATED. `paidIds` garde le vrai statut de paiement
+   * (affichage des badges, page Cotisations) : ne pas l'utiliser pour verrouiller.
+   */
+  const isUnlocked = useCallback((studentId: string) => isSuperAdmin || paidIds.has(studentId), [isSuperAdmin, data]);
+  return { paidIds, isUnlocked, loading: isLoading, refetch };
 }

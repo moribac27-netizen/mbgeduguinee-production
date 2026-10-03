@@ -29,7 +29,7 @@ function NotesPage() {
 
   const { classes } = useScopedClassOptions();
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   const { data: subjects = [] } = useQuery({
     queryKey: ["subjects"],
@@ -51,12 +51,12 @@ function NotesPage() {
   const maxScore = maxScoreForLevel(cls?.level);
 
   function isLocked(studentId: string) {
-    return planInfo.isPerStudent && !paidIds.has(studentId);
+    return planInfo.isPerStudent && !isUnlocked(studentId);
   }
 
   const rows = useMemo(() => {
     return students.map((s: any) => {
-      const locked = planInfo.isPerStudent && !paidIds.has(s.id);
+      const locked = planInfo.isPerStudent && !isUnlocked(s.id);
       const sg = locked ? [] : grades.filter((g: any) => g.student_id === s.id);
       let totalWeighted = 0, totalCoef = 0;
       if (!locked) {
@@ -68,7 +68,7 @@ function NotesPage() {
       const avg = !locked && totalCoef > 0 ? totalWeighted / totalCoef : null;
       return { student: s, grades: sg, avg, locked };
     }).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
-  }, [students, grades, subjects, planInfo.isPerStudent, paidIds]);
+  }, [students, grades, subjects, planInfo.isPerStudent, isUnlocked]);
 
   const selectableStudents = students.filter((s: any) => !isLocked(s.id));
 

@@ -98,7 +98,7 @@ function ParentPortal() {
   // Plan "par élève" : statut de paiement par enfant, calculé une seule fois
   // pour l'école du parent connecté et réutilisé pour le badge + le verrouillage.
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { paidIds, isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   return (
     <div className="space-y-6">
@@ -176,7 +176,7 @@ function ParentPortal() {
           {selected && (
             <ChildDetails
               student={selected}
-              isLocked={planInfo.isPerStudent && !paidIds.has(selected.id)}
+              isLocked={planInfo.isPerStudent && !isUnlocked(selected.id)}
             />
           )}
         </>

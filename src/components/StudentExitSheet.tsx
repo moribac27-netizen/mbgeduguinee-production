@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Printer, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchool } from "@/hooks/useSchool";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { maxScoreForLevel } from "@/lib/grading";
 import { fmtMoney } from "@/lib/reports";
 import { DocumentFooter, DocumentHeader, DocumentStat, StudentIdentity } from "@/components/documents/DocumentPrimitives";
@@ -55,6 +56,7 @@ function LineChart({ points }: { points: { period: string; value: number | null 
 
 export function StudentExitSheet({ studentId }: { studentId: string }) {
   const { school, logoUrl } = useSchool();
+  const { isSuperAdmin } = useSuperAdmin();
   const { data, isLoading, error } = useQuery({
     queryKey: ["student-exit-sheet", studentId, school?.academic_year],
     enabled: !!studentId && !!school?.id,
@@ -79,7 +81,8 @@ export function StudentExitSheet({ studentId }: { studentId: string }) {
 
   if (isLoading) return <div className="p-8 text-sm text-muted-foreground">Préparation du document…</div>;
   if (error || !data?.student) return <div className="p-8 text-sm text-destructive">Impossible de charger la fiche de sortie.</div>;
-  if (!data.payment) return <div className="p-8"><div className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm"><b>Document verrouillé.</b> La cotisation annuelle de cet élève n'est pas VALIDATED pour {school?.academic_year ?? "l'année en cours"}. La fiche complète sera disponible après validation.</div></div>;
+  // Le Super Admin n'est jamais bloqué par la cotisation ; les autres rôles gardent le verrou.
+  if (!data.payment && !isSuperAdmin) return <div className="p-8"><div className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm"><b>Document verrouillé.</b> La cotisation annuelle de cet élève n'est pas VALIDATED pour {school?.academic_year ?? "l'année en cours"}. La fiche complète sera disponible après validation.</div></div>;
 
   return (
     <div className="space-y-4">
@@ -87,7 +90,7 @@ export function StudentExitSheet({ studentId }: { studentId: string }) {
       <article className="mbg-document-page shadow-sm print:shadow-none">
         <DocumentHeader school={school} logoUrl={logoUrl} title="Fiche de sortie scolaire" subtitle="Document administratif de fin de parcours / transfert" reference={ref} />
         <StudentIdentity student={data.student}>
-          <div className="mt-3 flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="size-4 text-primary" /> Dossier financier VALIDATED · Réf. paiement {data.payment.reference ?? data.payment.receipt_number ?? "—"}</div>
+          <div className="mt-3 flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="size-4 text-primary" /> {data.payment ? <>Dossier financier VALIDATED · Réf. paiement {data.payment.reference ?? data.payment.receipt_number ?? "—"}</> : <>Cotisation non validée · accès Super Admin</>}</div>
         </StudentIdentity>
 
         <section className="mbg-document-section">
@@ -95,7 +98,7 @@ export function StudentExitSheet({ studentId }: { studentId: string }) {
           <div className="mbg-stat-grid">
             <DocumentStat label="Moyenne générale" value={avg == null ? "—" : `${avg.toFixed(2)} / 20`} tone={avg != null && avg >= 10 ? "success" : "default"} />
             <DocumentStat label="Résultat" value={result} />
-            <DocumentStat label="Cotisation annuelle" value={fmtMoney(Number(data.payment.amount || 50000))} tone="success" />
+            <DocumentStat label="Cotisation annuelle" value={data.payment ? fmtMoney(Number(data.payment.amount || 50000)) : "Non validée"} tone={data.payment ? "success" : "warning"} />
             <DocumentStat label="Année scolaire" value={school?.academic_year ?? "—"} />
           </div>
         </section>

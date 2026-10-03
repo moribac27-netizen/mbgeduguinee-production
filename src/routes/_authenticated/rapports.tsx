@@ -257,7 +257,7 @@ function NotesReport() {
   const [excludedCount, setExcludedCount] = useState(0);
 
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   useEffect(() => {
     supabase.from("classes").select("id,name,level").order("name").then(({ data }) => setClasses(data || []));
@@ -294,14 +294,14 @@ function NotesReport() {
       let excluded = 0;
       if (planInfo.isPerStudent) {
         const before = mapped.length;
-        mapped = mapped.filter((r) => paidIds.has(r.studentId));
+        mapped = mapped.filter((r) => isUnlocked(r.studentId));
         excluded = before - mapped.length;
       }
       setExcludedCount(excluded);
       setRows(mapped);
       setLoading(false);
     })();
-  }, [classId, term, planInfo.isPerStudent, paidIds]);
+  }, [classId, term, planInfo.isPerStudent, isUnlocked]);
 
   const columns = [
     { key: "eleve", label: "Élève" },
@@ -779,7 +779,7 @@ function BulletinsReport() {
   const [excludedCount, setExcludedCount] = useState(0);
 
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   useEffect(() => {
     supabase.from("classes").select("id,name,level").order("name").then(({ data }) => setClasses(data || []));
@@ -824,7 +824,7 @@ function BulletinsReport() {
       let excluded = 0;
       if (planInfo.isPerStudent) {
         const before = list.length;
-        list = list.filter((r) => paidIds.has(r.studentId));
+        list = list.filter((r) => isUnlocked(r.studentId));
         excluded = before - list.length;
       }
       setExcludedCount(excluded);
@@ -848,7 +848,7 @@ function BulletinsReport() {
       );
       setLoading(false);
     })();
-  }, [classId, term, planInfo.isPerStudent, paidIds]);
+  }, [classId, term, planInfo.isPerStudent, isUnlocked]);
 
   const columns = [
     { key: "rang", label: "Rang" },

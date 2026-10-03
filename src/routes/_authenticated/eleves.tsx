@@ -50,7 +50,7 @@ function ElevesPage() {
     },
   });
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { paidIds, isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes"],
@@ -124,7 +124,7 @@ function ElevesPage() {
                       </TableCell>
                     )}
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" title="Aperçu du bulletin" disabled={!s.class_id || (planInfo.isPerStudent && !paidIds.has(s.id))} onClick={() => setPreviewStudent(s)}><Eye className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" title="Aperçu du bulletin" disabled={!s.class_id || (planInfo.isPerStudent && !isUnlocked(s.id))} onClick={() => setPreviewStudent(s)}><Eye className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Historique disciplinaire" onClick={() => setDisciplineStudent(s)}><ShieldAlert className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Code d'accès famille" onClick={() => setCodeStudent(s)}><KeyRound className="size-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => { setEditing(s); setOpen(true); }}><Pencil className="size-4" /></Button>

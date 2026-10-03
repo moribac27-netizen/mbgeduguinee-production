@@ -30,7 +30,7 @@ function CartesPage() {
   const [printFormat, setPrintFormat] = useState<"a4" | "cr80">("a4");
 
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   const { data: school } = useQuery({
     queryKey: ["my-school-card"],
@@ -50,7 +50,7 @@ function CartesPage() {
   });
 
   function isLocked(studentId: string) {
-    return planInfo.isPerStudent && !paidIds.has(studentId);
+    return planInfo.isPerStudent && !isUnlocked(studentId);
   }
 
   const filtered = useMemo(() => {
