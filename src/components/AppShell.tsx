@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   CreditCard, Megaphone, LogOut, Menu, X, School, FileText, CalendarDays, UserCheck,
-  Calculator, Wallet, ScrollText, Library, Link2, Settings, MessageSquare, BarChart3, History, DatabaseBackup, ShieldCheck,
+  Calculator, Wallet, ScrollText, Library, Link2, Settings, MessageSquare, BarChart3, History, DatabaseBackup, Sparkles, Package, ShieldCheck,
   Coins, Home, IdCard, BookMarked, HeartPulse, Bus, UtensilsCrossed, Baby, Briefcase, ShieldAlert, Users2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,9 +15,6 @@ import { canAccess, homeForRoles } from "@/lib/access";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { logLogout } from "@/lib/audit";
 import { InstallPWA } from "@/components/InstallPWA";
-import { useSchool } from "@/hooks/useSchool";
-import { SchoolIdentityHeader } from "@/components/SchoolIdentityHeader";
-import { ConakryClock } from "@/components/ConakryClock";
 
 
 const STAFF_NAV = [
@@ -38,7 +35,6 @@ const STAFF_NAV = [
   { to: "/notes", label: "Notes", icon: ClipboardList },
   { to: "/examens", label: "Examens", icon: ScrollText },
   { to: "/bulletins", label: "Bulletins", icon: FileText },
-  { to: "/sortie-eleve", label: "Fiches de sortie", icon: FileText },
   { to: "/paiements", label: "Paiements", icon: CreditCard },
   { to: "/cotisations", label: "Cotisations", icon: Coins },
   { to: "/comptabilite", label: "Comptabilité", icon: Calculator },
@@ -54,6 +50,8 @@ const STAFF_NAV = [
   { to: "/rapports", label: "Rapports", icon: BarChart3 },
   { to: "/journal", label: "Journal d'activité", icon: History },
   { to: "/sauvegarde", label: "Sauvegarde", icon: DatabaseBackup },
+  { to: "/souscription", label: "Abonnement", icon: Sparkles },
+  { to: "/plans", label: "Offres (admin)", icon: Package },
   { to: "/super-admin", label: "Super Admin", icon: ShieldCheck },
   { to: "/personnalisation-recu", label: "Personnalisation reçu", icon: FileText },
   { to: "/parametres", label: "Paramètres", icon: Settings },
@@ -79,7 +77,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { roles } = useRoles();
   const { isSuperAdmin } = useSuperAdmin();
-  const { school } = useSchool();
   const role = primaryRole(roles);
   const BASE_NAV = role === "parent" ? PARENT_NAV : role === "eleve" ? STUDENT_NAV : STAFF_NAV;
   const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin));
@@ -159,13 +156,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <div className="flex-1" />
           <div className="text-sm text-muted-foreground hidden sm:block">
-            Année scolaire <span className="font-medium text-foreground">{school?.academic_year ?? "—"}</span>
+            Année scolaire <span className="font-medium text-foreground">2025-2026</span>
           </div>
-          <ConakryClock />
           <NotificationsBell />
         </header>
         <main key={pathname} className="flex-1 p-4 lg:p-8 max-w-[1400px] w-full mx-auto page-fade-in">
-          <SchoolIdentityHeader />
           {children}
         </main>
       </div>

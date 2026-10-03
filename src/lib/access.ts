@@ -8,11 +8,14 @@ export const PEDAGOGIC_DIRECTION: AppRole[] = ["directeur_etudes", "proviseur"];
 export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/super-admin", roles: [] }, // super admin only
   { prefix: "/directeur", roles: ["admin"] },
+  { prefix: "/plans", roles: ["admin"] },
   { prefix: "/sauvegarde", roles: ["admin", "directeur"] },
   { prefix: "/journal", roles: ["admin", "directeur"] },
   { prefix: "/parametres", roles: ["admin", "directeur"] },
   { prefix: "/collaborateurs", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] }, // écran Collaborateurs (Prompt 2)
   { prefix: "/personnalisation-recu", roles: ["admin", "directeur", "comptable"] },
+  { prefix: "/souscription", roles: ["admin", "directeur"] },
+  { prefix: "/abonnement", roles: "*" },
   { prefix: "/comptabilite", roles: ["admin", "directeur", "comptable"] },
   { prefix: "/salaires", roles: ["admin", "directeur", "comptable", "rh"] },
   { prefix: "/paiements", roles: ["admin", "directeur", "comptable"] },
@@ -20,7 +23,6 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/rapports", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "comptable"] },
   { prefix: "/direction-etudes", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },
   { prefix: "/eleves", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "surveillant", "secretariat"] },
-  { prefix: "/sortie-eleve", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "secretariat"] },
   { prefix: "/maternelle", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "educatrice_maternelle"] },
   { prefix: "/enseignants", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },
   { prefix: "/matieres", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },
@@ -77,10 +79,8 @@ export function homeForRoles(roles: AppRole[], isSuperAdmin: boolean): string {
   if (isSuperAdmin) return "/super-admin";
   if (roles.includes("admin") || roles.includes("directeur")) return "/dashboard";
   if (roles.includes("directeur_etudes") || roles.includes("proviseur")) return "/direction-etudes";
-  if (roles.includes("comptable")) return "/paiements";
-  if (roles.includes("rh")) return "/salaires";
-  if (roles.includes("enseignant") || roles.includes("surveillant")) return "/dashboard";
-  if (roles.includes("educatrice_maternelle")) return "/maternelle";
+  if (roles.includes("comptable") || roles.includes("rh")) return "/paiements";
+  if (roles.includes("enseignant") || roles.includes("surveillant") || roles.includes("educatrice_maternelle")) return "/dashboard";
   if (roles.includes("secretariat")) return "/eleves";
   if (roles.includes("bibliothecaire")) return "/bibliotheque";
   if (roles.includes("infirmerie")) return "/infirmerie";
