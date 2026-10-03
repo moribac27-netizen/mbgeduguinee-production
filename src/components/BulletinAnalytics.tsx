@@ -11,11 +11,6 @@ import {
   Tooltip,
   Legend,
   LabelList,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Award, Target, BarChart3 } from "lucide-react";
 
@@ -186,17 +181,17 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
   if (!analysis.filled.length) return null;
 
   const { timeline, last, radar, validated, best, worst, successRate, delta, notes } = analysis;
-  const axisProps = { stroke: "#555", fontSize: 10, tickLine: false } as any;
-  const chartH = variant === "print" ? 170 : 220;
+  const axisProps = { stroke: "#555", fontSize: 9, tickLine: false } as any;
+  const chartH = variant === "print" ? 100 : 220;
 
   return (
-    <section className="bulletin-analytics mt-6 space-y-4">
+    <section className="bulletin-analytics mt-3 space-y-2">
       <h3 className="text-sm font-bold uppercase tracking-wide border-b border-black/60 pb-1">
         Analyse graphique des performances
       </h3>
 
       {/* Statistiques rapides */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center print-avoid-break">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 text-center print-avoid-break">
         <QuickStat label="Moyenne actuelle" value={`${last?.eleve?.toFixed(2) ?? "—"}/${maxScore}`} icon={<BarChart3 className="size-3" />} />
         <QuickStat label="Moyenne précédente" value={analysis.prev?.eleve != null ? `${analysis.prev.eleve.toFixed(2)}/${maxScore}` : "—"} />
         <QuickStat label="Évolution" value={delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(2)}`} icon={delta == null ? <Minus className="size-3" /> : delta > 0 ? <TrendingUp className="size-3" /> : delta < 0 ? <TrendingDown className="size-3" /> : <Minus className="size-3" />} />
@@ -207,16 +202,16 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
         <QuickStat label="Taux de réussite" value={`${successRate}%`} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 break-inside-avoid">
+      <div className="grid gap-1.5 md:grid-cols-3 break-inside-avoid">
         {analysis.filled.length >= 2 ? <ChartBox title="Évolution de la moyenne générale">
           <ResponsiveContainer width="100%" height={chartH}>
-            <LineChart data={timeline} margin={{ top: 16, right: 12, left: -18, bottom: 0 }}>
+            <LineChart data={timeline} margin={{ top: 14, right: 8, left: -22, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
               <XAxis dataKey="label" {...axisProps} />
               <YAxis domain={[0, maxScore]} {...axisProps} />
               <Tooltip />
-              <Line type="monotone" dataKey="eleve" name="Moyenne" stroke="#1f6f5c" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} connectNulls>
-                <LabelList dataKey="eleve" position="top" fontSize={10} />
+              <Line type="monotone" dataKey="eleve" name="Moyenne" stroke="#1f6f5c" strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} connectNulls>
+                <LabelList dataKey="eleve" position="top" fontSize={9} />
               </Line>
             </LineChart>
           </ResponsiveContainer>
@@ -224,13 +219,13 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
 
         <ChartBox title="Évolution du rang (1 = meilleur)">
           <ResponsiveContainer width="100%" height={chartH}>
-            <LineChart data={timeline} margin={{ top: 16, right: 12, left: -18, bottom: 0 }}>
+            <LineChart data={timeline} margin={{ top: 14, right: 8, left: -22, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
               <XAxis dataKey="label" {...axisProps} />
               <YAxis reversed allowDecimals={false} domain={[1, "dataMax"]} {...axisProps} />
               <Tooltip />
-              <Line type="monotone" dataKey="rang" name="Rang" stroke="#8a5a2b" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3 }} isAnimationActive={false} connectNulls>
-                <LabelList dataKey="rang" position="top" fontSize={10} />
+              <Line type="monotone" dataKey="rang" name="Rang" stroke="#8a5a2b" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 2 }} isAnimationActive={false} connectNulls>
+                <LabelList dataKey="rang" position="top" fontSize={9} />
               </Line>
             </LineChart>
           </ResponsiveContainer>
@@ -238,32 +233,20 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
 
         <ChartBox title="Élève vs moyenne de la classe">
           <ResponsiveContainer width="100%" height={chartH}>
-            <LineChart data={timeline} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+            <LineChart data={timeline} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
               <XAxis dataKey="label" {...axisProps} />
               <YAxis domain={[0, maxScore]} {...axisProps} />
               <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Line type="monotone" dataKey="eleve" name="Élève" stroke="#1f6f5c" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} connectNulls />
+              <Legend wrapperStyle={{ fontSize: 9 }} />
+              <Line type="monotone" dataKey="eleve" name="Élève" stroke="#1f6f5c" strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} connectNulls />
               <Line type="monotone" dataKey="classe" name="Classe" stroke="#b3261e" strokeWidth={2} strokeDasharray="6 3" dot={{ r: 2 }} isAnimationActive={false} connectNulls />
             </LineChart>
           </ResponsiveContainer>
         </ChartBox>
-
-        <ChartBox title="Performance par matière">
-          <ResponsiveContainer width="100%" height={chartH}>
-            <RadarChart data={radar} outerRadius="72%">
-              <PolarGrid stroke="#ccc" />
-              <PolarAngleAxis dataKey="matiere" tick={{ fontSize: 9, fill: "#333" }} />
-              <PolarRadiusAxis domain={[0, maxScore]} tick={{ fontSize: 8, fill: "#777" }} />
-              <Radar name="Notes" dataKey="note" stroke="#1f6f5c" fill="#1f6f5c" fillOpacity={0.25} isAnimationActive={false} />
-              <Tooltip />
-            </RadarChart>
-          </ResponsiveContainer>
-        </ChartBox>
       </div>
 
-      <div className="border border-black/20 rounded-lg p-3 text-[11px] leading-relaxed break-inside-avoid bg-slate-50/60">
+      <div className="border border-black/20 rounded-lg p-2 text-[10px] leading-snug break-inside-avoid bg-slate-50/60">
         <div className="font-bold uppercase mb-1">Analyse automatique</div>
         <ul className="list-disc pl-4 space-y-0.5">
           {notes.map((n, i) => (
