@@ -13,6 +13,7 @@ import {
   LabelList,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Award, Target, BarChart3 } from "lucide-react";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 const PERIOD_ORDER = ["T1", "T2", "T3", "S1", "S2", "ANNUAL"];
 const PERIOD_LABEL: Record<string, string> = {
@@ -52,7 +53,7 @@ export function BulletinAnalytics({ studentId, classId, maxScore = 20, variant =
     queryKey: ["ba-grades", classId, ids.length],
     enabled: ids.length > 0,
     queryFn: async () =>
-      (await supabase.from("grades").select("student_id, subject_id, score, period").in("student_id", ids)).data ?? [],
+      (await supabase.from("grades").select("student_id, subject_id, score, period").in("student_id", ids).eq("academic_year", getCurrentAcademicYear())).data ?? [],
     staleTime: 60_000,
   });
 

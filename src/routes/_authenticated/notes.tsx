@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { maxScoreForLevel } from "@/lib/grading";
 import { useScopedClassOptions } from "@/hooks/useOptions";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 export const Route = createFileRoute("/_authenticated/notes")({
   head: () => ({ meta: [{ title: "Notes — MBGEduGuinée" }] }),
@@ -44,7 +45,7 @@ function NotesPage() {
   const { data: grades = [] } = useQuery({
     queryKey: ["grades", classId, period, studentIds.length],
     enabled: studentIds.length > 0,
-    queryFn: async () => (await supabase.from("grades").select("*").in("student_id", studentIds).eq("period", period)).data ?? [],
+    queryFn: async () => (await supabase.from("grades").select("*").in("student_id", studentIds).eq("period", period).eq("academic_year", getCurrentAcademicYear())).data ?? [],
   });
 
   const cls = classes.find((c: any) => c.id === classId);

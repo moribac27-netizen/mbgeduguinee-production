@@ -15,6 +15,7 @@ import {
   periodsFor,
   computeRanking,
 } from "@/lib/rankings";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 // Ré-exportés pour ne rien casser des imports existants
 // (ex. "@/components/BulletinDocument").{BULLETIN_PERIODS, periodLabel, ...}
@@ -63,7 +64,7 @@ export function BulletinDocument({ studentId, classId, period, paged = false }: 
     queryKey: ["bd-grades", classId, periods.join(","), ids.length],
     enabled: ids.length > 0,
     queryFn: async () =>
-      (await supabase.from("grades").select("*").in("student_id", ids).in("period", periods)).data ?? [],
+      (await supabase.from("grades").select("*").in("student_id", ids).in("period", periods).eq("academic_year", getCurrentAcademicYear())).data ?? [],
   });
 
   const maxScore = maxScoreForLevel(cls?.level);
