@@ -688,6 +688,7 @@ export type Database = {
           annual_fee: number
           created_at: string
           id: string
+          import_id: string | null
           level: string
           name: string
           school_id: string
@@ -698,6 +699,7 @@ export type Database = {
           annual_fee?: number
           created_at?: string
           id?: string
+          import_id?: string | null
           level: string
           name: string
           school_id?: string
@@ -708,6 +710,7 @@ export type Database = {
           annual_fee?: number
           created_at?: string
           id?: string
+          import_id?: string | null
           level?: string
           name?: string
           school_id?: string
@@ -716,6 +719,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "classes_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "classes_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
@@ -723,6 +733,121 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cotisation_payment_audit: {
+        Row: {
+          action: string
+          actor_id: string | null
+          amount: number
+          created_at: string
+          id: string
+          metadata: Json
+          payment_id: string
+          reference: string | null
+          school_id: string
+          student_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          payment_id: string
+          reference?: string | null
+          school_id: string
+          student_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          payment_id?: string
+          reference?: string | null
+          school_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotisation_payment_audit_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "student_plan_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotisation_payment_audit_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotisation_payment_audit_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_imports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_count: number
+          error_count: number
+          errors: Json
+          filename: string | null
+          id: string
+          kind: string
+          mode: string
+          rolled_back_at: string | null
+          school_id: string
+          skipped_count: number
+          status: string
+          total_rows: number
+          updated_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_count?: number
+          error_count?: number
+          errors?: Json
+          filename?: string | null
+          id?: string
+          kind: string
+          mode?: string
+          rolled_back_at?: string | null
+          school_id?: string
+          skipped_count?: number
+          status?: string
+          total_rows?: number
+          updated_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_count?: number
+          error_count?: number
+          errors?: Json
+          filename?: string | null
+          id?: string
+          kind?: string
+          mode?: string
+          rolled_back_at?: string | null
+          school_id?: string
+          skipped_count?: number
+          status?: string
+          total_rows?: number
+          updated_count?: number
+        }
+        Relationships: []
       }
       discipline_incidents: {
         Row: {
@@ -1100,9 +1225,12 @@ export type Database = {
       }
       grades: {
         Row: {
+          academic_year: string
+          coefficient: number | null
           created_at: string
           evaluation_type: string | null
           id: string
+          import_id: string | null
           max_score: number
           period: string
           recorded_by: string | null
@@ -1112,9 +1240,12 @@ export type Database = {
           subject_id: string
         }
         Insert: {
+          academic_year?: string
+          coefficient?: number | null
           created_at?: string
           evaluation_type?: string | null
           id?: string
+          import_id?: string | null
           max_score?: number
           period: string
           recorded_by?: string | null
@@ -1124,9 +1255,12 @@ export type Database = {
           subject_id: string
         }
         Update: {
+          academic_year?: string
+          coefficient?: number | null
           created_at?: string
           evaluation_type?: string | null
           id?: string
+          import_id?: string | null
           max_score?: number
           period?: string
           recorded_by?: string | null
@@ -1136,6 +1270,13 @@ export type Database = {
           subject_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "grades_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grades_school_id_fkey"
             columns: ["school_id"]
@@ -2689,56 +2830,95 @@ export type Database = {
         Row: {
           academic_year: string
           amount: number
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
+          declared_at: string | null
+          declared_total_amount: number | null
           id: string
           notes: string | null
           paid_at: string
           paid_by: string | null
+          payer_phone: string | null
+          payment_group_id: string | null
           payment_method: string | null
           payment_mode: string
           receipt_number: string | null
           reference: string | null
+          rejection_reason: string | null
           school_id: string
           school_share: number
           status: string
           student_id: string
+          transfer_amount: number | null
+          transfer_date: string | null
           updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           academic_year: string
           amount?: number
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
+          declared_at?: string | null
+          declared_total_amount?: number | null
           id?: string
           notes?: string | null
           paid_at?: string
           paid_by?: string | null
+          payer_phone?: string | null
+          payment_group_id?: string | null
           payment_method?: string | null
           payment_mode?: string
           receipt_number?: string | null
           reference?: string | null
+          rejection_reason?: string | null
           school_id: string
           school_share?: number
           status?: string
           student_id: string
+          transfer_amount?: number | null
+          transfer_date?: string | null
           updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           academic_year?: string
           amount?: number
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
+          declared_at?: string | null
+          declared_total_amount?: number | null
           id?: string
           notes?: string | null
           paid_at?: string
           paid_by?: string | null
+          payer_phone?: string | null
+          payment_group_id?: string | null
           payment_method?: string | null
           payment_mode?: string
           receipt_number?: string | null
           reference?: string | null
+          rejection_reason?: string | null
           school_id?: string
           school_share?: number
           status?: string
           student_id?: string
+          transfer_amount?: number | null
+          transfer_date?: string | null
           updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {
@@ -2768,6 +2948,7 @@ export type Database = {
           full_name: string
           gender: string | null
           id: string
+          import_id: string | null
           matricule: string
           parent_name: string | null
           parent_phone: string | null
@@ -2788,6 +2969,7 @@ export type Database = {
           full_name: string
           gender?: string | null
           id?: string
+          import_id?: string | null
           matricule: string
           parent_name?: string | null
           parent_phone?: string | null
@@ -2808,6 +2990,7 @@ export type Database = {
           full_name?: string
           gender?: string | null
           id?: string
+          import_id?: string | null
           matricule?: string
           parent_name?: string | null
           parent_phone?: string | null
@@ -2827,6 +3010,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "students_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "students_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
@@ -2840,6 +3030,7 @@ export type Database = {
           coefficient: number
           created_at: string
           id: string
+          import_id: string | null
           name: string
           school_id: string
         }
@@ -2847,6 +3038,7 @@ export type Database = {
           coefficient?: number
           created_at?: string
           id?: string
+          import_id?: string | null
           name: string
           school_id?: string
         }
@@ -2854,10 +3046,18 @@ export type Database = {
           coefficient?: number
           created_at?: string
           id?: string
+          import_id?: string | null
           name?: string
           school_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "subjects_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subjects_school_id_fkey"
             columns: ["school_id"]
@@ -2945,6 +3145,7 @@ export type Database = {
           class_id: string
           created_at: string
           id: string
+          import_id: string | null
           school_id: string
           subject_id: string | null
           teacher_id: string
@@ -2955,6 +3156,7 @@ export type Database = {
           class_id: string
           created_at?: string
           id?: string
+          import_id?: string | null
           school_id?: string
           subject_id?: string | null
           teacher_id: string
@@ -2965,6 +3167,7 @@ export type Database = {
           class_id?: string
           created_at?: string
           id?: string
+          import_id?: string | null
           school_id?: string
           subject_id?: string | null
           teacher_id?: string
@@ -2976,6 +3179,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_class_assignments_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
             referencedColumns: ["id"]
           },
           {
@@ -3008,6 +3218,7 @@ export type Database = {
           full_name: string
           hire_date: string | null
           id: string
+          import_id: string | null
           matricule: string
           monthly_salary: number | null
           phone: string | null
@@ -3022,6 +3233,7 @@ export type Database = {
           full_name: string
           hire_date?: string | null
           id?: string
+          import_id?: string | null
           matricule: string
           monthly_salary?: number | null
           phone?: string | null
@@ -3036,6 +3248,7 @@ export type Database = {
           full_name?: string
           hire_date?: string | null
           id?: string
+          import_id?: string | null
           matricule?: string
           monthly_salary?: number | null
           phone?: string | null
@@ -3045,6 +3258,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "teachers_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "data_imports"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "teachers_school_id_fkey"
             columns: ["school_id"]
@@ -3441,7 +3661,66 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_teachers: { Args: { _user_id: string }; Returns: boolean }
+      current_academic_year: { Args: { _at?: string }; Returns: string }
+      current_academic_year_default: { Args: never; Returns: string }
       current_school_id: { Args: never; Returns: string }
+      declare_cotisation_group_payment: {
+        Args: {
+          _payer_phone: string
+          _reference: string
+          _student_ids: string[]
+          _transfer_date: string
+        }
+        Returns: string
+      }
+      declare_cotisation_payment: {
+        Args: {
+          _payer_phone: string
+          _reference: string
+          _student_id: string
+          _transfer_date: string
+        }
+        Returns: {
+          academic_year: string
+          amount: number
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          declared_at: string | null
+          declared_total_amount: number | null
+          id: string
+          notes: string | null
+          paid_at: string
+          paid_by: string | null
+          payer_phone: string | null
+          payment_group_id: string | null
+          payment_method: string | null
+          payment_mode: string
+          receipt_number: string | null
+          reference: string | null
+          rejection_reason: string | null
+          school_id: string
+          school_share: number
+          status: string
+          student_id: string
+          transfer_amount: number | null
+          transfer_date: string | null
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_plan_payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      expire_overdue_subscriptions: { Args: never; Returns: undefined }
+      get_class_timetable: { Args: { _class_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3449,10 +3728,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_grades_batch: {
+        Args: { _import_id: string; _mode: string; _rows: Json }
+        Returns: Json
+      }
       is_direction: { Args: { _user_id: string }; Returns: boolean }
       is_finance: { Args: { _user_id: string }; Returns: boolean }
+      is_hr: { Args: { _user_id: string }; Returns: boolean }
       is_parent_of_student: {
         Args: { _student_id: string; _uid: string }
+        Returns: boolean
+      }
+      is_school_subscription_active: {
+        Args: { _school_id: string }
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
@@ -3460,8 +3748,14 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { _uid: string }; Returns: boolean }
       next_receipt_number: { Args: { _school_id: string }; Returns: string }
+      review_cotisation_payment: {
+        Args: { _approve: boolean; _payment_id: string; _reason?: string }
+        Returns: number
+      }
       same_school: { Args: { _school_id: string }; Returns: boolean }
       school_academic_year: { Args: { _school_id: string }; Returns: string }
+      school_access_mode: { Args: { _school_id: string }; Returns: string }
+      school_access_summary: { Args: { _school_id: string }; Returns: Json }
       school_paid_students_count: {
         Args: { _school_id: string }
         Returns: number
@@ -3479,6 +3773,14 @@ export type Database = {
         }[]
       }
       school_write_blocked: { Args: { _school_id: string }; Returns: boolean }
+      start_trial_subscription: {
+        Args: { p_plan_id: string; p_school_id: string }
+        Returns: undefined
+      }
+      student_contribution_validated: {
+        Args: { _academic_year?: string; _student_id: string }
+        Returns: boolean
+      }
       student_plan_paid: { Args: { _student_id: string }; Returns: boolean }
       student_recipient_users: {
         Args: { _student_id: string }
@@ -3565,12 +3867,6 @@ export type Database = {
         | "uniforme"
         | "examens"
         | "autres"
-      subscription_status:
-        | "trial"
-        | "active"
-        | "past_due"
-        | "canceled"
-        | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3757,13 +4053,6 @@ export const Constants = {
         "uniforme",
         "examens",
         "autres",
-      ],
-      subscription_status: [
-        "trial",
-        "active",
-        "past_due",
-        "canceled",
-        "expired",
       ],
     },
   },

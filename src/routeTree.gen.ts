@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DefinirMotDePasseRouteImport } from './routes/definir-mot-de-passe'
 import { Route as AuthenticatedAffectationsRouteImport } from './routes/_authenticated/affectations'
+import { Route as AuthenticatedAnalyseScolaireRouteImport } from './routes/_authenticated/analyse-scolaire'
 import { Route as AuthenticatedAnnoncesRouteImport } from './routes/_authenticated/annonces'
 import { Route as AuthenticatedBibliothequeRouteImport } from './routes/_authenticated/bibliotheque'
 import { Route as AuthenticatedBulletinsRouteImport } from './routes/_authenticated/bulletins'
@@ -78,6 +79,12 @@ const AuthenticatedAffectationsRoute =
   AuthenticatedAffectationsRouteImport.update({
     id: '/affectations',
     path: '/affectations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAnalyseScolaireRoute =
+  AuthenticatedAnalyseScolaireRouteImport.update({
+    id: '/analyse-scolaire',
+    path: '/analyse-scolaire',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAnnoncesRoute = AuthenticatedAnnoncesRouteImport.update({
@@ -296,6 +303,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
+  '/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
   '/bibliotheque': typeof AuthenticatedBibliothequeRoute
   '/bulletins': typeof AuthenticatedBulletinsRoute
@@ -342,6 +350,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
+  '/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
   '/bibliotheque': typeof AuthenticatedBibliothequeRoute
   '/bulletins': typeof AuthenticatedBulletinsRoute
@@ -390,6 +399,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/_authenticated/affectations': typeof AuthenticatedAffectationsRoute
+  '/_authenticated/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/_authenticated/annonces': typeof AuthenticatedAnnoncesRoute
   '/_authenticated/bibliotheque': typeof AuthenticatedBibliothequeRoute
   '/_authenticated/bulletins': typeof AuthenticatedBulletinsRoute
@@ -438,6 +448,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/definir-mot-de-passe'
     | '/affectations'
+    | '/analyse-scolaire'
     | '/annonces'
     | '/bibliotheque'
     | '/bulletins'
@@ -484,6 +495,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/definir-mot-de-passe'
     | '/affectations'
+    | '/analyse-scolaire'
     | '/annonces'
     | '/bibliotheque'
     | '/bulletins'
@@ -531,6 +543,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/definir-mot-de-passe'
     | '/_authenticated/affectations'
+    | '/_authenticated/analyse-scolaire'
     | '/_authenticated/annonces'
     | '/_authenticated/bibliotheque'
     | '/_authenticated/bulletins'
@@ -617,6 +630,13 @@ declare module '@tanstack/react-router' {
       path: '/affectations'
       fullPath: '/affectations'
       preLoaderRoute: typeof AuthenticatedAffectationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/analyse-scolaire': {
+      id: '/_authenticated/analyse-scolaire'
+      path: '/analyse-scolaire'
+      fullPath: '/analyse-scolaire'
+      preLoaderRoute: typeof AuthenticatedAnalyseScolaireRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/annonces': {
@@ -904,6 +924,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAffectationsRoute: typeof AuthenticatedAffectationsRoute
+  AuthenticatedAnalyseScolaireRoute: typeof AuthenticatedAnalyseScolaireRoute
   AuthenticatedAnnoncesRoute: typeof AuthenticatedAnnoncesRoute
   AuthenticatedBibliothequeRoute: typeof AuthenticatedBibliothequeRoute
   AuthenticatedBulletinsRoute: typeof AuthenticatedBulletinsRoute
@@ -946,6 +967,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAffectationsRoute: AuthenticatedAffectationsRoute,
+  AuthenticatedAnalyseScolaireRoute: AuthenticatedAnalyseScolaireRoute,
   AuthenticatedAnnoncesRoute: AuthenticatedAnnoncesRoute,
   AuthenticatedBibliothequeRoute: AuthenticatedBibliothequeRoute,
   AuthenticatedBulletinsRoute: AuthenticatedBulletinsRoute,
