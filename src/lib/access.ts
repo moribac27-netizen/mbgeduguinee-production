@@ -18,6 +18,7 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/paiements", roles: ["admin", "directeur", "comptable"] },
   { prefix: "/cotisations", roles: ["admin", "directeur", "comptable"] },
   { prefix: "/resultats-generaux", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },
+  { prefix: "/analyse-scolaire", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },
   { prefix: "/rapports", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "comptable"] },
   { prefix: "/direction-etudes", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },
   { prefix: "/eleves", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "surveillant", "secretariat"] },
