@@ -3,7 +3,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { usePerStudentPlan } from "@/hooks/usePerStudentPlan";
 
-const BLOCKED_WHEN_RESTRICTED = ["/notes", "/bulletins", "/cartes", "/examens", "/rapports"];
+const BLOCKED_WHEN_RESTRICTED = ["/notes", "/bulletins", "/cartes", "/examens", "/rapports", "/resultats-generaux", "/analyse-scolaire"];
 
 function matches(pathname: string, list: string[]) {
   return list.some((p) => pathname === p || pathname.startsWith(p + "/"));
