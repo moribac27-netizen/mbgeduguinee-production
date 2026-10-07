@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Award, Lock } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SmartEntry } from "@/components/notes/SmartEntry";
 import { toast } from "sonner";
 import { maxScoreForLevel } from "@/lib/grading";
 import { useScopedClassOptions } from "@/hooks/useOptions";
@@ -21,7 +23,38 @@ export const Route = createFileRoute("/_authenticated/notes")({
   component: NotesPage,
 });
 
+/**
+ * Page Notes : la vue actuelle (tableau, classement, « Saisir une note ») est
+ * conservée telle quelle dans l'onglet « Tableau & classement ». La saisie
+ * intelligente s'ajoute à côté ; aucune des deux ne remplace l'autre, et
+ * toutes deux lisent/écrivent la même table `grades` (donc les mêmes bulletins).
+ */
 function NotesPage() {
+  const [view, setView] = useState<"smart" | "classic">("smart");
+  return (
+    <div className="space-y-4">
+      <Tabs value={view} onValueChange={(v) => setView(v as "smart" | "classic")}>
+        <TabsList>
+          <TabsTrigger value="smart">Saisie intelligente</TabsTrigger>
+          <TabsTrigger value="classic">Tableau &amp; classement</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {view === "smart" ? (
+        <>
+          <div>
+            <h1 className="font-display text-3xl font-bold">Saisie des notes</h1>
+            <p className="text-muted-foreground mt-1">Préparer → Saisir → Contrôler → Corriger. Les bulletins utilisent exactement les mêmes notes.</p>
+          </div>
+          <SmartEntry />
+        </>
+      ) : (
+        <ClassicNotesView />
+      )}
+    </div>
+  );
+}
+
+function ClassicNotesView() {
   const qc = useQueryClient();
   const [classId, setClassId] = useState<string>("");
   const [period, setPeriod] = useState("T1");
