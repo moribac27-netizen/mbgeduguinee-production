@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "@/lib/audit";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
+import { getSchoolId } from "@/lib/school";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ interface Created {
   className: string;
   academicYear: string;
   classCount: number | null; // effectif de la classe relu après création
+  nursery?: { ok: boolean; sectionName: string | null; error?: string };
 }
 
 /**
@@ -52,11 +54,14 @@ export function EnrollmentWizard({
   students,
   onClose,
   onView,
+  nursery,
 }: {
   classes: any[];
   students: any[];
   onClose: () => void;
   onView: (matricule: string) => void;
+  /** Mode Maternelle : choix de la section et création automatique de la fiche enfant. */
+  nursery?: { sections: Array<{ id: string; name: string; class_id: string | null }> };
 }) {
   const qc = useQueryClient();
   const academicYear = getCurrentAcademicYear();
@@ -71,6 +76,7 @@ export function EnrollmentWizard({
   const [confirmedDupes, setConfirmedDupes] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
   const [lookup, setLookup] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const lock = useRef(false);
   const manualMatricule = useRef(false);
 
@@ -167,8 +173,20 @@ export function EnrollmentWizard({
         entity_label: `${row.full_name} (${data.matricule})`,
         metadata: { classId: form.class_id, academicYear, via: "inscription_rapide" },
       });
+      let nurseryInfo: Created["nursery"];
+      if (nursery) {
+        const sectionName = nursery.sections.find((x) => x.id === sectionId)?.name ?? null;
+        const sid = schoolId ?? (await getSchoolId());
+        const { error: nErr } = sid
+          ? await supabase.from("nursery_children" as any).insert({ school_id: sid, student_id: data.id, section_id: sectionId || null })
+          : { error: { message: "Établissement non identifié." } };
+        nurseryInfo = nErr ? { ok: false, sectionName, error: nErr.message } : { ok: true, sectionName };
+        void qc.invalidateQueries({ queryKey: ["nursery-children"] });
+        void qc.invalidateQueries({ queryKey: ["nursery-stats"] });
+        void qc.invalidateQueries({ queryKey: ["opt-students"] });
+      }
       await qc.invalidateQueries({ queryKey: ["students"] });
-      setCreated({ id: data.id, full_name: row.full_name, matricule: data.matricule, className: classNameOf(form.class_id), academicYear, classCount: count ?? null });
+      setCreated({ id: data.id, full_name: row.full_name, matricule: data.matricule, className: classNameOf(form.class_id), academicYear, classCount: count ?? null, nursery: nurseryInfo });
     } catch (e: any) {
       setNetError(e?.message ? `${e.message}. Vos informations sont conservées : réessayez.` : "Connexion interrompue. Vos informations sont conservées : réessayez.");
     } finally {
@@ -204,6 +222,9 @@ export function EnrollmentWizard({
         <ul className="text-sm space-y-1">
           <li>✅ Élève créé.</li>
           <li>✅ Affectation à la classe effectuée.</li>
+          {created.nursery && (created.nursery.ok
+            ? <li>✅ Fiche enfant Maternelle créée{created.nursery.sectionName ? ` (${created.nursery.sectionName})` : ""}.</li>
+            : <li className="text-destructive">⚠️ Élève créé, mais fiche Maternelle non créée : {created.nursery.error}. Créez-la depuis « Fiches enfants ».</li>)}
           <li>✅ Disponible dans les listes de la classe{created.classCount != null ? ` (${created.classCount} élève${created.classCount > 1 ? "s" : ""} dans ${created.className})` : ""}.</li>
         </ul>
         <DialogFooter className="flex-wrap gap-2">
@@ -217,6 +238,7 @@ export function EnrollmentWizard({
   }
 
   const summary = buildSummary(form, { academicYear, className: cls?.name ?? "—", level: cls?.level });
+  if (nursery && sectionId) summary.lines.push({ label: "Section maternelle", value: nursery.sections.find((x) => x.id === sectionId)?.name ?? "—" });
   const pendingDupes = dupes.filter((d) => !d.blocking).length ? dupes.filter((d) => !d.blocking) : liveDupes.filter((d) => !d.blocking);
 
   return (
@@ -271,6 +293,18 @@ export function EnrollmentWizard({
       {step === 1 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <p className="sm:col-span-2 text-sm text-muted-foreground">Choisissez d'abord la classe dans laquelle l'élève est inscrit. Elle sera conservée pour inscrire les élèves suivants.</p>
+          {nursery && (
+            <Field label="Section maternelle" className="sm:col-span-2">
+              <Select value={sectionId} onValueChange={(v) => {
+                setSectionId(v);
+                const sec = nursery.sections.find((x) => x.id === v);
+                if (sec?.class_id) set({ class_id: sec.class_id });
+              }}>
+                <SelectTrigger><SelectValue placeholder={nursery.sections.length ? "Choisir la section (facultatif)" : "Aucune section créée"} /></SelectTrigger>
+                <SelectContent>{nursery.sections.map((x) => <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Année scolaire"><Input value={academicYear} readOnly disabled /></Field>
           <Field label="Classe" error={errors.class_id}>
             <Select value={form.class_id} onValueChange={(v) => set({ class_id: v })}>

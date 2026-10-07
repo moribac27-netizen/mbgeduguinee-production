@@ -284,7 +284,13 @@ function CrudDialog({
       ({ error } = await supabase.from(table as any).insert({ ...payload, ...extraInsert, school_id: schoolId }));
     }
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      return toast.error(
+        error.code === "23505"
+          ? `Cet enregistrement existe déjà (${singular}). Modifiez l'existant plutôt que d'en créer un second.`
+          : error.message,
+      );
+    }
     void logActivity({
       action: editing ? "update" : "create",
       entity_type: table,

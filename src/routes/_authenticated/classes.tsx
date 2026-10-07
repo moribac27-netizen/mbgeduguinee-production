@@ -64,7 +64,7 @@ function ClassesPage() {
                 <Select value={form.level} onValueChange={(v) => setForm({ ...form, level: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {["Primaire", "Collège", "Lycée", "Formation"].map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                    {["Maternelle", "Primaire", "Collège", "Lycée", "Formation"].map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

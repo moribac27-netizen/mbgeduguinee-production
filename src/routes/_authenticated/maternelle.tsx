@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,14 @@ import { useRoles } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
 import { fmtDate } from "@/lib/reports";
-import { printNurseryBulletin, printDailyLog, dailyLogMessage } from "@/lib/nursery-print";
+import {
+  printNurseryBulletin, printDailyLog, dailyLogMessage, printChildRecord, printSectionList,
+  openPrintWindow, closePrintWindow,
+} from "@/lib/nursery-print";
+import { Dialog } from "@/components/ui/dialog";
+import { EnrollmentWizard } from "@/components/students/EnrollmentWizard";
 import { toast } from "sonner";
-import { Baby, FileText, Printer, Share2 } from "lucide-react";
+import { Baby, FileText, Printer, Share2, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/maternelle")({
   head: () => ({
@@ -116,13 +121,55 @@ function Maternelle() {
   const { isSuperAdmin } = useSuperAdmin();
   const canWrite =
     isSuperAdmin ||
-    roles.some((r) => ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant"].includes(r));
+    roles.some((r) => ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "educatrice_maternelle"].includes(r));
 
   const pdfMeta = usePdfMeta();
   const { options: studentOptions } = useStudentOptions();
   const { options: classOptions } = useClassOptions();
   const { options: teacherOptions } = useTableOptions("teachers", "full_name");
   const { options: sectionOptions } = useTableOptions("nursery_sections", "name");
+  const qc = useQueryClient();
+  const [enrollOpen, setEnrollOpen] = useState(false);
+
+  // Enfants ayant une fiche Maternelle (clé préfixée par "nursery-children" : rafraîchie par CrudSection).
+  const { data: nurseryChildren = [] } = useQuery({
+    queryKey: ["nursery-children", "full"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("nursery_children" as any)
+        .select("*, students(id, full_name, matricule, gender, birth_date, birth_place, address, parent_name, parent_phone, classes(name)), nursery_sections(id, name)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    staleTime: 15_000,
+  });
+  // Suivi et évaluations ne concernent que les enfants de la Maternelle (pas tout le collège/lycée).
+  const nurseryOptions = useMemo(
+    () => nurseryChildren.map((c: any) => ({ value: c.student_id, label: `${c.students?.full_name ?? "—"}${c.nursery_sections?.name ? ` — ${c.nursery_sections.name}` : ""}` })),
+    [nurseryChildren],
+  );
+  const { data: sectionsFull = [] } = useQuery({
+    queryKey: ["nursery-sections", "full"],
+    queryFn: async () => {
+      const { data } = await supabase.from("nursery_sections" as any).select("id, name, class_id, age_range, capacity, teachers(full_name)").order("name");
+      return (data ?? []) as any[];
+    },
+    staleTime: 15_000,
+  });
+  const { classes: allClasses } = useClassOptions();
+  const nurseryClasses = useMemo(() => {
+    const m = allClasses.filter((c: any) => /maternelle/i.test(c.level ?? ""));
+    return m.length ? m : allClasses;
+  }, [allClasses]);
+  const { data: studentsFull = [] } = useQuery({
+    queryKey: ["students"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("students").select("*, classes(name, level)").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: competencies = [] } = useQuery({
     queryKey: ["opt-nursery-competencies"],
@@ -206,7 +253,7 @@ function Maternelle() {
             title="Sections maternelle"
             singular="section"
             queryKey={["nursery-sections"]}
-            select="*, classes(name), teachers(full_name)"
+            select="*, classes(name), teachers(full_name), nursery_children(count)"
             orderBy={{ column: "name" }}
             canWrite={canWrite}
             searchKeys={["name", "age_range"]}
@@ -222,7 +269,16 @@ function Maternelle() {
             columns={[
               { key: "name", label: "Section" },
               { key: "age_range", label: "Âge" },
-              { key: "capacity", label: "Capacité" },
+              {
+                key: "capacity",
+                label: "Effectif / capacité",
+                render: (r) => {
+                  const n = r.nursery_children?.[0]?.count ?? 0;
+                  const full = r.capacity && n > r.capacity;
+                  return <span className={full ? "text-destructive font-medium" : ""}>{n}{r.capacity ? ` / ${r.capacity}` : ""}{full ? " (complet dépassé)" : ""}</span>;
+                },
+                exportFormat: (r) => `${r.nursery_children?.[0]?.count ?? 0}${r.capacity ? ` / ${r.capacity}` : ""}`,
+              },
               { key: "class", label: "Classe", render: (r) => r.classes?.name ?? "—", exportFormat: (r) => r.classes?.name ?? "" },
               { key: "teacher", label: "Enseignant", render: (r) => r.teachers?.full_name ?? "—", exportFormat: (r) => r.teachers?.full_name ?? "" },
             ]}
@@ -230,15 +286,32 @@ function Maternelle() {
         </TabsContent>
 
         <TabsContent value="enfants" className="mt-4">
+          {canWrite && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3">
+              <p className="text-sm text-muted-foreground">Nouvel enfant : l'inscription crée l'élève, l'affecte à sa classe et crée sa fiche Maternelle en une fois.</p>
+              <Button className="gap-2" onClick={() => setEnrollOpen(true)}><UserPlus className="size-4" />Inscrire un enfant</Button>
+            </div>
+          )}
+          <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
+            {enrollOpen && (
+              <EnrollmentWizard
+                classes={nurseryClasses}
+                students={studentsFull as any[]}
+                nursery={{ sections: sectionsFull.map((x: any) => ({ id: x.id, name: x.name, class_id: x.class_id ?? null })) }}
+                onClose={() => { setEnrollOpen(false); void qc.invalidateQueries({ queryKey: ["nursery-children"] }); }}
+                onView={() => setEnrollOpen(false)}
+              />
+            )}
+          </Dialog>
           <CrudSection
             table="nursery_children"
             title="Fiches enfants"
             singular="fiche enfant"
             queryKey={["nursery-children"]}
-            select="*, students(full_name, matricule), nursery_sections(name)"
+            select="*, students(full_name, matricule, classes(name)), nursery_sections(name)"
             orderBy={{ column: "created_at", ascending: false }}
             canWrite={canWrite}
-            searchKeys={["pickup_person", "allergies"]}
+            searchKeys={["students.full_name", "students.matricule", "nursery_sections.name", "pickup_person", "allergies"]}
             emptyHint="Rattachez les élèves de maternelle à une section et complétez leur fiche."
             fields={[
               { name: "student_id", label: "Enfant", type: "select", options: studentOptions, required: true },
@@ -253,6 +326,8 @@ function Maternelle() {
             ]}
             columns={[
               { key: "student", label: "Enfant", render: studentName, exportFormat: studentName },
+              { key: "matricule", label: "Matricule", render: (r) => r.students?.matricule ?? "—", exportFormat: (r) => r.students?.matricule ?? "" },
+              { key: "class", label: "Classe", render: (r) => r.students?.classes?.name ?? "—", exportFormat: (r) => r.students?.classes?.name ?? "" },
               { key: "section", label: "Section", render: (r) => r.nursery_sections?.name ?? "—", exportFormat: (r) => r.nursery_sections?.name ?? "" },
               { key: "pickup_person", label: "Récupéré par" },
               { key: "allergies", label: "Allergies", render: (r) => r.allergies || "—" },
@@ -264,6 +339,7 @@ function Maternelle() {
               },
             ]}
           />
+          <DocumentsCard pdfMeta={pdfMeta} kids={nurseryChildren} sections={sectionsFull} />
         </TabsContent>
 
         <TabsContent value="suivi" className="mt-4">
@@ -276,9 +352,9 @@ function Maternelle() {
             orderBy={{ column: "date", ascending: false }}
             canWrite={canWrite}
             searchKeys={["activities", "incidents", "parent_comment"]}
-            emptyHint="Saisissez chaque jour l'humeur, les repas, la sieste et les activités de l'enfant."
+            emptyHint="Saisissez chaque jour l'humeur, les repas, la sieste et les activités de l'enfant (l'enfant doit avoir une fiche, onglet « Fiches enfants »)."
             fields={[
-              { name: "student_id", label: "Enfant", type: "select", options: studentOptions, required: true },
+              { name: "student_id", label: "Enfant", type: "select", options: nurseryOptions, required: true },
               { name: "section_id", label: "Section", type: "select", options: sectionOptions },
               { name: "date", label: "Date", type: "date", required: true, default: today() },
               { name: "attendance", label: "Présence", type: "select", options: ATTENDANCE, default: "present" },
@@ -302,7 +378,7 @@ function Maternelle() {
               { key: "parent_comment", label: "Message aux parents", render: (r) => r.parent_comment || "—" },
             ]}
           />
-          <DailyLogExportCard pdfMeta={pdfMeta} studentOptions={studentOptions} />
+          <DailyLogExportCard pdfMeta={pdfMeta} studentOptions={nurseryOptions} />
         </TabsContent>
 
 
@@ -345,7 +421,7 @@ function Maternelle() {
             searchKeys={["period", "comment"]}
             emptyHint="Évaluez chaque enfant compétence par compétence, par période."
             fields={[
-              { name: "student_id", label: "Enfant", type: "select", options: studentOptions, required: true },
+              { name: "student_id", label: "Enfant", type: "select", options: nurseryOptions, required: true },
               { name: "competency_id", label: "Compétence", type: "select", options: competencyOptions, required: true },
               { name: "period", label: "Période", type: "select", options: PERIODS, required: true, default: "Trimestre 1" },
               { name: "level", label: "Niveau atteint", type: "select", options: LEVELS, required: true, default: "en_cours" },
@@ -364,7 +440,7 @@ function Maternelle() {
               { key: "comment", label: "Commentaire", render: (r) => r.comment || "—" },
             ]}
           />
-          <BulletinExportCard pdfMeta={pdfMeta} studentOptions={studentOptions} />
+          <BulletinExportCard pdfMeta={pdfMeta} studentOptions={nurseryOptions} />
         </TabsContent>
 
         <TabsContent value="planning" className="mt-4">
@@ -410,14 +486,16 @@ function BulletinExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
 
   async function handlePrint() {
     if (!studentId) return toast.error("Sélectionnez un enfant.");
+    const win = openPrintWindow(); // dans le clic, avant les requêtes : évite le blocage pop-up
+    const fail = (msg: string) => { closePrintWindow(win); toast.error(msg); };
     const { data, error } = await supabase
       .from("nursery_evaluations" as any)
-      .select("level, comment, students(full_name), nursery_competencies(label, domain), nursery_children:student_id(id)")
+      .select("level, comment, students(full_name), nursery_competencies(label, domain)")
       .eq("student_id", studentId)
       .eq("period", period);
-    if (error) return toast.error("Impossible de charger les évaluations.");
+    if (error) return fail("Impossible de charger les évaluations.");
     const rows = (data ?? []) as any[];
-    if (rows.length === 0) return toast.error("Aucune évaluation pour cette période.");
+    if (rows.length === 0) return fail("Aucune évaluation pour cette période.");
     const { data: child } = await supabase
       .from("nursery_children" as any)
       .select("nursery_sections(name)")
@@ -429,6 +507,7 @@ function BulletinExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
       sectionName: (child as any)?.nursery_sections?.name ?? null,
       period,
       rows,
+      win,
     });
     if (!ok) toast.error("Autorisez les fenêtres pop-up pour imprimer.");
   }
@@ -469,7 +548,7 @@ function DailyLogExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
   const [studentId, setStudentId] = useState("");
   const [date, setDate] = useState(today());
 
-  async function loadLog() {
+  async function loadLog(): Promise<any | null> {
     if (!studentId) {
       toast.error("Sélectionnez un enfant.");
       return null;
@@ -504,9 +583,12 @@ function DailyLogExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
   }
 
   async function handlePrint() {
+    if (!studentId) return void toast.error("Sélectionnez un enfant.");
+    const win = openPrintWindow();
     const log = await loadLog();
-    if (!log) return;
+    if (!log) return void closePrintWindow(win);
     const ok = printDailyLog({
+      win,
       meta: pdfMeta,
       childName: log.childName,
       sectionName: log.sectionName,
@@ -564,3 +646,98 @@ function DailyLogExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
   );
 }
 
+/** Documents imprimables de la Maternelle : fiche de renseignements d'un enfant, liste d'une section. */
+function DocumentsCard({ pdfMeta, kids, sections }: { pdfMeta: any; kids: any[]; sections: any[] }) {
+  const [childId, setChildId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+
+  function printChild() {
+    const c = kids.find((x) => x.student_id === childId);
+    if (!c) return void toast.error("Sélectionnez un enfant.");
+    const st = c.students ?? {};
+    const ok = printChildRecord({
+      meta: pdfMeta,
+      child: {
+        fullName: st.full_name ?? "—",
+        matricule: st.matricule,
+        gender: st.gender,
+        birthDate: st.birth_date ? fmtDate(st.birth_date) : null,
+        birthPlace: st.birth_place,
+        address: st.address,
+        className: st.classes?.name,
+        sectionName: c.nursery_sections?.name,
+        parentName: st.parent_name,
+        parentPhone: st.parent_phone,
+        pickupPerson: c.pickup_person,
+        pickupPhone: c.pickup_phone,
+        allergies: c.allergies,
+        medicalNotes: c.medical_notes,
+        napNeeded: c.nap_needed,
+        toiletTrained: c.toilet_trained,
+        specialNotes: c.special_notes,
+      },
+    });
+    if (!ok) toast.error("Autorisez les fenêtres pop-up pour imprimer.");
+  }
+
+  function printList() {
+    const sec = sections.find((x) => x.id === sectionId);
+    if (!sec) return void toast.error("Sélectionnez une section.");
+    const rows = kids
+      .filter((c) => c.section_id === sectionId)
+      .map((c) => ({
+        fullName: c.students?.full_name ?? "—",
+        matricule: c.students?.matricule,
+        gender: c.students?.gender,
+        birthDate: c.students?.birth_date ? fmtDate(c.students.birth_date) : null,
+        parentPhone: c.students?.parent_phone ?? c.pickup_phone,
+        pickupPerson: c.pickup_person,
+        allergies: c.allergies,
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "fr"));
+    const ok = printSectionList({
+      meta: pdfMeta,
+      sectionName: sec.name,
+      teacherName: sec.teachers?.full_name,
+      ageRange: sec.age_range,
+      capacity: sec.capacity,
+      rows,
+    });
+    if (!ok) toast.error("Autorisez les fenêtres pop-up pour imprimer.");
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><FileText className="size-4" /> Documents à imprimer</CardTitle>
+        <CardDescription>Fiche de renseignements d'un enfant (inscription) et liste des enfants d'une section, avec le logo de l'école.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div className="space-y-1.5">
+            <Label>Enfant</Label>
+            <Select value={childId} onValueChange={setChildId}>
+              <SelectTrigger><SelectValue placeholder={kids.length ? "Choisir un enfant" : "Aucune fiche enfant"} /></SelectTrigger>
+              <SelectContent>
+                {kids.map((c) => <SelectItem key={c.student_id} value={c.student_id}>{c.students?.full_name ?? "—"}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={printChild} className="gap-2"><Printer className="size-4" /> Fiche de renseignements</Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div className="space-y-1.5">
+            <Label>Section</Label>
+            <Select value={sectionId} onValueChange={setSectionId}>
+              <SelectTrigger><SelectValue placeholder={sections.length ? "Choisir une section" : "Aucune section"} /></SelectTrigger>
+              <SelectContent>
+                {sections.map((x) => <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" onClick={printList} className="gap-2"><Printer className="size-4" /> Liste de la section</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
