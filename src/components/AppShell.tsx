@@ -39,6 +39,7 @@ const STAFF_NAV = [
   { to: "/examens", label: "Examens", icon: ScrollText },
   { to: "/bulletins", label: "Bulletins", icon: FileText },
   { to: "/resultats-generaux", label: "Listes générales", icon: Trophy },
+  { to: "/analyse-scolaire", label: "Analyse scolaire", icon: BarChart3 },
   { to: "/sortie-eleve", label: "Fiches de sortie", icon: FileText },
   { to: "/paiements", label: "Paiements", icon: CreditCard },
   { to: "/cotisations", label: "Cotisations", icon: Coins },
