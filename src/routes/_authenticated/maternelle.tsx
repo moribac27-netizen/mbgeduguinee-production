@@ -23,6 +23,7 @@ import {
 } from "@/lib/nursery-print";
 import { Dialog } from "@/components/ui/dialog";
 import { EnrollmentWizard } from "@/components/students/EnrollmentWizard";
+import { NewNurseryClass } from "@/components/students/NewNurseryClass";
 import { toast } from "sonner";
 import { Baby, FileText, Printer, Share2, UserPlus } from "lucide-react";
 
@@ -257,6 +258,16 @@ function Maternelle() {
         </TabsList>
 
         <TabsContent value="sections" className="mt-4">
+          {canWrite && (
+            <div className="mb-4 space-y-2 rounded-lg border bg-muted/30 p-3">
+              <p className="text-sm text-muted-foreground">
+                {nurseryClasses.length === 0
+                  ? "Aucune classe de niveau Maternelle n'existe encore. Créez-en une, puis rattachez-la à une section."
+                  : `${nurseryClasses.length} classe(s) de Maternelle : ${nurseryClasses.map((c: any) => c.name).join(", ")}. Vous pouvez en créer une autre.`}
+              </p>
+              <NewNurseryClass />
+            </div>
+          )}
           <CrudSection
             table="nursery_sections"
             title="Sections maternelle"
