@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "@/lib/audit";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
+import { identityKey } from "@/lib/enrollment";
 
 export type ImportKind = "classes" | "subjects" | "students" | "teachers" | "assignments" | "grades";
 export type ImportMode = "add" | "update" | "add_update";
@@ -137,6 +138,15 @@ export async function buildPreview(kind: ImportKind, mode: ImportMode, grid: str
   const existing = await fetchAllRows(kind, kind === "students" ? "id, matricule" : kind === "teachers" ? "id, matricule" : "id, name");
   const existingByKey = new Map<string, string>();
   for (const e of existing) { const k = norm(e[keyField]); if (k) existingByKey.set(k, e.id); }
+  // Élèves : correspondances « même nom + même date de naissance » (matricule différent ou absent).
+  const identityOwner = new Map<string, { id: string; matricule: string; name: string }>();
+  if (kind === "students") {
+    for (const e of await fetchAllRows("students", "id, matricule, full_name, birth_date")) {
+      const k = identityKey(e.full_name, e.birth_date);
+      if (k && !identityOwner.has(k)) identityOwner.set(k, { id: e.id, matricule: e.matricule, name: e.full_name });
+    }
+  }
+  const seenIdentity = new Set<string>();
   let classByName = new Map<string, string | null>();
   if (kind === "students") {
     const cl = await fetchAllRows("classes", "id, name");
@@ -186,6 +196,15 @@ export async function buildPreview(kind: ImportKind, mode: ImportMode, grid: str
       if (seen.has(key)) errs.push("Doublon dans le fichier.");
       seen.add(key);
       existingId = existingByKey.get(key);
+    }
+    if (kind === "students" && !errs.length && !existingId) {
+      const ik = identityKey(v.full_name, v.birth_date);
+      if (ik) {
+        const owner = identityOwner.get(ik);
+        if (owner) errs.push(`Correspondance possible : « ${owner.name} » (matricule ${owner.matricule}) a le même nom et la même date de naissance. Indiquez son matricule pour la mettre à jour, ou corrigez la ligne.`);
+        else if (seenIdentity.has(ik)) errs.push("Correspondance possible avec une autre ligne du fichier (même nom et même date de naissance).");
+        seenIdentity.add(ik);
+      }
     }
     const label = String(v.full_name ?? v.name ?? "");
     if (errs.length) { action = "error"; }

@@ -5,9 +5,11 @@ import {
   findDuplicates,
   generateMatricule,
   hasBlocking,
+  identityKey,
   isUniqueViolation,
   nameKey,
   nextForm,
+  planReenrollment,
   phoneKey,
   searchStudents,
   stepErrors,
@@ -114,5 +116,31 @@ describe("enregistrement", () => {
     expect(isUniqueViolation({ code: "23505" })).toBe(true);
     expect(isUniqueViolation({ message: "autre" })).toBe(false);
     expect(isUniqueViolation(null)).toBe(false);
+  });
+});
+
+describe("identityKey (import)", () => {
+  it("ordre des mots et accents indifférents, vide sans date", () => {
+    expect(identityKey("Amadou CONDÉ", "2015-01-02")).toBe(identityKey("conde amadou", "2015-01-02"));
+    expect(identityKey("Amadou Condé", "")).toBe("");
+    expect(identityKey("Amadou Condé", "2015-01-02")).not.toBe(identityKey("Amadou Condé", "2015-01-03"));
+  });
+});
+
+describe("planReenrollment", () => {
+  const st = [
+    { id: "a", class_id: "6A", status: "actif" },
+    { id: "b", class_id: "6A", status: "actif" },
+    { id: "c", class_id: "6A", status: "abandon" },
+    { id: "d", class_id: "5A", status: "actif" },
+    { id: "e", class_id: null, status: "actif" },
+  ];
+  it("regroupe par classe d'origine, ignore inactifs, non-mappés et sans classe", () => {
+    const p = planReenrollment(st, { "6A": "5A", "5A": "" });
+    expect(p.moves).toEqual([{ fromClassId: "6A", toClassId: "5A", studentIds: ["a", "b"] }]);
+    expect(p).toMatchObject({ total: 2, unchanged: 1, inactive: 1 });
+  });
+  it("destination identique = aucun mouvement", () => {
+    expect(planReenrollment(st, { "6A": "6A" }).total).toBe(0);
   });
 });
