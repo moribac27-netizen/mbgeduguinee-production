@@ -14,6 +14,7 @@ import { Plus, Search, Trash2, Pencil, Eye, ShieldAlert, KeyRound, Copy, Printer
 import { toast } from "sonner";
 import { StudentPhoto } from "@/components/StudentPhoto";
 import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
+import { EnrollmentWizard } from "@/components/students/EnrollmentWizard";
 import { BulletinPreviewDialog } from "@/components/BulletinPreviewDialog";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 import { fmtDate, fmtDateTime } from "@/lib/reports";
@@ -80,7 +81,16 @@ function ElevesPage() {
           <DialogTrigger asChild>
             <Button className="gap-2"><Plus className="size-4" /> Nouvel élève</Button>
           </DialogTrigger>
-          <StudentDialog editing={editing} classes={classes} onClose={() => { setOpen(false); setEditing(null); qc.invalidateQueries({ queryKey: ["students"] }); }} />
+          {editing ? (
+            <StudentDialog editing={editing} classes={classes} onClose={() => { setOpen(false); setEditing(null); qc.invalidateQueries({ queryKey: ["students"] }); }} />
+          ) : (
+            <EnrollmentWizard
+              classes={classes}
+              students={students}
+              onClose={() => setOpen(false)}
+              onView={(matricule) => { setSearch(matricule); setOpen(false); }}
+            />
+          )}
         </Dialog>
       </div>
 
