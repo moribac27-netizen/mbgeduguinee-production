@@ -10,7 +10,7 @@ export type RowAction = "create" | "update" | "skip" | "error";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_ROWS = 5000;
-const LEVELS = ["Primaire", "Collège", "Lycée", "Formation"];
+const LEVELS = ["Maternelle", "Primaire", "Collège", "Lycée", "Formation"];
 const BATCH = 200;
 
 export interface PreviewRow {

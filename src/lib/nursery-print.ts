@@ -1,7 +1,7 @@
 import type { PdfMeta } from "@/lib/reports";
 
 const esc = (v: any) =>
-  String(v ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m] as string);
+  String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m] as string);
 
 const LEVEL_STYLE: Record<string, { label: string; icon: string; color: string }> = {
   acquis: { label: "Acquis", icon: "★★★", color: "#1f8a5b" },
@@ -48,6 +48,11 @@ function styles(meta: PdfMeta) {
   td { padding:6px 8px; border-top:1px solid #e7ebe8; vertical-align:top; }
   tbody tr:nth-child(even) td { background:#f8faf9; }
   .lvl { font-weight:800; white-space:nowrap; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; font-size:10.5px; }
+  .fields .f { border-bottom:1px dotted #b9c3bd; padding:3px 0; min-height:22px; }
+  .fields .f.wide { grid-column:1 / -1; }
+  .fields b { display:block; font-size:8px; color:#68716b; text-transform:uppercase; letter-spacing:.04em; font-weight:700; }
+  .alert { color:#c0392b; font-weight:700; }
   .legend { margin-top:12px; font-size:9px; color:#68716b; }
   .sign { margin-top:28px; display:flex; justify-content:space-between; gap:24px; font-size:10px; break-inside:avoid; }
   .sign div { width:45%; border-top:1px solid #b9c3bd; padding-top:6px; }
@@ -56,9 +61,26 @@ function styles(meta: PdfMeta) {
 </style>`;
 }
 
-function open(html: string) {
+/**
+ * Ouvre la fenêtre d'impression. À appeler DIRECTEMENT dans le clic (avant tout
+ * `await`) : les navigateurs bloquent les pop-up ouverts après une requête.
+ * On passe ensuite cette fenêtre aux fonctions d'impression ; en cas d'erreur
+ * de chargement, l'appelant la ferme avec `closePrintWindow`.
+ */
+export function openPrintWindow(): Window | null {
   const w = window.open("", "_blank", "width=1000,height=900");
+  if (w) w.document.write("<p style=\"font-family:sans-serif;padding:24px\">Préparation du document…</p>");
+  return w;
+}
+
+export function closePrintWindow(w: Window | null | undefined) {
+  try { w?.close(); } catch { /* déjà fermée */ }
+}
+
+function open(html: string, win?: Window | null) {
+  const w = win ?? window.open("", "_blank", "width=1000,height=900");
   if (!w) return false;
+  w.document.open();
   w.document.write(html);
   w.document.close();
   return true;
@@ -86,6 +108,7 @@ export function printNurseryBulletin(opts: {
   period: string;
   rows: NurseryEvaluationRow[];
   teacherComment?: string | null;
+  win?: Window | null;
 }) {
   const { meta, childName, sectionName, period, rows } = opts;
   const reference = `MAT-${new Date().getFullYear()}-${((globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000").replace(/-/g, "").slice(0, 6)).toUpperCase()}`;
@@ -125,7 +148,7 @@ ${opts.teacherComment ? `<h2>Appréciation de la monitrice</h2><p style="font-si
 <footer>Document généré par MBGEduGuinée</footer>
 <script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>
 </body></html>`;
-  return open(html);
+  return open(html, opts.win);
 }
 
 /** Fiche de suivi quotidien à remettre / envoyer aux parents. */
@@ -136,6 +159,7 @@ export function printDailyLog(opts: {
   date: string;
   items: { label: string; value: string }[];
   parentComment?: string | null;
+  win?: Window | null;
 }) {
   const { meta, childName, sectionName, date, items } = opts;
   const reference = `SUI-${new Date().getFullYear()}-${((globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000").replace(/-/g, "").slice(0, 6)).toUpperCase()}`;
@@ -155,10 +179,134 @@ ${opts.parentComment ? `<h2>Message aux parents</h2><p style="font-size:12px">${
 <footer>Document généré par MBGEduGuinée</footer>
 <script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>
 </body></html>`;
-  return open(html);
+  return open(html, opts.win);
 }
 
 export function dailyLogMessage(childName: string, date: string, items: { label: string; value: string }[], parentComment?: string | null) {
   const lines = items.map((i) => `• ${i.label} : ${i.value || "—"}`).join("\n");
   return `Suivi du ${date} — ${childName}\n${lines}${parentComment ? `\n\nMessage : ${parentComment}` : ""}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Fiche de renseignements (inscription) et liste de section           */
+/* ------------------------------------------------------------------ */
+
+export interface ChildRecord {
+  fullName: string;
+  matricule?: string | null;
+  gender?: string | null; // "M" | "F"
+  birthDate?: string | null; // déjà formaté pour l'affichage
+  birthPlace?: string | null;
+  address?: string | null;
+  className?: string | null;
+  sectionName?: string | null;
+  parentName?: string | null;
+  parentPhone?: string | null;
+  pickupPerson?: string | null;
+  pickupPhone?: string | null;
+  allergies?: string | null;
+  medicalNotes?: string | null;
+  napNeeded?: boolean | null;
+  toiletTrained?: boolean | null;
+  specialNotes?: string | null;
+}
+
+const field = (label: string, value: any, wide = false, cls = "") =>
+  `<div class="f${wide ? " wide" : ""}"><b>${esc(label)}</b><span class="${cls}">${esc(value || "") || "&nbsp;"}</span></div>`;
+const yesNo = (v: boolean | null | undefined) => (v == null ? "" : v ? "Oui" : "Non");
+const refCode = (prefix: string) =>
+  `${prefix}-${new Date().getFullYear()}-${(globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000").replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+
+/** HTML de la fiche de renseignements d'un enfant (pur : testable sans navigateur). */
+export function childRecordHtml(opts: { meta: PdfMeta; child: ChildRecord; autoPrint?: boolean }): string {
+  const { meta, child: c } = opts;
+  const today = new Date().toLocaleDateString("fr-FR");
+  const sex = c.gender === "M" ? "Masculin" : c.gender === "F" ? "Féminin" : "";
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8" />
+<title>Fiche de renseignements — ${esc(c.fullName)}</title>${styles(meta)}</head><body>
+${header(meta, "Fiche de renseignements", `Maternelle · Établie le ${today}`, refCode("FIC"))}
+<div class="idbox">
+  <div><b>Enfant</b>${esc(c.fullName)}</div>
+  <div><b>Matricule</b>${esc(c.matricule || "—")}</div>
+  <div><b>Section</b>${esc(c.sectionName || "—")}</div>
+</div>
+<h2>Identité de l'enfant</h2>
+<div class="fields">
+  ${field("Nom et prénom(s)", c.fullName, true)}
+  ${field("Sexe", sex)}${field("Date de naissance", c.birthDate)}
+  ${field("Lieu de naissance", c.birthPlace)}${field("Adresse", c.address)}
+</div>
+<h2>Scolarité</h2>
+<div class="fields">
+  ${field("Année scolaire", meta.academicYear)}${field("Classe", c.className)}
+  ${field("Section", c.sectionName)}${field("Matricule", c.matricule)}
+</div>
+<h2>Responsable légal</h2>
+<div class="fields">${field("Nom du responsable", c.parentName)}${field("Téléphone", c.parentPhone)}</div>
+<h2>Personne autorisée à récupérer l'enfant</h2>
+<div class="fields">${field("Nom", c.pickupPerson)}${field("Téléphone", c.pickupPhone)}</div>
+<h2>Santé et habitudes</h2>
+<div class="fields">
+  ${field("Allergies", c.allergies, true, c.allergies ? "alert" : "")}
+  ${field("Informations médicales", c.medicalNotes, true)}
+  ${field("Fait la sieste", yesNo(c.napNeeded))}${field("Propreté acquise", yesNo(c.toiletTrained))}
+  ${field("Remarques particulières", c.specialNotes, true)}
+</div>
+<div class="sign"><div>Signature du responsable légal</div><div>Cachet et signature de la direction</div></div>
+<footer><span>Document généré par MBGEduGuinée</span><span>${esc(meta.schoolName || "")}</span></footer>
+${opts.autoPrint === false ? "" : `<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>`}
+</body></html>`;
+}
+
+export function printChildRecord(opts: { meta: PdfMeta; child: ChildRecord; win?: Window | null }) {
+  return open(childRecordHtml(opts), opts.win);
+}
+
+export interface SectionListRow {
+  fullName: string;
+  matricule?: string | null;
+  gender?: string | null;
+  birthDate?: string | null;
+  parentPhone?: string | null;
+  pickupPerson?: string | null;
+  allergies?: string | null;
+}
+
+/** HTML de la liste des enfants d'une section (avec allergies en évidence). */
+export function sectionListHtml(opts: {
+  meta: PdfMeta;
+  sectionName: string;
+  teacherName?: string | null;
+  ageRange?: string | null;
+  capacity?: number | null;
+  rows: SectionListRow[];
+  autoPrint?: boolean;
+}): string {
+  const { meta, rows } = opts;
+  const today = new Date().toLocaleDateString("fr-FR");
+  const body = rows
+    .map(
+      (r, i) => `<tr><td>${i + 1}</td><td><b>${esc(r.fullName)}</b></td><td>${esc(r.matricule || "")}</td>
+<td>${esc(r.gender || "")}</td><td>${esc(r.birthDate || "")}</td><td>${esc(r.parentPhone || "")}</td>
+<td>${esc(r.pickupPerson || "")}</td><td class="${r.allergies ? "alert" : ""}">${esc(r.allergies || "")}</td></tr>`,
+    )
+    .join("");
+  const cap = opts.capacity ? ` / ${opts.capacity}` : "";
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8" />
+<title>Liste — ${esc(opts.sectionName)}</title>${styles(meta)}</head><body>
+${header(meta, "Liste de la section", `${esc(opts.sectionName)} · ${today}`, refCode("LST"))}
+<div class="idbox">
+  <div><b>Section</b>${esc(opts.sectionName)}</div>
+  <div><b>Monitrice référente</b>${esc(opts.teacherName || "—")}</div>
+  <div><b>Effectif</b>${rows.length}${cap}${opts.ageRange ? ` · ${esc(opts.ageRange)}` : ""}</div>
+</div>
+<table><thead><tr><th>N°</th><th>Enfant</th><th>Matricule</th><th>Sexe</th><th>Naissance</th><th>Tél. parent</th><th>Récupéré par</th><th>Allergies</th></tr></thead>
+<tbody>${body || `<tr><td colspan="8">Aucun enfant dans cette section.</td></tr>`}</tbody></table>
+<footer><span>Document généré par MBGEduGuinée</span><span>${esc(meta.schoolName || "")}</span></footer>
+${opts.autoPrint === false ? "" : `<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>`}
+</body></html>`;
+}
+
+export function printSectionList(opts: Parameters<typeof sectionListHtml>[0] & { win?: Window | null }) {
+  return open(sectionListHtml(opts), opts.win);
 }
