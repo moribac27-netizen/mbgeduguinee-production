@@ -53,6 +53,7 @@ function styles(meta: PdfMeta) {
   .fields .f.wide { grid-column:1 / -1; }
   .fields b { display:block; font-size:8px; color:#68716b; text-transform:uppercase; letter-spacing:.04em; font-weight:700; }
   .alert { color:#c0392b; font-weight:700; }
+  .photo { float:right; width:72px; height:88px; object-fit:cover; border:1px solid #d9dfda; border-radius:6px; margin:0 0 6px 10px; }
   .legend { margin-top:12px; font-size:9px; color:#68716b; }
   .sign { margin-top:28px; display:flex; justify-content:space-between; gap:24px; font-size:10px; break-inside:avoid; }
   .sign div { width:45%; border-top:1px solid #b9c3bd; padding-top:6px; }
@@ -209,6 +210,7 @@ export interface ChildRecord {
   napNeeded?: boolean | null;
   toiletTrained?: boolean | null;
   specialNotes?: string | null;
+  photoUrl?: string | null; // URL http(s) (signée) de la photo
 }
 
 const field = (label: string, value: any, wide = false, cls = "") =>
@@ -218,20 +220,22 @@ const refCode = (prefix: string) =>
   `${prefix}-${new Date().getFullYear()}-${(globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000").replace(/-/g, "").slice(0, 6).toUpperCase()}`;
 
 /** HTML de la fiche de renseignements d'un enfant (pur : testable sans navigateur). */
-export function childRecordHtml(opts: { meta: PdfMeta; child: ChildRecord; autoPrint?: boolean }): string {
+export function childRecordHtml(opts: { meta: PdfMeta; child: ChildRecord; autoPrint?: boolean; title?: string }): string {
   const { meta, child: c } = opts;
+  const title = opts.title || "Fiche de renseignements";
+  const photo = c.photoUrl && /^https?:\/\//i.test(c.photoUrl) ? `<img class="photo" src="${esc(c.photoUrl)}" alt="" />` : "";
   const today = new Date().toLocaleDateString("fr-FR");
   const sex = c.gender === "M" ? "Masculin" : c.gender === "F" ? "Féminin" : "";
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8" />
-<title>Fiche de renseignements — ${esc(c.fullName)}</title>${styles(meta)}</head><body>
-${header(meta, "Fiche de renseignements", `Maternelle · Établie le ${today}`, refCode("FIC"))}
+<title>${esc(title)}${c.fullName ? ` — ${esc(c.fullName)}` : ""}</title>${styles(meta)}</head><body>
+${header(meta, title, `Maternelle · Établie le ${today}`, refCode("FIC"))}
 <div class="idbox">
   <div><b>Enfant</b>${esc(c.fullName)}</div>
   <div><b>Matricule</b>${esc(c.matricule || "—")}</div>
   <div><b>Section</b>${esc(c.sectionName || "—")}</div>
 </div>
 <h2>Identité de l'enfant</h2>
-<div class="fields">
+${photo}<div class="fields">
   ${field("Nom et prénom(s)", c.fullName, true)}
   ${field("Sexe", sex)}${field("Date de naissance", c.birthDate)}
   ${field("Lieu de naissance", c.birthPlace)}${field("Adresse", c.address)}

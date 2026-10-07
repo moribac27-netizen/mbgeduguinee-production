@@ -62,3 +62,28 @@ describe("liste de section", () => {
     expect(sectionListHtml({ meta: {}, autoPrint: false, sectionName: "X", rows: [] })).toContain("Aucun enfant");
   });
 });
+
+import { STANDARD_COMPETENCIES, NURSERY_DOMAINS } from "../src/lib/nursery-defaults";
+
+describe("référentiel par défaut", () => {
+  it("20 compétences, domaines valides, libellés et ordres uniques", () => {
+    expect(STANDARD_COMPETENCIES).toHaveLength(20);
+    expect(STANDARD_COMPETENCIES.every((c) => (NURSERY_DOMAINS as readonly string[]).includes(c.domain))).toBe(true);
+    expect(new Set(STANDARD_COMPETENCIES.map((c) => c.label)).size).toBe(20);
+    expect(new Set(STANDARD_COMPETENCIES.map((c) => c.display_order)).size).toBe(20);
+  });
+});
+
+describe("fiche vierge et photo", () => {
+  it("fiche d'inscription vierge : titre dédié, champs vides imprimables", () => {
+    const h = childRecordHtml({ meta: { schoolName: "École" }, title: "Fiche d'inscription", child: { fullName: "" }, autoPrint: false });
+    expect(h).toContain("Fiche d&#39;inscription");
+    expect(h).not.toMatch(/undefined|null/);
+  });
+  it("n'accepte que les photos en http(s)", () => {
+    const ok = childRecordHtml({ meta: {}, child: { fullName: "A B", photoUrl: "https://x.test/p.jpg" }, autoPrint: false });
+    const bad = childRecordHtml({ meta: {}, child: { fullName: "A B", photoUrl: "javascript:alert(1)" }, autoPrint: false });
+    expect(ok).toContain('src="https://x.test/p.jpg"');
+    expect(bad).not.toContain("javascript:");
+  });
+});
