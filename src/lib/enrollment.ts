@@ -72,10 +72,10 @@ export function nextForm(prev: EnrollmentForm, newMatricule: string): Enrollment
 
 export type FieldErrors = Partial<Record<keyof EnrollmentForm, string>>;
 
-/** Étape 1 = identité, étape 2 = scolarité, étape 3 = compléments. */
+/** Étape 1 = classe (année, classe, matricule), étape 2 = identité, étape 3 = compléments. */
 export const STEP_FIELDS: Record<1 | 2 | 3, Array<keyof EnrollmentForm>> = {
-  1: ["full_name", "gender", "birth_date"],
-  2: ["class_id", "matricule"],
+  1: ["class_id", "matricule"],
+  2: ["full_name", "gender", "birth_date"],
   3: ["parent_phone"],
 };
 

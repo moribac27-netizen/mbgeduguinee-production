@@ -48,8 +48,8 @@ describe("validation", () => {
   });
   it("stepErrors ne renvoie que l'étape demandée", () => {
     const f = ok({ full_name: "", class_id: "" });
-    expect(Object.keys(stepErrors(1, f))).toEqual(["full_name"]);
-    expect(Object.keys(stepErrors(2, f))).toEqual(["class_id"]);
+    expect(Object.keys(stepErrors(1, f))).toEqual(["class_id"]);
+    expect(Object.keys(stepErrors(2, f))).toEqual(["full_name"]);
   });
 });
 
