@@ -238,3 +238,60 @@ export function generateMatricule(random: () => string = () => globalThis.crypto
 export function isUniqueViolation(err: { code?: string; message?: string } | null | undefined): boolean {
   return !!err && (err.code === "23505" || /duplicate key|unique/i.test(err.message ?? ""));
 }
+
+/** Clé d'identité « nom (ordre indifférent) + date de naissance » ; "" si la date manque. */
+export function identityKey(fullName: string | null | undefined, birthDate: string | null | undefined): string {
+  const n = nameKey(fullName);
+  const d = String(birthDate ?? "").trim();
+  return n && d ? `${n}|${d}` : "";
+}
+
+/* ------------------------------------------------------------------ */
+/* Changement de classe / réinscription en lot                         */
+/* ------------------------------------------------------------------ */
+
+export interface ClassMove {
+  fromClassId: string;
+  toClassId: string;
+  studentIds: string[];
+}
+
+export interface ReenrollmentPlan {
+  moves: ClassMove[];
+  total: number; // élèves qui changeront de classe
+  unchanged: number; // sans destination choisie ou destination identique
+  inactive: number; // statut autre que « actif » : jamais déplacés automatiquement
+}
+
+/**
+ * Plan de réinscription : `mapping` associe une classe d'origine à sa classe de
+ * destination ("" ou absente = ne pas changer). Un seul passage par classe
+ * d'origine ; les élèves non « actifs » ne sont jamais déplacés.
+ */
+export function planReenrollment(
+  students: Array<{ id: string; class_id?: string | null; status?: string | null }>,
+  mapping: Record<string, string>,
+): ReenrollmentPlan {
+  const byPair = new Map<string, ClassMove>();
+  let unchanged = 0;
+  let inactive = 0;
+  for (const s of students) {
+    const from = s.class_id ?? "";
+    if (!from) continue;
+    const to = mapping[from] ?? "";
+    if (!to || to === from) {
+      unchanged++;
+      continue;
+    }
+    if ((s.status ?? "actif") !== "actif") {
+      inactive++;
+      continue;
+    }
+    const k = `${from}>${to}`;
+    const m = byPair.get(k) ?? { fromClassId: from, toClassId: to, studentIds: [] };
+    m.studentIds.push(s.id);
+    byPair.set(k, m);
+  }
+  const moves = [...byPair.values()];
+  return { moves, total: moves.reduce((n, m) => n + m.studentIds.length, 0), unchanged, inactive };
+}

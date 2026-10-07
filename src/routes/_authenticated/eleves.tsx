@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Trash2, Pencil, Eye, ShieldAlert, KeyRound, Copy, Printer } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Eye, ShieldAlert, KeyRound, Copy, Printer, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { StudentPhoto } from "@/components/StudentPhoto";
 import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
 import { EnrollmentWizard } from "@/components/students/EnrollmentWizard";
+import { ChangeClassDialog, ReenrollDialog } from "@/components/students/ClassMoveDialogs";
 import { BulletinPreviewDialog } from "@/components/BulletinPreviewDialog";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 import { fmtDate, fmtDateTime } from "@/lib/reports";
@@ -38,6 +39,8 @@ function ElevesPage() {
   const [previewStudent, setPreviewStudent] = useState<any | null>(null);
   const [disciplineStudent, setDisciplineStudent] = useState<any | null>(null);
   const [codeStudent, setCodeStudent] = useState<any | null>(null);
+  const [moveStudent, setMoveStudent] = useState<any | null>(null);
+  const [reenrollOpen, setReenrollOpen] = useState(false);
 
   const { data: students = [] } = useQuery({
     queryKey: ["students"],
@@ -77,6 +80,8 @@ function ElevesPage() {
           <h1 className="font-display text-3xl font-bold">Élèves</h1>
           <p className="text-muted-foreground mt-1">{students.length} élève(s) inscrits</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <Button variant="outline" className="gap-2" onClick={() => setReenrollOpen(true)}><RefreshCw className="size-4" /> Réinscriptions</Button>
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
           <DialogTrigger asChild>
             <Button className="gap-2"><Plus className="size-4" /> Nouvel élève</Button>
@@ -92,6 +97,7 @@ function ElevesPage() {
             />
           )}
         </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -137,6 +143,7 @@ function ElevesPage() {
                       <Button variant="ghost" size="icon" title="Aperçu du bulletin" disabled={!s.class_id || (planInfo.isPerStudent && !isUnlocked(s.id))} onClick={() => setPreviewStudent(s)}><Eye className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Historique disciplinaire" onClick={() => setDisciplineStudent(s)}><ShieldAlert className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Code d'accès famille" onClick={() => setCodeStudent(s)}><KeyRound className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" title="Changer de classe" onClick={() => setMoveStudent(s)}><ArrowRightLeft className="size-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => { setEditing(s); setOpen(true); }}><Pencil className="size-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="size-4 text-destructive" /></Button>
                     </TableCell>
@@ -159,6 +166,8 @@ function ElevesPage() {
       {disciplineStudent && (
         <DisciplineHistoryDialog student={disciplineStudent} onClose={() => setDisciplineStudent(null)} />
       )}
+      {moveStudent && <ChangeClassDialog student={moveStudent} classes={classes} onClose={() => setMoveStudent(null)} />}
+      {reenrollOpen && <ReenrollDialog students={students} classes={classes} onClose={() => setReenrollOpen(false)} />}
       {codeStudent && (
         <AccessCodeDialog student={codeStudent} onClose={() => setCodeStudent(null)} />
       )}
