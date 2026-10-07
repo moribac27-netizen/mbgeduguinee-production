@@ -61,7 +61,7 @@ export function EnrollmentWizard({
   onClose: () => void;
   onView: (matricule: string) => void;
   /** Mode Maternelle : choix de la section et création automatique de la fiche enfant. */
-  nursery?: { sections: Array<{ id: string; name: string; class_id: string | null }> };
+  nursery?: { sections: Array<{ id: string; name: string; class_id: string | null; capacity?: number | null; count?: number }> };
 }) {
   const qc = useQueryClient();
   const academicYear = getCurrentAcademicYear();
@@ -303,6 +303,12 @@ export function EnrollmentWizard({
                 <SelectTrigger><SelectValue placeholder={nursery.sections.length ? "Choisir la section (facultatif)" : "Aucune section créée"} /></SelectTrigger>
                 <SelectContent>{nursery.sections.map((x) => <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}</SelectContent>
               </Select>
+              {(() => {
+                const sec = nursery.sections.find((x) => x.id === sectionId);
+                return sec?.capacity && (sec.count ?? 0) >= sec.capacity ? (
+                  <p className="mt-1 text-xs text-amber-700">Cette section est complète ({sec.count} / {sec.capacity}). Vous pouvez continuer, vérifiez l'effectif.</p>
+                ) : null;
+              })()}
             </Field>
           )}
           <Field label="Année scolaire"><Input value={academicYear} readOnly disabled /></Field>

@@ -14,6 +14,9 @@ import { useRoles } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
 import { fmtDate } from "@/lib/reports";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
+import { getSchoolId } from "@/lib/school";
+import { STANDARD_COMPETENCIES } from "@/lib/nursery-defaults";
 import {
   printNurseryBulletin, printDailyLog, dailyLogMessage, printChildRecord, printSectionList,
   openPrintWindow, closePrintWindow,
@@ -129,6 +132,7 @@ function Maternelle() {
   const { options: teacherOptions } = useTableOptions("teachers", "full_name");
   const { options: sectionOptions } = useTableOptions("nursery_sections", "name");
   const qc = useQueryClient();
+  const year = getCurrentAcademicYear();
   const [enrollOpen, setEnrollOpen] = useState(false);
 
   // Enfants ayant une fiche Maternelle (clé préfixée par "nursery-children" : rafraîchie par CrudSection).
@@ -297,7 +301,7 @@ function Maternelle() {
               <EnrollmentWizard
                 classes={nurseryClasses}
                 students={studentsFull as any[]}
-                nursery={{ sections: sectionsFull.map((x: any) => ({ id: x.id, name: x.name, class_id: x.class_id ?? null })) }}
+                nursery={{ sections: sectionsFull.map((x: any) => ({ id: x.id, name: x.name, class_id: x.class_id ?? null, capacity: x.capacity ?? null, count: nurseryChildren.filter((c: any) => c.section_id === x.id).length })) }}
                 onClose={() => { setEnrollOpen(false); void qc.invalidateQueries({ queryKey: ["nursery-children"] }); }}
                 onView={() => setEnrollOpen(false)}
               />
@@ -383,6 +387,7 @@ function Maternelle() {
 
 
         <TabsContent value="competences" className="mt-4">
+          {canWrite && competencies.length === 0 && <SeedCompetenciesCard />}
           <CrudSection
             table="nursery_competencies"
             title="Référentiel de compétences"
@@ -412,9 +417,10 @@ function Maternelle() {
         <TabsContent value="evaluations" className="mt-4">
           <CrudSection
             table="nursery_evaluations"
-            title="Évaluations par compétences"
+            title={`Évaluations par compétences — ${year}`}
             singular="évaluation"
-            queryKey={["nursery-evaluations"]}
+            queryKey={["nursery-evaluations", year]}
+            where={(q: any) => q.eq("academic_year", year)}
             select="*, students(full_name), nursery_competencies(label, domain)"
             orderBy={{ column: "created_at", ascending: false }}
             canWrite={canWrite}
@@ -483,6 +489,16 @@ function Maternelle() {
 function BulletinExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; studentOptions: { value: string; label: string }[] }) {
   const [studentId, setStudentId] = useState("");
   const [period, setPeriod] = useState("Trimestre 1");
+  const [ayear, setAyear] = useState(getCurrentAcademicYear());
+  const { data: knownYears = [] } = useQuery({
+    queryKey: ["nursery-eval-years"],
+    queryFn: async () => {
+      const { data } = await supabase.from("nursery_evaluations" as any).select("academic_year");
+      return [...new Set((data ?? []).map((r: any) => r.academic_year as string))];
+    },
+    staleTime: 60_000,
+  });
+  const yearOptions = [...new Set([getCurrentAcademicYear(), ...knownYears])].sort().reverse();
 
   async function handlePrint() {
     if (!studentId) return toast.error("Sélectionnez un enfant.");
@@ -492,17 +508,18 @@ function BulletinExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
       .from("nursery_evaluations" as any)
       .select("level, comment, students(full_name), nursery_competencies(label, domain)")
       .eq("student_id", studentId)
-      .eq("period", period);
+      .eq("period", period)
+      .eq("academic_year", ayear);
     if (error) return fail("Impossible de charger les évaluations.");
     const rows = (data ?? []) as any[];
-    if (rows.length === 0) return fail("Aucune évaluation pour cette période.");
+    if (rows.length === 0) return fail(`Aucune évaluation pour cette période (${ayear}).`);
     const { data: child } = await supabase
       .from("nursery_children" as any)
       .select("nursery_sections(name)")
       .eq("student_id", studentId)
       .maybeSingle();
     const ok = printNurseryBulletin({
-      meta: pdfMeta,
+      meta: { ...pdfMeta, academicYear: ayear },
       childName: rows[0]?.students?.full_name ?? studentOptions.find((o) => o.value === studentId)?.label ?? "—",
       sectionName: (child as any)?.nursery_sections?.name ?? null,
       period,
@@ -518,7 +535,7 @@ function BulletinExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
         <CardTitle className="flex items-center gap-2 text-base"><FileText className="size-4" /> Bulletin maternelle</CardTitle>
         <CardDescription>Export PDF illustré par niveaux (Acquis / En cours / À travailler), avec le logo de l'école.</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-[1fr_200px_auto] sm:items-end">
+      <CardContent className="grid gap-3 sm:grid-cols-[1fr_160px_200px_auto] sm:items-end">
         <div className="space-y-1.5">
           <Label>Enfant</Label>
           <Select value={studentId} onValueChange={setStudentId}>
@@ -526,6 +543,13 @@ function BulletinExportCard({ pdfMeta, studentOptions }: { pdfMeta: any; student
             <SelectContent>
               {studentOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
             </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Année scolaire</Label>
+          <Select value={ayear} onValueChange={setAyear}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{yearOptions.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
@@ -651,11 +675,21 @@ function DocumentsCard({ pdfMeta, kids, sections }: { pdfMeta: any; kids: any[];
   const [childId, setChildId] = useState("");
   const [sectionId, setSectionId] = useState("");
 
-  function printChild() {
+  async function printChild() {
     const c = kids.find((x) => x.student_id === childId);
     if (!c) return void toast.error("Sélectionnez un enfant.");
+    const win = openPrintWindow(); // avant tout await : pas de blocage pop-up
     const st = c.students ?? {};
+    let photoUrl: string | null = null;
+    if (st.photo_url) {
+      try {
+        photoUrl = /^https?:\/\//i.test(st.photo_url)
+          ? st.photo_url
+          : (await supabase.storage.from("school-assets").createSignedUrl(st.photo_url, 600)).data?.signedUrl ?? null;
+      } catch { photoUrl = null; } // sans photo plutôt que pas de fiche
+    }
     const ok = printChildRecord({
+      win,
       meta: pdfMeta,
       child: {
         fullName: st.full_name ?? "—",
@@ -675,8 +709,15 @@ function DocumentsCard({ pdfMeta, kids, sections }: { pdfMeta: any; kids: any[];
         napNeeded: c.nap_needed,
         toiletTrained: c.toilet_trained,
         specialNotes: c.special_notes,
+        photoUrl,
       },
     });
+    if (!ok) toast.error("Autorisez les fenêtres pop-up pour imprimer.");
+  }
+
+  /** Fiche d'inscription vierge à remplir à la main à l'accueil. */
+  function printBlank() {
+    const ok = printChildRecord({ meta: pdfMeta, title: "Fiche d'inscription", child: { fullName: "" } });
     if (!ok) toast.error("Autorisez les fenêtres pop-up pour imprimer.");
   }
 
@@ -710,7 +751,7 @@ function DocumentsCard({ pdfMeta, kids, sections }: { pdfMeta: any; kids: any[];
     <Card className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base"><FileText className="size-4" /> Documents à imprimer</CardTitle>
-        <CardDescription>Fiche de renseignements d'un enfant (inscription) et liste des enfants d'une section, avec le logo de l'école.</CardDescription>
+        <CardDescription>Fiche de renseignements d'un enfant (avec photo), fiche d'inscription vierge et liste des enfants d'une section, avec le logo de l'école.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -723,7 +764,10 @@ function DocumentsCard({ pdfMeta, kids, sections }: { pdfMeta: any; kids: any[];
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={printChild} className="gap-2"><Printer className="size-4" /> Fiche de renseignements</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={printChild} className="gap-2"><Printer className="size-4" /> Fiche de renseignements</Button>
+            <Button variant="outline" onClick={printBlank} className="gap-2"><Printer className="size-4" /> Fiche vierge</Button>
+          </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <div className="space-y-1.5">
@@ -739,5 +783,34 @@ function DocumentsCard({ pdfMeta, kids, sections }: { pdfMeta: any; kids: any[];
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Référentiel vide : propose les 20 compétences standard (modifiables ensuite). */
+function SeedCompetenciesCard() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  async function seed() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const schoolId = await getSchoolId();
+      if (!schoolId) return void toast.error("Établissement non identifié.");
+      const { error } = await supabase.from("nursery_competencies" as any).insert(STANDARD_COMPETENCIES.map((c) => ({ ...c, school_id: schoolId })));
+      if (error) return void toast.error(error.message);
+      toast.success(`${STANDARD_COMPETENCIES.length} compétences ajoutées`);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["nursery-competencies"] }),
+        qc.invalidateQueries({ queryKey: ["opt-nursery-competencies"] }),
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3">
+      <p className="text-sm text-muted-foreground">Le référentiel est vide. Chargez les 20 compétences standard (langage, motricité, socialisation, autonomie, éveil) : vous pourrez ensuite les modifier ou en ajouter.</p>
+      <Button onClick={seed} disabled={busy}>{busy ? "Ajout…" : "Charger le référentiel standard"}</Button>
+    </div>
   );
 }
