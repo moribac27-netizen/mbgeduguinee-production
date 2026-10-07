@@ -13,6 +13,7 @@ import { maxScoreForLevel } from "@/lib/grading";
 import { exportExcel, exportPDF } from "@/lib/reports";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 
 export const Route = createFileRoute("/_authenticated/rapports")({
@@ -269,6 +270,7 @@ function NotesReport() {
       let q = supabase
         .from("grades")
         .select("score,max_score,period,evaluation_type,student_id,students(full_name,class_id,classes(name,level)),subjects(name)")
+        .eq("academic_year", getCurrentAcademicYear())
         .order("created_at", { ascending: false });
       if (term !== "all") q = q.eq("period", term);
       const { data } = await q;
@@ -791,7 +793,8 @@ function BulletinsReport() {
       const { data, error } = await supabase
         .from("grades")
         .select("score,max_score,period,student_id,students(full_name,class_id,classes(name,level)),subjects(name,coefficient)")
-        .eq("period", term);
+        .eq("period", term)
+        .eq("academic_year", getCurrentAcademicYear());
       if (error) toast.error(error.message);
       const acc = new Map<string, any>();
       (data || []).forEach((g: any) => {

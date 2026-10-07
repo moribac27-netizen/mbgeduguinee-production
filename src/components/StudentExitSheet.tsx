@@ -8,6 +8,7 @@ import { maxScoreForLevel } from "@/lib/grading";
 import { fmtMoney } from "@/lib/reports";
 import { DocumentFooter, DocumentHeader, DocumentStat, StudentIdentity } from "@/components/documents/DocumentPrimitives";
 import { Button } from "@/components/ui/button";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 function average(rows: any[]) {
   if (!rows.length) return null;
@@ -63,7 +64,7 @@ export function StudentExitSheet({ studentId }: { studentId: string }) {
     queryFn: async () => {
       const [{ data: student, error: studentError }, { data: grades, error: gradesError }, { data: payment, error: paymentError }] = await Promise.all([
         supabase.from("students").select("*, classes(name, level)").eq("id", studentId).maybeSingle(),
-        supabase.from("grades").select("score,max_score,period,evaluation_type,created_at,subjects(name,coefficient)").eq("student_id", studentId).order("created_at"),
+        supabase.from("grades").select("score,max_score,period,evaluation_type,created_at,subjects(name,coefficient)").eq("student_id", studentId).eq("academic_year", getCurrentAcademicYear()).order("created_at"),
         (supabase as any).from("student_plan_payments").select("status,amount,school_share,reference,receipt_number,validated_at,academic_year").eq("student_id", studentId).eq("academic_year", school?.academic_year ?? "").eq("status", "VALIDATED").maybeSingle(),
       ]);
       if (studentError) throw studentError;

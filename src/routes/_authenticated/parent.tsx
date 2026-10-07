@@ -98,7 +98,7 @@ function ParentPortal() {
   // Plan "par élève" : statut de paiement par enfant, calculé une seule fois
   // pour l'école du parent connecté et réutilisé pour le badge + le verrouillage.
   const { info: planInfo } = usePerStudentPlan();
-  const { paidIds, isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
+  const { paidIds } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
   return (
     <div className="space-y-6">
@@ -176,7 +176,7 @@ function ParentPortal() {
           {selected && (
             <ChildDetails
               student={selected}
-              isLocked={planInfo.isPerStudent && !isUnlocked(selected.id)}
+              isLocked={planInfo.isPerStudent && !paidIds.has(selected.id)}
             />
           )}
         </>
@@ -231,13 +231,9 @@ function ChildDetails({ student, isLocked }: { student: any; isLocked: boolean }
     queryKey: ["parent-schedule", student.class_id],
     enabled: !!student.class_id,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("schedule_slots")
-        .select("id, day_of_week, start_time, end_time, subjects(name), rooms(name), teachers(full_name)")
-        .eq("class_id", student.class_id)
-        .order("day_of_week")
-        .order("start_time");
-      return data ?? [];
+      const { data, error } = await (supabase as any).rpc("get_class_timetable", { _class_id: student.class_id });
+      if (error) throw error;
+      return (data as any[]) ?? [];
     },
   });
 

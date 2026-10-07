@@ -103,7 +103,11 @@ function StudentDashboard({ student }: { student: any }) {
   const { data: schedule = [], error: scheduleError } = useQuery({
     queryKey: ["eleve-schedule", student.class_id],
     enabled: !!student.class_id,
-    queryFn: async () => (await supabase.from("schedule_slots").select("id, day_of_week, start_time, end_time, subjects(name), rooms(name), teachers(full_name)").eq("class_id", student.class_id).order("day_of_week").order("start_time")).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_class_timetable", { _class_id: student.class_id });
+      if (error) throw error;
+      return (data as any[]) ?? [];
+    },
   });
   const { data: announcements = [], error: announcementsError } = useQuery({
     queryKey: ["eleve-announcements"],

@@ -35,6 +35,7 @@ import { Route as AuthenticatedEmploiDuTempsRouteImport } from './routes/_authen
 import { Route as AuthenticatedEnseignantsRouteImport } from './routes/_authenticated/enseignants'
 import { Route as AuthenticatedEvenementsRouteImport } from './routes/_authenticated/evenements'
 import { Route as AuthenticatedExamensRouteImport } from './routes/_authenticated/examens'
+import { Route as AuthenticatedImportExportRouteImport } from './routes/_authenticated/import-export'
 import { Route as AuthenticatedInfirmerieRouteImport } from './routes/_authenticated/infirmerie'
 import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
 import { Route as AuthenticatedMaternelleRouteImport } from './routes/_authenticated/maternelle'
@@ -194,6 +195,12 @@ const AuthenticatedExamensRoute = AuthenticatedExamensRouteImport.update({
   path: '/examens',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedImportExportRoute =
+  AuthenticatedImportExportRouteImport.update({
+    id: '/import-export',
+    path: '/import-export',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInfirmerieRoute = AuthenticatedInfirmerieRouteImport.update({
   id: '/infirmerie',
   path: '/infirmerie',
@@ -324,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/enseignants': typeof AuthenticatedEnseignantsRoute
   '/evenements': typeof AuthenticatedEvenementsRoute
   '/examens': typeof AuthenticatedExamensRoute
+  '/import-export': typeof AuthenticatedImportExportRoute
   '/infirmerie': typeof AuthenticatedInfirmerieRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/maternelle': typeof AuthenticatedMaternelleRoute
@@ -371,6 +379,7 @@ export interface FileRoutesByTo {
   '/enseignants': typeof AuthenticatedEnseignantsRoute
   '/evenements': typeof AuthenticatedEvenementsRoute
   '/examens': typeof AuthenticatedExamensRoute
+  '/import-export': typeof AuthenticatedImportExportRoute
   '/infirmerie': typeof AuthenticatedInfirmerieRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/maternelle': typeof AuthenticatedMaternelleRoute
@@ -420,6 +429,7 @@ export interface FileRoutesById {
   '/_authenticated/enseignants': typeof AuthenticatedEnseignantsRoute
   '/_authenticated/evenements': typeof AuthenticatedEvenementsRoute
   '/_authenticated/examens': typeof AuthenticatedExamensRoute
+  '/_authenticated/import-export': typeof AuthenticatedImportExportRoute
   '/_authenticated/infirmerie': typeof AuthenticatedInfirmerieRoute
   '/_authenticated/journal': typeof AuthenticatedJournalRoute
   '/_authenticated/maternelle': typeof AuthenticatedMaternelleRoute
@@ -469,6 +479,7 @@ export interface FileRouteTypes {
     | '/enseignants'
     | '/evenements'
     | '/examens'
+    | '/import-export'
     | '/infirmerie'
     | '/journal'
     | '/maternelle'
@@ -516,6 +527,7 @@ export interface FileRouteTypes {
     | '/enseignants'
     | '/evenements'
     | '/examens'
+    | '/import-export'
     | '/infirmerie'
     | '/journal'
     | '/maternelle'
@@ -564,6 +576,7 @@ export interface FileRouteTypes {
     | '/_authenticated/enseignants'
     | '/_authenticated/evenements'
     | '/_authenticated/examens'
+    | '/_authenticated/import-export'
     | '/_authenticated/infirmerie'
     | '/_authenticated/journal'
     | '/_authenticated/maternelle'
@@ -779,6 +792,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedExamensRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/import-export': {
+      id: '/_authenticated/import-export'
+      path: '/import-export'
+      fullPath: '/import-export'
+      preLoaderRoute: typeof AuthenticatedImportExportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/infirmerie': {
       id: '/_authenticated/infirmerie'
       path: '/infirmerie'
@@ -945,6 +965,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedEnseignantsRoute: typeof AuthenticatedEnseignantsRoute
   AuthenticatedEvenementsRoute: typeof AuthenticatedEvenementsRoute
   AuthenticatedExamensRoute: typeof AuthenticatedExamensRoute
+  AuthenticatedImportExportRoute: typeof AuthenticatedImportExportRoute
   AuthenticatedInfirmerieRoute: typeof AuthenticatedInfirmerieRoute
   AuthenticatedJournalRoute: typeof AuthenticatedJournalRoute
   AuthenticatedMaternelleRoute: typeof AuthenticatedMaternelleRoute
@@ -988,6 +1009,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedEnseignantsRoute: AuthenticatedEnseignantsRoute,
   AuthenticatedEvenementsRoute: AuthenticatedEvenementsRoute,
   AuthenticatedExamensRoute: AuthenticatedExamensRoute,
+  AuthenticatedImportExportRoute: AuthenticatedImportExportRoute,
   AuthenticatedInfirmerieRoute: AuthenticatedInfirmerieRoute,
   AuthenticatedJournalRoute: AuthenticatedJournalRoute,
   AuthenticatedMaternelleRoute: AuthenticatedMaternelleRoute,
