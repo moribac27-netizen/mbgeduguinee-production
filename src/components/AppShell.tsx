@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   CreditCard, Megaphone, LogOut, Menu, X, School, FileText, CalendarDays, UserCheck,
   Calculator, Wallet, ScrollText, Library, Link2, Settings, MessageSquare, BarChart3, History, DatabaseBackup, ShieldCheck,
-  Coins, Home, IdCard, BookMarked, HeartPulse, Bus, UtensilsCrossed, Baby, Briefcase, ShieldAlert, Users2, Trophy,
+  Coins, Home, IdCard, BookMarked, HeartPulse, Bus, UtensilsCrossed, Baby, Briefcase, ShieldAlert, Users2, Trophy, FileSpreadsheet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,7 @@ const STAFF_NAV = [
   { to: "/messagerie", label: "Messagerie", icon: MessageSquare },
   { to: "/rapports", label: "Rapports", icon: BarChart3 },
   { to: "/journal", label: "Journal d'activité", icon: History },
+  { to: "/import-export", label: "Import / Export", icon: FileSpreadsheet },
   { to: "/sauvegarde", label: "Sauvegarde", icon: DatabaseBackup },
   { to: "/super-admin", label: "Super Admin", icon: ShieldCheck },
   { to: "/personnalisation-recu", label: "Personnalisation reçu", icon: FileText },

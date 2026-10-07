@@ -10,6 +10,7 @@ import {
   FileText, UserCheck, MessageSquare, TrendingUp,
 } from "lucide-react";
 import { maxScoreForLevel } from "@/lib/grading";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 export const Route = createFileRoute("/_authenticated/direction-etudes")({
   head: () => ({
@@ -51,7 +52,7 @@ function DirectionEtudesPage() {
   });
   const { data: grades = [] } = useQuery({
     queryKey: ["de-grades"],
-    queryFn: async () => (await supabase.from("grades").select("student_id, subject_id, score, period")).data ?? [],
+    queryFn: async () => (await supabase.from("grades").select("student_id, subject_id, score, period").eq("academic_year", getCurrentAcademicYear())).data ?? [],
   });
   const { data: slots = [] } = useQuery({
     queryKey: ["de-slots"],
