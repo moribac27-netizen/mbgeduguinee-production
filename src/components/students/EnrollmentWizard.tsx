@@ -318,6 +318,10 @@ export function EnrollmentWizard({
               <SelectContent>{classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} — {c.level}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
+          {nursery && classes.length === 0 && (
+            <p className="sm:col-span-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">Aucune classe de niveau Maternelle n'existe encore. Créez-la ci-dessous : elle sera utilisée pour cet enfant et les suivants.</p>
+          )}
+          {nursery && <NewNurseryClass onCreated={(id) => set({ class_id: id })} />}
           <Field label="Niveau"><Input value={cls?.level ?? "—"} readOnly disabled /></Field>
           <Field label="Matricule (généré automatiquement, modifiable)" error={errors.matricule}>
             <Input value={form.matricule} onChange={(e) => { manualMatricule.current = true; set({ matricule: e.target.value }); }} />
@@ -389,6 +393,41 @@ export function EnrollmentWizard({
         </div>
       </DialogFooter>
     </DialogContent>
+  );
+}
+
+/** Crée une classe de niveau « Maternelle » (même table `classes` que la page Classes). */
+function NewNurseryClass({ onCreated }: { onCreated: (id: string) => void }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [fee, setFee] = useState("0");
+  const [busy, setBusy] = useState(false);
+  async function create() {
+    if (busy || !name.trim()) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.from("classes").insert({ name: name.trim(), level: "Maternelle", annual_fee: Math.max(0, Number(fee) || 0) } as any).select("id").single();
+      if (error || !data) return void toast.error(error?.message ?? "Création impossible.");
+      toast.success("Classe de Maternelle créée");
+      await Promise.all(["opt-classes", "classes-full", "classes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+      onCreated(data.id);
+      setOpen(false);
+      setName("");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!open) return <Button type="button" variant="link" className="h-auto p-0 text-xs sm:col-span-2 justify-start" onClick={() => setOpen(true)}>+ Créer une classe de Maternelle</Button>;
+  return (
+    <div className="sm:col-span-2 grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_160px_auto] sm:items-end">
+      <Field label="Nom de la classe"><Input autoFocus placeholder="ex. Petite section" value={name} onChange={(e) => setName(e.target.value)} /></Field>
+      <Field label="Frais annuels (GNF)"><Input type="number" min={0} value={fee} onChange={(e) => setFee(e.target.value)} /></Field>
+      <div className="flex gap-2">
+        <Button type="button" onClick={create} disabled={busy || !name.trim()}>{busy ? "Création…" : "Créer"}</Button>
+        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+      </div>
+    </div>
   );
 }
 

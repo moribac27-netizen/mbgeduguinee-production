@@ -162,10 +162,15 @@ function Maternelle() {
     staleTime: 15_000,
   });
   const { classes: allClasses } = useClassOptions();
-  const nurseryClasses = useMemo(() => {
-    const m = allClasses.filter((c: any) => /maternelle/i.test(c.level ?? ""));
-    return m.length ? m : allClasses;
-  }, [allClasses]);
+  // Uniquement les classes de niveau « Maternelle » (jamais le primaire, le collège ou le lycée).
+  const nurseryClasses = useMemo(() => allClasses.filter((c: any) => /maternelle/i.test(c.level ?? "")), [allClasses]);
+  // Formulaire des sections : classes Maternelle + celles déjà rattachées (pour ne rien effacer à l'enregistrement).
+  const sectionClassOptions = useMemo(() => {
+    const attached = new Set(sectionsFull.map((x: any) => x.class_id).filter(Boolean));
+    return allClasses
+      .filter((c: any) => /maternelle/i.test(c.level ?? "") || attached.has(c.id))
+      .map((c: any) => ({ value: c.id, label: c.name }));
+  }, [allClasses, sectionsFull]);
   const { data: studentsFull = [] } = useQuery({
     queryKey: ["students"],
     queryFn: async () => {
@@ -266,7 +271,7 @@ function Maternelle() {
               { name: "name", label: "Nom de la section", required: true, placeholder: "ex. Petite section A" },
               { name: "age_range", label: "Tranche d'âge", placeholder: "ex. 3-4 ans" },
               { name: "capacity", label: "Capacité", type: "number", min: 0 },
-              { name: "class_id", label: "Classe rattachée", type: "select", options: classOptions },
+              { name: "class_id", label: "Classe rattachée (niveau Maternelle)", type: "select", options: sectionClassOptions, help: "Créez la classe dans Classes (niveau Maternelle) ou depuis « Inscrire un enfant »." },
               { name: "teacher_id", label: "Enseignant référent", type: "select", options: teacherOptions },
               { name: "notes", label: "Notes", type: "textarea", full: true },
             ]}
