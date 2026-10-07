@@ -31,7 +31,7 @@ import {
 } from "@/lib/enrollment";
 
 type Step = 1 | 2 | 3 | 4;
-const STEP_LABELS: Record<Step, string> = { 1: "Élève", 2: "Scolarité", 3: "Compléments", 4: "Vérification" };
+const STEP_LABELS: Record<Step, string> = { 1: "Classe", 2: "Élève", 3: "Compléments", 4: "Vérification" };
 
 interface Created {
   id: string;
@@ -113,7 +113,7 @@ export function EnrollmentWizard({
     const all = validateForm(form);
     if (Object.keys(all).length) {
       setErrors(all);
-      setStep(all.full_name || all.gender || all.birth_date ? 1 : all.class_id || all.matricule ? 2 : 3);
+      setStep(all.class_id || all.matricule ? 1 : all.full_name || all.gender || all.birth_date ? 2 : 3);
       return;
     }
     lock.current = true;
@@ -134,7 +134,7 @@ export function EnrollmentWizard({
       setDupes(matches);
       if (hasBlocking(matches) && manualMatricule.current) {
         setErrors({ matricule: "Ce matricule est déjà attribué." });
-        setStep(2);
+        setStep(1);
         return;
       }
       if (matches.some((m) => !m.blocking) && !confirmedDupes) return; // l'écran de vérification affiche l'alerte
@@ -151,7 +151,7 @@ export function EnrollmentWizard({
       if (error || !data) {
         if (error && isUniqueViolation(error)) {
           setErrors({ matricule: "Ce matricule est déjà attribué." });
-          setStep(2);
+          setStep(1);
         } else {
           setNetError(error?.message ?? "Enregistrement impossible. Vos informations sont conservées : réessayez.");
         }
@@ -187,7 +187,7 @@ export function EnrollmentWizard({
     setErrors({});
     setNetError(null);
     setLookup("");
-    setStep(1);
+    setStep(2);
   }
 
   /* ----------------------------- Succès ----------------------------- */
@@ -231,7 +231,7 @@ export function EnrollmentWizard({
         ))}
       </ol>
 
-      {step === 1 && (
+      {step === 2 && (
         <div className="space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -268,8 +268,9 @@ export function EnrollmentWizard({
         </div>
       )}
 
-      {step === 2 && (
+      {step === 1 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <p className="sm:col-span-2 text-sm text-muted-foreground">Choisissez d'abord la classe dans laquelle l'élève est inscrit. Elle sera conservée pour inscrire les élèves suivants.</p>
           <Field label="Année scolaire"><Input value={academicYear} readOnly disabled /></Field>
           <Field label="Classe" error={errors.class_id}>
             <Select value={form.class_id} onValueChange={(v) => set({ class_id: v })}>
