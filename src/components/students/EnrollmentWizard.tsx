@@ -123,6 +123,11 @@ export function EnrollmentWizard({
       setStep(all.class_id || all.matricule ? 1 : all.full_name || all.gender || all.birth_date ? 2 : 3);
       return;
     }
+    if (nursery && !classes.some((c) => c.id === form.class_id)) {
+      setErrors({ class_id: "Choisissez une classe de niveau Maternelle." });
+      setStep(1);
+      return;
+    }
     lock.current = true;
     setSaving(true);
     setNetError(null);
@@ -299,13 +304,17 @@ export function EnrollmentWizard({
               <Select value={sectionId} onValueChange={(v) => {
                 setSectionId(v);
                 const sec = nursery.sections.find((x) => x.id === v);
-                if (sec?.class_id) set({ class_id: sec.class_id });
+                // La classe rattachée n'est reprise que si elle fait partie des classes proposées (Maternelle) :
+                // une section encore rattachée à une classe de primaire ne doit jamais y inscrire l'enfant.
+                if (sec?.class_id && classes.some((c) => c.id === sec.class_id)) set({ class_id: sec.class_id });
               }}>
                 <SelectTrigger><SelectValue placeholder={nursery.sections.length ? "Choisir la section (facultatif)" : "Aucune section créée"} /></SelectTrigger>
                 <SelectContent>{nursery.sections.map((x) => <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}</SelectContent>
               </Select>
               {(() => {
                 const sec = nursery.sections.find((x) => x.id === sectionId);
+                if (sec?.class_id && !classes.some((c) => c.id === sec.class_id))
+                  return <p className="mt-1 text-xs text-amber-700">Cette section est rattachée à une classe qui n'est pas de niveau Maternelle : choisissez la classe de l'enfant ci-dessous, puis corrigez la section dans l'onglet Sections.</p>;
                 return sec?.capacity && (sec.count ?? 0) >= sec.capacity ? (
                   <p className="mt-1 text-xs text-amber-700">Cette section est complète ({sec.count} / {sec.capacity}). Vous pouvez continuer, vérifiez l'effectif.</p>
                 ) : null;
