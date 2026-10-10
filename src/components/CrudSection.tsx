@@ -59,6 +59,8 @@ interface Props {
   columns: CrudColumn[];
   searchKeys?: string[];
   extraInsert?: Record<string, any>;
+  /** Complète/transforme la ligne avant l'enregistrement (ex. créer la classe liée). Lever une erreur annule l'enregistrement. */
+  beforeSave?: (payload: Record<string, any>, editing: any) => Promise<Record<string, any>>;
   canWrite?: boolean;
   emptyHint?: string;
   filters?: ReactNode;
@@ -94,7 +96,7 @@ function fromDbValue(field: CrudField, v: any) {
 
 export function CrudSection({
   table, title, singular, queryKey, select = "*", orderBy,
-  fields, columns, searchKeys = [], extraInsert, canWrite = true,
+  fields, columns, searchKeys = [], extraInsert, beforeSave, canWrite = true,
   emptyHint, filters, where, rowClassName,
 }: Props) {
   const qc = useQueryClient();
@@ -228,6 +230,7 @@ export function CrudSection({
             fields={fields}
             editing={editing}
             extraInsert={extraInsert}
+            beforeSave={beforeSave}
             onDone={() => { setOpen(false); setEditing(null); qc.invalidateQueries({ queryKey }); }}
             onCancel={() => { setOpen(false); setEditing(null); }}
           />
@@ -238,13 +241,14 @@ export function CrudSection({
 }
 
 function CrudDialog({
-  table, singular, fields, editing, extraInsert, onDone, onCancel,
+  table, singular, fields, editing, extraInsert, beforeSave, onDone, onCancel,
 }: {
   table: string;
   singular: string;
   fields: CrudField[];
   editing: any;
   extraInsert?: Record<string, any>;
+  beforeSave?: (payload: Record<string, any>, editing: any) => Promise<Record<string, any>>;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -275,13 +279,22 @@ function CrudDialog({
     fields.forEach((f) => (payload[f.name] = toDbValue(f, form[f.name])));
 
     setSaving(true);
+    let finalPayload = payload;
+    if (beforeSave) {
+      try {
+        finalPayload = await beforeSave(payload, editing);
+      } catch (err: any) {
+        setSaving(false);
+        return toast.error(err?.message ?? "Enregistrement impossible.");
+      }
+    }
     let error: any;
     if (editing) {
-      ({ error } = await supabase.from(table as any).update(payload).eq("id", editing.id));
+      ({ error } = await supabase.from(table as any).update(finalPayload).eq("id", editing.id));
     } else {
       const schoolId = await getSchoolId();
       if (!schoolId) { setSaving(false); return toast.error("Établissement non identifié."); }
-      ({ error } = await supabase.from(table as any).insert({ ...payload, ...extraInsert, school_id: schoolId }));
+      ({ error } = await supabase.from(table as any).insert({ ...finalPayload, ...extraInsert, school_id: schoolId }));
     }
     setSaving(false);
     if (error) {
