@@ -497,3 +497,50 @@ export function workItems(opts: {
     };
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Statuts en masse (« absent ») et validation de la saisie            */
+/* ------------------------------------------------------------------ */
+
+/** Lignes `grade_marks` → carte « élève|matière » → statut. */
+export function marksFromRows(rows: Array<{ student_id: string; subject_id: string; status: string }>): Map<string, MarkStatus> {
+  const m = new Map<string, MarkStatus>();
+  for (const r of rows) m.set(markKey(r.student_id, r.subject_id), r.status as MarkStatus);
+  return m;
+}
+
+/** Matières dont la saisie est validée pour le contexte (classe, période, évaluation, année). */
+export function validatedSubjectIds(
+  rows: Array<{ class_id: string; subject_id: string; period: string; evaluation_type: string; academic_year: string }>,
+  ctx: Pick<EntryContext, "classId" | "period" | "evaluationType" | "academicYear">,
+): Set<string> {
+  return new Set(
+    rows
+      .filter((r) => r.class_id === ctx.classId && r.period === ctx.period && r.evaluation_type === ctx.evaluationType && r.academic_year === ctx.academicYear)
+      .map((r) => r.subject_id),
+  );
+}
+
+/**
+ * « Absent » en masse : pour chaque (élève, matière) choisi, décide s'il faut poser le statut.
+ * Une case qui contient déjà une note n'est JAMAIS marquée (on ne cache pas une note) : elle est comptée à part.
+ */
+export function planMarks(opts: {
+  studentIds: string[];
+  subjectIds: string[];
+  cells: Array<Pick<Cell, "studentId" | "subjectId" | "rows">>;
+  lockedSubjectIds?: Set<string>;
+}): { targets: Array<{ studentId: string; subjectId: string }>; skippedWithNote: number; skippedValidated: number } {
+  const withNote = new Set(opts.cells.filter((c) => c.rows.length > 0).map((c) => markKey(c.studentId, c.subjectId)));
+  const targets: Array<{ studentId: string; subjectId: string }> = [];
+  let skippedWithNote = 0;
+  let skippedValidated = 0;
+  for (const studentId of opts.studentIds) {
+    for (const subjectId of opts.subjectIds) {
+      if (opts.lockedSubjectIds?.has(subjectId)) skippedValidated++;
+      else if (withNote.has(markKey(studentId, subjectId))) skippedWithNote++;
+      else targets.push({ studentId, subjectId });
+    }
+  }
+  return { targets, skippedWithNote, skippedValidated };
+}

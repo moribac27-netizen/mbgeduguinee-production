@@ -21,24 +21,21 @@ import {
   type DuplicateConflict, type SaveContext, type WorkContext,
 } from "@/hooks/useGradeEntry";
 import {
-  buildCells, classProgress, diffDrafts, markKey, needsAttention, nextStudentId, previousStudentId,
+  buildCells, MARK_LABELS, marksFromRows, validatedSubjectIds, classProgress, diffDrafts, markKey, needsAttention, nextStudentId, previousStudentId,
   reviewItems, workItems, parseScoreInput, type Cell, type NextMode, type ReviewItem, type SaveOp,
 } from "@/lib/grade-entry";
 import { ClassGridView } from "./ClassGridView";
 import { FilterBar, IntensiveView, StudentFormView, StudentList, type ListFilters } from "./StudentViews";
 import { EntrySummary, MyWork, ReviewPanel } from "./ReviewAndSummary";
 import { scoreText } from "./entry-shared";
+import { MarkAbsentButton, MarkAbsentDialog } from "./MarksAndValidation";
+import { useGradeMarks, useGradeValidations, useMarkActions } from "@/hooks/useGradeMarks";
+import { useRoles } from "@/hooks/useAuth";
 
 type Mode = "classe" | "eleve" | "intensive";
 const ALL = "all";
 
-/**
- * La validation définitive de la saisie et le marquage « absent » en masse
- * demandent un stockage dédié (nouvelles tables) qui n'est pas encore créé.
- * Tant que ce n'est pas le cas, ces deux fonctions restent masquées plutôt que
- * d'afficher des boutons sans effet.
- */
-export const VALIDATION_ENABLED = false;
+export const VALIDATION_ENABLED = true;
 
 const EMPTY: any[] = []; // référence stable : évite des recalculs à chaque rendu
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -111,7 +108,18 @@ export function SmartEntry() {
     () => ({ classId, subjectIds: subjectsInScope.map((s: any) => s.id), period, evaluationType: evalType, academicYear, maxScore }),
     [classId, subjectsInScope, period, evalType, academicYear, maxScore],
   );
-  const cells = useMemo(() => buildCells({ ctx, students: eligible, grades }), [ctx, eligible, grades]);
+  const scope = useMemo(() => ({ classId, period, evaluationType: evalType, academicYear }), [classId, period, evalType, academicYear]);
+  const marksQ = useGradeMarks(scope, eligibleIds);
+  const validationsQ = useGradeValidations(scope);
+  const marks = useMemo(() => marksFromRows(marksQ.data ?? EMPTY), [marksQ.data]);
+  const validatedIds = useMemo(() => validatedSubjectIds(validationsQ.data ?? EMPTY, ctx), [validationsQ.data, ctx]);
+  const allValidated = ctx.subjectIds.length > 0 && ctx.subjectIds.every((id) => validatedIds.has(id));
+  const { roles } = useRoles();
+  const canReopen = roles.some((r) => ["admin", "directeur", "directeur_etudes", "proviseur"].includes(r));
+  const markActions = useMarkActions(scope);
+  const [absentOpen, setAbsentOpen] = useState(false);
+  const [confirmValidate, setConfirmValidate] = useState(false);
+  const cells = useMemo(() => buildCells({ ctx, students: eligible, grades, marks }), [ctx, eligible, grades, marks]);
   const cellsByStudent = useMemo(() => {
     const m = new Map<string, Map<string, Cell>>();
     for (const c of cells) {
@@ -169,6 +177,10 @@ export function SmartEntry() {
   // ---- brouillons ----
   const setDraft = useCallback(
     (studentId: string, subjectIdArg: string, text: string) => {
+      if (validatedIds.has(subjectIdArg)) {
+        toast.warning("🔒 Saisie validée : cette matière n'est plus modifiable.");
+        return;
+      }
       const key = markKey(studentId, subjectIdArg);
       const cell = cellsByStudent.get(studentId)?.get(subjectIdArg);
       const saved = cell?.rows.length === 1 ? scoreText(Number(cell.rows[0].score)) : "";
@@ -188,7 +200,7 @@ export function SmartEntry() {
         return next;
       });
     },
-    [cellsByStudent, maxScore],
+    [cellsByStudent, maxScore, validatedIds],
   );
 
   const dropDrafts = useCallback((keys: string[]) => {
@@ -451,7 +463,9 @@ export function SmartEntry() {
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 flex flex-wrap items-center gap-3">
           <span>✅ Toutes les notes attendues ont été saisies.</span>
           <Button size="sm" variant="outline" onClick={() => setShowReview(true)}>Vérifier</Button>
-          {VALIDATION_ENABLED && <Button size="sm">Valider la saisie</Button>}
+          {VALIDATION_ENABLED && !allValidated && (
+            <Button size="sm" disabled={hasPending || markActions.busy} onClick={() => setConfirmValidate(true)} title={hasPending ? "Enregistrez d'abord vos modifications" : undefined}>Valider la saisie</Button>
+          )}
         </div>
       )}
 
@@ -466,7 +480,54 @@ export function SmartEntry() {
         <Button variant={showReview ? "default" : "outline"} size="sm" className="gap-2" onClick={() => setShowReview((v) => !v)}>
           <ListChecks className="size-4" />Contrôle &amp; corrections ({items.filter((i) => i.kind !== "missing").length + progress.missing})
         </Button>
+        {VALIDATION_ENABLED && !allValidated && <MarkAbsentButton onClick={() => guard(() => setAbsentOpen(true))} />}
       </div>
+
+      {VALIDATION_ENABLED && validatedIds.size > 0 && (
+        <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 flex flex-wrap items-center gap-3">
+          <span>🔒 Saisie validée pour {allValidated ? "toutes les matières" : `${validatedIds.size} matière(s) : ${[...validatedIds].map(subjectName).join(", ")}`} : plus de modification possible.</span>
+          {canReopen && (
+            <Button size="sm" variant="outline" disabled={markActions.busy} onClick={async () => {
+              const r: any = await markActions.reopen([...validatedIds]);
+              if (r?.error) toast.error(r.error); else toast.success("Saisie rouverte.");
+            }}>Rouvrir la saisie</Button>
+          )}
+        </div>
+      )}
+
+      <MarkAbsentDialog
+        open={absentOpen}
+        onOpenChange={setAbsentOpen}
+        students={eligible}
+        subjects={subjectsInScope}
+        cells={cells}
+        lockedSubjectIds={validatedIds}
+        busy={markActions.busy}
+        onApply={async (targets, status) => {
+          const r: any = await markActions.setMarks(targets, status);
+          if (r?.error) { toast.error(`❌ ${r.error}`); return false; }
+          toast.success(status ? `✅ ${r.count} case(s) marquée(s) « ${MARK_LABELS[status]} ».` : `✅ Statut retiré sur ${r.count} case(s).`);
+          return true;
+        }}
+      />
+
+      <AlertDialog open={confirmValidate} onOpenChange={setConfirmValidate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Valider la saisie ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Les notes de {cls?.name} ({ENTRY_PERIODS.find((p) => p.v === period)?.l}, {EVALUATION_TYPES.find((t) => t.v === evalType)?.l}) ne seront plus modifiables. Seule la direction pourra rouvrir la saisie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const r: any = await markActions.validate(ctx.subjectIds.filter((id) => !validatedIds.has(id)));
+              if (r?.error) toast.error(`❌ ${r.error}`); else toast.success("🔒 Saisie validée.");
+            }}>Valider</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {(gradesQ.isLoading || studentsQ.isLoading) && <p className="text-sm text-muted-foreground">Chargement…</p>}
       {(gradesQ.error || studentsQ.error) && <p className="text-sm text-red-700">❌ Chargement impossible. Vérifiez votre connexion puis rechargez la page.</p>}
