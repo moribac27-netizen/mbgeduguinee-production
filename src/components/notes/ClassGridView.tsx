@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { StudentPhoto } from "@/components/StudentPhoto";
 import { AlertTriangle, Copy } from "lucide-react";
 import type { Cell, StudentProgress } from "@/lib/grade-entry";
-import { markKey } from "@/lib/grade-entry";
+import { MARK_LABELS, markKey } from "@/lib/grade-entry";
 import { ProgressMeter, ScoreInput, StatusBadge, focusCell, scoreText } from "./entry-shared";
 
 export interface GridProps {
@@ -70,6 +70,10 @@ const GridRow = memo(
               {dup ? (
                 <Badge variant="destructive" className="gap-1" title={cell!.anomalies[0]?.message}>
                   <Copy className="size-3" /> Doublon
+                </Badge>
+              ) : cell?.state === "excused" && !changed[i] ? (
+                <Badge variant="secondary" className="h-9 px-3" title="Aucune note attendue (ni manquante, ni zéro)">
+                  {cell.excusedAs ? MARK_LABELS[cell.excusedAs] : "Dispensé"}
                 </Badge>
               ) : (
                 <ScoreInput
