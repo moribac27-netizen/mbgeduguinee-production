@@ -23,7 +23,7 @@ import {
 } from "@/lib/nursery-print";
 import { Dialog } from "@/components/ui/dialog";
 import { EnrollmentWizard } from "@/components/students/EnrollmentWizard";
-import { NewNurseryClass } from "@/components/students/NewNurseryClass";
+import { ensureNurseryClass } from "@/lib/nursery-class";
 import { toast } from "sonner";
 import { Baby, FileText, Printer, Share2, UserPlus } from "lucide-react";
 
@@ -165,13 +165,6 @@ function Maternelle() {
   const { classes: allClasses } = useClassOptions();
   // Uniquement les classes de niveau « Maternelle » (jamais le primaire, le collège ou le lycée).
   const nurseryClasses = useMemo(() => allClasses.filter((c: any) => /maternelle/i.test(c.level ?? "")), [allClasses]);
-  // Formulaire des sections : classes Maternelle + celles déjà rattachées (pour ne rien effacer à l'enregistrement).
-  const sectionClassOptions = useMemo(() => {
-    const attached = new Set(sectionsFull.map((x: any) => x.class_id).filter(Boolean));
-    return allClasses
-      .filter((c: any) => /maternelle/i.test(c.level ?? "") || attached.has(c.id))
-      .map((c: any) => ({ value: c.id, label: c.name }));
-  }, [allClasses, sectionsFull]);
   const { data: studentsFull = [] } = useQuery({
     queryKey: ["students"],
     queryFn: async () => {
@@ -258,16 +251,9 @@ function Maternelle() {
         </TabsList>
 
         <TabsContent value="sections" className="mt-4">
-          {canWrite && (
-            <div className="mb-4 space-y-2 rounded-lg border bg-muted/30 p-3">
-              <p className="text-sm text-muted-foreground">
-                {nurseryClasses.length === 0
-                  ? "Aucune classe de niveau Maternelle n'existe encore. Créez-en une, puis rattachez-la à une section."
-                  : `${nurseryClasses.length} classe(s) de Maternelle : ${nurseryClasses.map((c: any) => c.name).join(", ")}. Vous pouvez en créer une autre.`}
-              </p>
-              <NewNurseryClass />
-            </div>
-          )}
+          <p className="mb-3 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+            Une section est aussi une classe de Maternelle : en créant une section, sa classe est créée (ou reliée) automatiquement, avec le même nom.
+          </p>
           <CrudSection
             table="nursery_sections"
             title="Sections maternelle"
@@ -276,13 +262,17 @@ function Maternelle() {
             select="*, classes(name), teachers(full_name), nursery_children(count)"
             orderBy={{ column: "name" }}
             canWrite={canWrite}
+            beforeSave={async (payload, editing) => {
+              const class_id = await ensureNurseryClass(supabase, { name: String(payload.name ?? ""), sectionId: editing?.id ?? null, currentClassId: editing?.class_id ?? null });
+              await Promise.all(["opt-classes", "classes-full", "classes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+              return { ...payload, class_id };
+            }}
             searchKeys={["name", "age_range"]}
             emptyHint="Créez vos sections : Petite, Moyenne et Grande section."
             fields={[
               { name: "name", label: "Nom de la section", required: true, placeholder: "ex. Petite section A" },
               { name: "age_range", label: "Tranche d'âge", placeholder: "ex. 3-4 ans" },
               { name: "capacity", label: "Capacité", type: "number", min: 0 },
-              { name: "class_id", label: "Classe rattachée (niveau Maternelle)", type: "select", options: sectionClassOptions, help: "Créez la classe dans Classes (niveau Maternelle) ou depuis « Inscrire un enfant »." },
               { name: "teacher_id", label: "Enseignant référent", type: "select", options: teacherOptions },
               { name: "notes", label: "Notes", type: "textarea", full: true },
             ]}

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
-import { NewNurseryClass } from "@/components/students/NewNurseryClass";
+import { ensureNurseryClass, isNurseryLevel } from "@/lib/nursery-class";
 import {
   buildSummary,
   emptyForm,
@@ -51,7 +51,7 @@ interface Created {
  * donc immédiatement visible dans Notes, Présences, Bulletins, etc.
  */
 export function EnrollmentWizard({
-  classes,
+  classes: classesProp,
   students,
   onClose,
   onView,
@@ -78,6 +78,9 @@ export function EnrollmentWizard({
   const [schoolId, setSchoolId] = useState<string | null>(null);
   const [lookup, setLookup] = useState("");
   const [sectionId, setSectionId] = useState("");
+  const [extraClasses, setExtraClasses] = useState<any[]>([]);
+  const [sectionBusy, setSectionBusy] = useState(false);
+  const classes = useMemo(() => [...classesProp, ...extraClasses.filter((e) => !classesProp.some((c) => c.id === e.id))], [classesProp, extraClasses]);
   const lock = useRef(false);
   const manualMatricule = useRef(false);
 
@@ -123,8 +126,8 @@ export function EnrollmentWizard({
       setStep(all.class_id || all.matricule ? 1 : all.full_name || all.gender || all.birth_date ? 2 : 3);
       return;
     }
-    if (nursery && !classes.some((c) => c.id === form.class_id)) {
-      setErrors({ class_id: "Choisissez une classe de niveau Maternelle." });
+    if (nursery && (!sectionId || !classes.some((c) => c.id === form.class_id && isNurseryLevel(c.level)))) {
+      setErrors({ class_id: "Choisissez la section : sa classe de Maternelle est utilisée automatiquement." });
       setStep(1);
       return;
     }
@@ -198,6 +201,32 @@ export function EnrollmentWizard({
     } finally {
       lock.current = false;
       setSaving(false);
+    }
+  }
+
+  /** Section choisie → sa classe de Maternelle (créée / reliée / corrigée automatiquement si besoin). */
+  async function pickSection(id: string) {
+    setSectionId(id);
+    const sec = nursery?.sections.find((x) => x.id === id);
+    if (!sec) return;
+    const ok = sec.class_id ? classes.find((c) => c.id === sec.class_id && isNurseryLevel(c.level)) : undefined;
+    if (ok && ok.name.trim().toLowerCase() === sec.name.trim().toLowerCase()) return set({ class_id: ok.id });
+    setSectionBusy(true);
+    try {
+      const classId = await ensureNurseryClass(supabase, { name: sec.name, sectionId: sec.id, currentClassId: sec.class_id });
+      if (classId !== sec.class_id) {
+        const { data: upd, error } = await supabase.from("nursery_sections" as any).update({ class_id: classId }).eq("id", sec.id).select("id");
+        if (error || !(upd as any[])?.length) throw new Error(error?.message ?? "Correction de la section refusée : vérifiez vos droits.");
+      }
+      const { data: c } = await supabase.from("classes").select("id, name, level").eq("id", classId).maybeSingle();
+      if (c) setExtraClasses((x) => [...x.filter((e) => e.id !== c.id), c]);
+      await Promise.all(["opt-classes", "classes-full", "classes", "nursery-sections"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+      set({ class_id: classId });
+    } catch (e: any) {
+      set({ class_id: "" });
+      setErrors({ class_id: e?.message ?? "Impossible de préparer la classe de cette section." });
+    } finally {
+      setSectionBusy(false);
     }
   }
 
@@ -301,20 +330,16 @@ export function EnrollmentWizard({
           <p className="sm:col-span-2 text-sm text-muted-foreground">Choisissez d'abord la classe dans laquelle l'élève est inscrit. Elle sera conservée pour inscrire les élèves suivants.</p>
           {nursery && (
             <Field label="Section maternelle" className="sm:col-span-2">
-              <Select value={sectionId} onValueChange={(v) => {
-                setSectionId(v);
-                const sec = nursery.sections.find((x) => x.id === v);
-                // La classe rattachée n'est reprise que si elle fait partie des classes proposées (Maternelle) :
-                // une section encore rattachée à une classe de primaire ne doit jamais y inscrire l'enfant.
-                if (sec?.class_id && classes.some((c) => c.id === sec.class_id)) set({ class_id: sec.class_id });
-              }}>
-                <SelectTrigger><SelectValue placeholder={nursery.sections.length ? "Choisir la section (facultatif)" : "Aucune section créée"} /></SelectTrigger>
+              <Select value={sectionId} disabled={sectionBusy} onValueChange={(v) => void pickSection(v)}>
+                <SelectTrigger><SelectValue placeholder={nursery.sections.length ? "Choisir la section" : "Aucune section créée"} /></SelectTrigger>
                 <SelectContent>{nursery.sections.map((x) => <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}</SelectContent>
               </Select>
+              {nursery.sections.length === 0 && (
+                <p className="mt-1 text-xs text-amber-700">Créez d'abord une section dans l'onglet « Sections » : sa classe de Maternelle sera créée automatiquement.</p>
+              )}
+              {sectionBusy && <p className="mt-1 text-xs text-muted-foreground">Préparation de la classe de la section…</p>}
               {(() => {
                 const sec = nursery.sections.find((x) => x.id === sectionId);
-                if (sec?.class_id && !classes.some((c) => c.id === sec.class_id))
-                  return <p className="mt-1 text-xs text-amber-700">Cette section est rattachée à une classe qui n'est pas de niveau Maternelle : choisissez la classe de l'enfant ci-dessous, puis corrigez la section dans l'onglet Sections.</p>;
                 return sec?.capacity && (sec.count ?? 0) >= sec.capacity ? (
                   <p className="mt-1 text-xs text-amber-700">Cette section est complète ({sec.count} / {sec.capacity}). Vous pouvez continuer, vérifiez l'effectif.</p>
                 ) : null;
@@ -322,16 +347,18 @@ export function EnrollmentWizard({
             </Field>
           )}
           <Field label="Année scolaire"><Input value={academicYear} readOnly disabled /></Field>
-          <Field label="Classe" error={errors.class_id}>
-            <Select value={form.class_id} onValueChange={(v) => set({ class_id: v })}>
-              <SelectTrigger><SelectValue placeholder="Choisir la classe" /></SelectTrigger>
-              <SelectContent>{classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} — {c.level}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-          {nursery && classes.length === 0 && (
-            <p className="sm:col-span-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">Aucune classe de niveau Maternelle n'existe encore. Créez-la ci-dessous : elle sera utilisée pour cet enfant et les suivants.</p>
+          {nursery ? (
+            <Field label="Classe (automatique = classe de la section)" error={errors.class_id}>
+              <Input value={cls?.name ?? "— choisissez la section —"} readOnly disabled />
+            </Field>
+          ) : (
+            <Field label="Classe" error={errors.class_id}>
+              <Select value={form.class_id} onValueChange={(v) => set({ class_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Choisir la classe" /></SelectTrigger>
+                <SelectContent>{classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} — {c.level}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
           )}
-          {nursery && <div className="sm:col-span-2"><NewNurseryClass onCreated={(id) => set({ class_id: id })} /></div>}
           <Field label="Niveau"><Input value={cls?.level ?? "—"} readOnly disabled /></Field>
           <Field label="Matricule (généré automatiquement, modifiable)" error={errors.matricule}>
             <Input value={form.matricule} onChange={(e) => { manualMatricule.current = true; set({ matricule: e.target.value }); }} />
