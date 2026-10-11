@@ -1,31 +1,14 @@
-import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Check, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DEFAULT_PUBLIC_OFFERS, formatPublicGNF, offerFeatures, toPublicOffers, type PublicOffer } from "@/lib/public-offers";
+import { usePublicOffers } from "@/hooks/usePublicOffers";
+import { formatPublicGNF, offerFeatures } from "@/lib/public-offers";
 
-/** Offres Basique / Standard / Premium pour les visiteurs. Prix lus depuis Supabase (modifiables par le Super Admin), sinon valeurs par défaut. */
+/** Offres Basique / Standard / Premium pour les visiteurs. Prix lus depuis Supabase et rafraîchis automatiquement. */
 export function PublicOffers() {
-  const [offers, setOffers] = useState<PublicOffer[]>(DEFAULT_PUBLIC_OFFERS);
-
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const { data, error } = await (supabase as any)
-          .from("subscription_offers")
-          .select("code,name,annual_price_per_student,school_commission_per_student,parent_login_allowed,student_login_allowed,features,payer_roles,is_active")
-          .eq("is_active", true);
-        if (!error && alive) setOffers(toPublicOffers(data));
-      } catch {
-        /* valeurs par défaut conservées */
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  const offers = usePublicOffers();
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-20 lg:px-8" id="tarifs">

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { CheckCircle2, Loader2, Tags, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "@/lib/audit";
+import { PUBLIC_OFFERS_KEY } from "@/hooks/usePublicOffers";
 import { formatGNF } from "@/lib/orange-money";
 import {
   ALL_PAYER_ROLES, MODULE_LABELS, PAYMENT_STATUS_LABELS, aggregateFinance, isPendingStatus, paymentErrorMessage,
@@ -190,6 +191,7 @@ function OffersEditor({ offers, onDone }: { offers: any[]; onDone: () => void })
 }
 
 function OfferCard({ offer, onDone }: { offer: any; onDone: () => void }) {
+  const qc = useQueryClient();
   const [f, setF] = useState({
     name: offer.name as string, annual_price: String(offer.annual_price_per_student), school_commission: String(offer.school_commission_per_student),
     active: !!offer.is_active, parent_login: !!offer.parent_login_allowed, student_login: !!offer.student_login_allowed,
@@ -209,7 +211,9 @@ function OfferCard({ offer, onDone }: { offer: any; onDone: () => void }) {
     setSaving(false);
     if (error || !(data ?? []).length) return toast.error(error?.message ?? "Modification refusée.");
     void logActivity({ action: "offer.update", entity_type: "subscription_offer", entity_id: offer.id, entity_label: f.name });
-    toast.success("Offre enregistrée. Les paiements déjà déclarés ou validés ne sont pas modifiés.");
+    toast.success("Offre enregistrée et appliquée aux établissements concernés et à la page publique. Les paiements déjà déclarés ou validés ne sont pas modifiés.");
+    void qc.invalidateQueries({ queryKey: ["annual-contribution-access"] });
+    void qc.invalidateQueries({ queryKey: PUBLIC_OFFERS_KEY });
     onDone();
   }
 
