@@ -14,6 +14,9 @@ import { usePdfMeta } from "@/hooks/usePdfMeta";
 import { formatGNF, ORANGE_MONEY, orangeMoneyUssdLink } from "@/lib/orange-money";
 import { printCotisationReceipt } from "@/lib/cotisation-print";
 import { registerStudentPayment } from "@/lib/cotisation";
+import { useRoles } from "@/hooks/useAuth";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { canPayWithOffer, paymentErrorMessage } from "@/lib/offers";
 
 interface Props {
   studentId: string;
@@ -24,6 +27,10 @@ interface Props {
 
 export function CotisationCard({ studentId, studentName, matricule, className }: Props) {
   const { info } = usePerStudentPlan();
+  const { roles } = useRoles();
+  const { isSuperAdmin } = useSuperAdmin();
+  // Cette carte n'est affichée qu'au parent de l'élève ou à l'élève lui-même.
+  const mayPay = canPayWithOffer(roles, isSuperAdmin, info.offer, { parentOfStudent: roles.includes("parent"), studentSelf: roles.includes("eleve") });
   const meta = usePdfMeta("Cotisation annuelle");
   const [open, setOpen] = useState(false);
   const [reference, setReference] = useState("");
@@ -72,7 +79,7 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
       payerPhone: payerPhone.trim() || null,
     });
     setSaving(false);
-    if (res.status === "error") return toast.error("Enregistrement impossible", { description: res.error });
+    if (res.status === "error") return toast.error("Enregistrement impossible", { description: paymentErrorMessage(res.error) });
     setOpen(false);
     setReference("");
     setPayerPhone("");
@@ -81,7 +88,7 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
   }
 
   const status = payment?.status ?? null;
-  const canDeclare = status !== "VALIDATED" && status !== "AWAITING_VALIDATION";
+  const canDeclare = mayPay && status !== "VALIDATED" && status !== "AWAITING_VALIDATION";
 
   return (
     <Card>
@@ -103,7 +110,7 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
         ) : status === "AWAITING_VALIDATION" ? (
           <div className="space-y-2">
             <Badge variant="secondary" className="gap-1"><Clock className="size-3" /> En attente de validation</Badge>
-            <p className="text-sm text-muted-foreground">Référence {payment.reference}. Le dossier reste verrouillé tant que la cotisation n'est pas VALIDATED.</p>
+            <p className="text-sm text-muted-foreground">Référence {payment.reference}. La validation finale est faite par l'administration de la plateforme ; le dossier reste verrouillé d'ici là.</p>
           </div>
         ) : (
           <>
@@ -117,8 +124,9 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
             <p className="text-sm text-muted-foreground">
               Transférez {formatGNF(info.unitPrice)} par Orange Money au <strong>{ORANGE_MONEY.local}</strong> — {ORANGE_MONEY.holder} — puis déclarez la référence.
             </p>
+            {!mayPay && <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">Le paiement en ligne n'est pas disponible pour votre compte avec l'offre {info.offer?.name ?? ""} de l'établissement. Rapprochez-vous de la direction de l'école.</p>}
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" asChild><a href={orangeMoneyUssdLink()}>Composer {ORANGE_MONEY.ussd}</a></Button>
+              {mayPay && <Button variant="outline" asChild><a href={orangeMoneyUssdLink()}>Composer {ORANGE_MONEY.ussd}</a></Button>}
               {canDeclare && <Button onClick={() => setOpen(true)}>Déclarer mon paiement</Button>}
             </div>
           </>
@@ -137,7 +145,7 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
             <div><Label>Référence de transaction *</Label><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Référence Orange Money" /></div>
             <div><Label>Numéro Orange Money utilisé</Label><Input value={payerPhone} onChange={(e) => setPayerPhone(e.target.value)} placeholder="Ex. 62 12 34 56 78" inputMode="tel" /></div>
             <div><Label>Date du transfert</Label><Input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} /></div>
-            <p className="text-xs text-muted-foreground">La saisie de ces informations ne valide pas le paiement. Une vérification par un utilisateur autorisé est obligatoire.</p>
+            <p className="text-xs text-muted-foreground">La saisie de ces informations ne valide pas le paiement. La validation finale est réservée au Super Admin.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Annuler</Button>

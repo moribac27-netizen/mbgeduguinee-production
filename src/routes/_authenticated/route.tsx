@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { RoleGuard } from "@/components/RoleGuard";
 import { AnnualContributionGuard } from "@/components/AnnualContributionGuard";
+import { OfferGuard } from "@/components/OfferGuard";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/_authenticated")({
     <AppShell>
       <RoleGuard />
       <AnnualContributionGuard />
+      <OfferGuard />
       <Outlet />
     </AppShell>
   ),

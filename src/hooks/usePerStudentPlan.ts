@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { PER_STUDENT_ACCESS_THRESHOLD, PER_STUDENT_SCHOOL_SHARE_GNF, PER_STUDENT_UNIT_PRICE_GNF } from "@/lib/pricing";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
+import type { OfferConditions } from "@/lib/offers";
 
 export interface PerStudentPlanInfo {
   schoolId: string | null;
@@ -18,6 +19,8 @@ export interface PerStudentPlanInfo {
   accessMode: "RESTRICTED" | "FULL";
   schoolRevenue: number;
   remaining: number;
+  /** Offre de l'établissement (null tant qu'elle n'est pas chargée ou si l'utilisateur n'a pas d'école). */
+  offer: OfferConditions | null;
 }
 
 const EMPTY: PerStudentPlanInfo = {
@@ -33,6 +36,7 @@ const EMPTY: PerStudentPlanInfo = {
   accessMode: "RESTRICTED",
   schoolRevenue: 0,
   remaining: PER_STUDENT_ACCESS_THRESHOLD,
+  offer: null,
 };
 
 /** Source unique côté frontend pour l'état financier de l'établissement. */
@@ -55,14 +59,41 @@ export function usePerStudentPlan() {
       const paidCount = Number(s.paid_count ?? 0);
       const threshold = Number(s.threshold ?? PER_STUDENT_ACCESS_THRESHOLD);
       const accessMode = s.access_mode === "FULL" ? "FULL" : "RESTRICTED";
-      const unitPrice = Number(s.unit_price ?? PER_STUDENT_UNIT_PRICE_GNF);
-      const schoolShare = Number(s.school_share ?? PER_STUDENT_SCHOOL_SHARE_GNF);
       const academicYear = String(s.academic_year ?? getCurrentAcademicYear());
+
+      // Offre active de l'établissement pour l'année scolaire : instantané des conditions (prix, commission, droits).
+      // Sans souscription enregistrée, l'établissement garde ses conditions historiques (50 000 / 15 000 GNF).
+      const { data: sub, error: subError } = await (supabase as any)
+        .from("school_offer_subscriptions")
+        .select("offer_code, offer_name, annual_price_per_student, school_commission_per_student, parent_login_allowed, student_login_allowed, features, payer_roles")
+        .eq("school_id", schoolId)
+        .eq("academic_year", academicYear)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (subError) throw subError;
+
+      const unitPrice = Number(sub?.annual_price_per_student ?? s.unit_price ?? PER_STUDENT_UNIT_PRICE_GNF);
+      const schoolShare = Number(sub?.school_commission_per_student ?? s.school_share ?? PER_STUDENT_SCHOOL_SHARE_GNF);
+      const offer: OfferConditions | null = sub
+        ? {
+            code: String(sub.offer_code),
+            name: String(sub.offer_name ?? sub.offer_code),
+            unit_price: unitPrice,
+            school_commission: schoolShare,
+            parent_login: !!sub.parent_login_allowed,
+            student_login: !!sub.student_login_allowed,
+            payer_roles: Array.isArray(sub.payer_roles) ? sub.payer_roles.map(String) : [],
+            modules: { cantine: sub.features?.cantine !== false, infirmerie: sub.features?.infirmerie !== false, bibliotheque: sub.features?.bibliotheque !== false },
+          }
+        : null;
 
       return {
         schoolId,
+        offer,
         isPerStudent: true,
-        planName: "Cotisation annuelle par élève",
+        planName: offer ? `Offre ${offer.name}` : "Cotisation annuelle par élève",
         unitPrice,
         schoolShare,
         threshold,
