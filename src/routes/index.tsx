@@ -142,6 +142,7 @@ function LoginChoice({ onClose }: { onClose: () => void }) {
 }
 
 function DashboardPreview() {
+  const range = priceRange(usePublicOffers());
   return (
     <div className="relative mx-auto w-full max-w-2xl">
       <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-[#19B5A5]/20 blur-3xl" />
