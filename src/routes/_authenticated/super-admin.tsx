@@ -64,7 +64,7 @@ function SuperAdminDashboard() {
 
   if(loading)return <div className="h-64 animate-pulse bg-muted rounded-xl"/>;
   return <div className="p-4 md:p-8 space-y-6 animate-fade-in">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl md:text-3xl font-display font-bold flex items-center gap-2"><ShieldCheck className="size-7 text-primary"/> Super Administrateur</h1><p className="text-sm text-muted-foreground mt-1">Supervision des écoles et des cotisations annuelles.</p></div><Button variant="outline" onClick={()=>void load()}><RefreshCw className="size-4 mr-2"/> Actualiser</Button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl md:text-3xl font-display font-bold flex items-center gap-2"><ShieldCheck className="size-7 text-primary"/> Super Administrateur</h1><p className="text-sm text-muted-foreground mt-1">Supervision des écoles et des cotisations annuelles.</p></div><div className="flex flex-wrap gap-2"><Button asChild><a href="/offres">Offres & paiements</a></Button><Button variant="outline" onClick={()=>void load()}><RefreshCw className="size-4 mr-2"/> Actualiser</Button></div></div>
     <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {[['Écoles',schools.length,Building2],['Élèves',totals.students,Users],['Enseignants',totals.teachers,GraduationCap],['VALIDATED',totals.validated,CreditCard],['En attente',totals.pending,Activity]].map(([label,value,Icon]:any)=><Card key={label as string}><CardContent className="p-5"><Icon className="size-5 text-primary mb-2"/><div className="text-2xl font-bold">{value}</div><div className="text-xs text-muted-foreground">{label}</div></CardContent></Card>)}
     </div>

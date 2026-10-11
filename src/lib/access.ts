@@ -7,6 +7,7 @@ export const PEDAGOGIC_DIRECTION: AppRole[] = ["directeur_etudes", "proviseur"];
 // "*" means all authenticated users. Super admin bypasses all rules.
 export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/super-admin", roles: [] }, // super admin only
+  { prefix: "/offres", roles: [] }, // offres, paiements à valider, commissions : super admin only
   { prefix: "/directeur", roles: ["admin"] },
   { prefix: "/sauvegarde", roles: ["admin", "directeur"] },
   { prefix: "/journal", roles: ["admin", "directeur"] },
@@ -16,7 +17,7 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/comptabilite", roles: ["admin", "directeur", "comptable"] },
   { prefix: "/salaires", roles: ["admin", "directeur", "comptable", "rh"] },
   { prefix: "/paiements", roles: ["admin", "directeur", "comptable"] },
-  { prefix: "/cotisations", roles: ["admin", "directeur", "comptable"] },
+  { prefix: "/cotisations", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "comptable"] },
   { prefix: "/import-export", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "secretariat"] },
   { prefix: "/resultats-generaux", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },
   { prefix: "/analyse-scolaire", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },

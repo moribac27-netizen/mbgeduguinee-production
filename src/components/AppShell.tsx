@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   CreditCard, Megaphone, LogOut, Menu, X, School, FileText, CalendarDays, UserCheck,
   Calculator, Wallet, ScrollText, Library, Link2, Settings, MessageSquare, BarChart3, History, DatabaseBackup, ShieldCheck,
-  Coins, Home, IdCard, BookMarked, HeartPulse, Bus, UtensilsCrossed, Baby, Briefcase, ShieldAlert, Users2, Trophy, FileSpreadsheet,
+  Coins, Tags, Home, IdCard, BookMarked, HeartPulse, Bus, UtensilsCrossed, Baby, Briefcase, ShieldAlert, Users2, Trophy, FileSpreadsheet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { NotificationsBell } from "@/components/NotificationsBell";
 import { logLogout } from "@/lib/audit";
 import { InstallPWA } from "@/components/InstallPWA";
 import { useSchool } from "@/hooks/useSchool";
+import { usePerStudentPlan } from "@/hooks/usePerStudentPlan";
+import { pathBlockedByOffer } from "@/lib/offers";
 import { SchoolIdentityHeader } from "@/components/SchoolIdentityHeader";
 import { ConakryClock } from "@/components/ConakryClock";
 
@@ -58,6 +60,7 @@ const STAFF_NAV = [
   { to: "/import-export", label: "Import / Export", icon: FileSpreadsheet },
   { to: "/sauvegarde", label: "Sauvegarde", icon: DatabaseBackup },
   { to: "/super-admin", label: "Super Admin", icon: ShieldCheck },
+  { to: "/offres", label: "Offres & paiements", icon: Tags },
   { to: "/personnalisation-recu", label: "Personnalisation reçu", icon: FileText },
   { to: "/parametres", label: "Paramètres", icon: Settings },
   { to: "/collaborateurs", label: "Collaborateurs", icon: Users2 },
@@ -83,9 +86,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { roles } = useRoles();
   const { isSuperAdmin } = useSuperAdmin();
   const { school } = useSchool();
+  const { info: planInfo } = usePerStudentPlan();
   const role = primaryRole(roles);
   const BASE_NAV = role === "parent" ? PARENT_NAV : role === "eleve" ? STUDENT_NAV : STAFF_NAV;
-  const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin));
+  const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin) && !pathBlockedByOffer(item.to, planInfo.offer, isSuperAdmin));
   const homePath = homeForRoles(roles, isSuperAdmin);
 
   async function handleSignOut() {

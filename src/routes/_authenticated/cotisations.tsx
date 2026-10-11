@@ -15,6 +15,9 @@ import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan"
 import { usePdfMeta } from "@/hooks/usePdfMeta";
 import { formatGNF, ORANGE_MONEY, orangeMoneyUssdLink } from "@/lib/orange-money";
 import { printCotisationReceipt } from "@/lib/cotisation-print";
+import { useRoles } from "@/hooks/useAuth";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { canFinalizePayment, canPayWithOffer, MODULE_LABELS, PAYMENT_STATUS_LABELS, paymentErrorMessage, summarizeCommissions, type OfferModule } from "@/lib/offers";
 
 export const Route = createFileRoute("/_authenticated/cotisations")({
   head: () => ({ meta: [
@@ -26,6 +29,10 @@ export const Route = createFileRoute("/_authenticated/cotisations")({
 
 function CotisationsPage() {
   const { info, loading, refetch } = usePerStudentPlan();
+  const { roles } = useRoles();
+  const { isSuperAdmin } = useSuperAdmin();
+  const mayDeclare = canPayWithOffer(roles, isSuperAdmin, info.offer);
+  const mayFinalize = canFinalizePayment(isSuperAdmin);
   const meta = usePdfMeta("Cotisations annuelles");
   const { paidIds, refetch: refetchPaid } = usePaidStudentIds(info.schoolId, info.academicYear);
   const [search, setSearch] = useState("");
@@ -56,6 +63,17 @@ function CotisationsPage() {
     },
   });
 
+  const { data: commissions = [] } = useQuery({
+    queryKey: ["school-commissions", info.schoolId],
+    enabled: !!info.schoolId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("school_commissions").select("id, amount, status, academic_year, student_id, created_at, commission_payouts(reference, paid_at)").eq("school_id", info.schoolId).order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const commissionTotals = useMemo(() => summarizeCommissions((commissions as any[]).filter((c) => c.academic_year === info.academicYear)), [commissions, info.academicYear]);
+
   const byStudent = useMemo(() => new Map((payments as any[]).map((p) => [p.student_id, p])), [payments]);
   const pendingCount = (payments as any[]).filter((p) => ["INITIATED", "PENDING_VERIFICATION", "AWAITING_VALIDATION"].includes(p.status)).length;
   const filtered = (students as any[]).filter((s) => [s.full_name, s.matricule].some((v: string) => v?.toLowerCase().includes(search.toLowerCase())));
@@ -75,7 +93,7 @@ function CotisationsPage() {
       _payer_phone: payerPhone.trim() || null,
     });
     setSaving(false);
-    if (error) return toast.error("Déclaration impossible", { description: error.message });
+    if (error) return toast.error("Déclaration impossible", { description: paymentErrorMessage(error.message) });
     setConfirm(false); setSelected(new Set()); setReference(""); setPayerPhone("");
     toast.success(`${selected.size} cotisation(s) déclarée(s) — montant serveur : ${formatGNF(selected.size * info.unitPrice)}`);
     void data;
@@ -83,14 +101,15 @@ function CotisationsPage() {
   }
 
   async function review(row: any, approve: boolean) {
+    if (!mayFinalize) return toast.error(paymentErrorMessage("SUPER_ADMIN_VALIDATION_REQUIRED"));
     let reason: string | null = null;
     if (!approve) {
       reason = window.prompt("Motif du rejet ?")?.trim() || null;
       if (!reason) return;
     }
     const { error } = await (supabase as any).rpc("review_cotisation_payment", { _payment_id: row.id, _approve: approve, _reason: reason });
-    if (error) return toast.error(error.message);
-    toast.success(approve ? "Paiement validé" : "Paiement rejeté");
+    if (error) return toast.error(paymentErrorMessage(error.message));
+    toast.success(approve ? "Paiement validé" : "Paiement refusé");
     await Promise.all([refetch(), refetchPaid(), refetchPayments()]);
   }
 
@@ -118,20 +137,32 @@ function CotisationsPage() {
         <CardContent><div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{ width: `${progress}%` }} /></div><p className="text-sm text-muted-foreground mt-2">{info.unlocked ? "Le seuil global est atteint." : `Accès restreint — ${info.paidCount}/20 cotisations validées. Il reste ${info.remaining} élève(s) à valider.`}</p></CardContent>
       </Card>
 
+      {info.offer && (
+        <Card>
+          <CardHeader className="pb-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>Offre {info.offer.name}</CardTitle><CardDescription>{formatGNF(info.offer.unit_price)} par élève et par année scolaire ({info.academicYear}) · commission école : {formatGNF(info.offer.school_commission)} par cotisation validée.</CardDescription></div><Badge>{info.offer.name}</Badge></div></CardHeader>
+          <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+            <div><span className="text-muted-foreground">Connexion Parents : </span><b>{info.offer.parent_login ? "autorisée" : "non incluse"}</b></div>
+            <div><span className="text-muted-foreground">Connexion Élèves : </span><b>{info.offer.student_login ? "autorisée" : "non incluse"}</b></div>
+            <div className="sm:col-span-2"><span className="text-muted-foreground">Modules : </span>{(Object.keys(MODULE_LABELS) as OfferModule[]).map((m) => <Badge key={m} variant={info.offer!.modules[m] ? "secondary" : "outline"} className="mr-1">{MODULE_LABELS[m]} {info.offer!.modules[m] ? "✓" : "✗"}</Badge>)}</div>
+            <div className="sm:col-span-2 text-xs text-muted-foreground">Validation finale des paiements : Super Admin uniquement. {mayDeclare ? "" : "Votre rôle peut consulter les cotisations mais pas déclarer de paiement avec cette offre."}</div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid sm:grid-cols-3 gap-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Coins className="size-4" /> Part école</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{formatGNF(info.schoolRevenue)}</div><p className="text-xs text-muted-foreground">{info.paidCount} × {formatGNF(info.schoolShare)}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Coins className="size-4" /> Commissions {info.academicYear}</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{formatGNF(commissionTotals.total)}</div><p className="text-xs text-muted-foreground">À reverser : {formatGNF(commissionTotals.pending)} · Déjà reversé : {formatGNF(commissionTotals.paid)}</p></CardContent></Card>
         <Card className={pendingCount ? "border-amber-500/40" : undefined}><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Clock className="size-4" /> En attente</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{pendingCount}</div><p className="text-xs text-muted-foreground">Déclarations à vérifier.</p></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Élèves non validés</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{Math.max(0, (students as any[]).length - info.paidCount)}</div><p className="text-xs text-muted-foreground">Leurs dossiers restent verrouillés.</p></CardContent></Card>
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3"><div><CardTitle>Élèves et cotisations</CardTitle><CardDescription>Les paiements individuels et groupés passent par le même contrôle serveur.</CardDescription></div><Button disabled={selected.size === 0} onClick={() => setConfirm(true)}>Déclarer un paiement groupé {selected.size ? `(${selected.size})` : ""}</Button></CardHeader>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3"><div><CardTitle>Élèves et cotisations</CardTitle><CardDescription>Les paiements individuels et groupés passent par le même contrôle serveur.</CardDescription></div><Button disabled={selected.size === 0 || !mayDeclare} title={mayDeclare ? undefined : "Votre rôle n'est pas autorisé à déclarer un paiement avec cette offre."} onClick={() => setConfirm(true)}>Déclarer un paiement groupé {selected.size ? `(${selected.size})` : ""}</Button></CardHeader>
         <CardContent>
           <div className="relative mb-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" /><Input className="pl-9" placeholder="Rechercher un élève…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
           <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={unpaidSelectable.length > 0 && unpaidSelectable.every((s) => selected.has(s.id))} onCheckedChange={(v) => setSelected(v ? new Set(unpaidSelectable.map((s) => s.id)) : new Set())} /></TableHead><TableHead>Matricule</TableHead><TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>Référence</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
             {filtered.map((s: any) => {
               const row = byStudent.get(s.id); const isPaid = paidIds.has(s.id); const pending = ["INITIATED", "PENDING_VERIFICATION", "AWAITING_VALIDATION"].includes(row?.status); const rejected = row?.status === "REJECTED";
-              return <TableRow key={s.id}><TableCell><Checkbox disabled={isPaid || pending} checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} /></TableCell><TableCell>{s.matricule ?? "—"}</TableCell><TableCell className="font-medium">{s.full_name}</TableCell><TableCell>{s.classes?.name ?? "—"}</TableCell><TableCell>{row?.reference ?? "—"}</TableCell><TableCell>{isPaid ? <Badge><CheckCircle2 className="size-3 mr-1" /> VALIDATED</Badge> : pending ? <Badge variant="secondary"><Clock className="size-3 mr-1" /> AWAITING_VALIDATION</Badge> : rejected ? <Badge variant="destructive"><XCircle className="size-3 mr-1" /> REJECTED</Badge> : <Badge variant="outline">NON VALIDÉE</Badge>}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2">{pending && <><Button size="sm" onClick={() => void review(row, true)}><CheckCircle2 className="size-4 mr-1" /> Valider</Button><Button size="sm" variant="outline" onClick={() => void review(row, false)}><XCircle className="size-4 mr-1" /> Rejeter</Button></>}{isPaid && <Button size="sm" variant="ghost" onClick={() => receipt(s, row)}><Printer className="size-4" /></Button>}</div></TableCell></TableRow>;
+              return <TableRow key={s.id}><TableCell><Checkbox disabled={isPaid || pending} checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} /></TableCell><TableCell>{s.matricule ?? "—"}</TableCell><TableCell className="font-medium">{s.full_name}</TableCell><TableCell>{s.classes?.name ?? "—"}</TableCell><TableCell>{row?.reference ?? "—"}</TableCell><TableCell>{isPaid ? <Badge><CheckCircle2 className="size-3 mr-1" /> {PAYMENT_STATUS_LABELS.VALIDATED}</Badge> : pending ? <Badge variant="secondary"><Clock className="size-3 mr-1" /> {PAYMENT_STATUS_LABELS.AWAITING_VALIDATION}</Badge> : rejected ? <Badge variant="destructive"><XCircle className="size-3 mr-1" /> {PAYMENT_STATUS_LABELS.REJECTED}{row?.rejection_reason ? ` — ${row.rejection_reason}` : ""}</Badge> : <Badge variant="outline">NON VALIDÉE</Badge>}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2">{pending && (mayFinalize ? <><Button size="sm" onClick={() => void review(row, true)}><CheckCircle2 className="size-4 mr-1" /> Valider</Button><Button size="sm" variant="outline" onClick={() => void review(row, false)}><XCircle className="size-4 mr-1" /> Refuser</Button></> : <span className="text-xs text-muted-foreground">Validation par le Super Admin</span>)}{isPaid && <Button size="sm" variant="ghost" onClick={() => receipt(s, row)}><Printer className="size-4" /></Button>}</div></TableCell></TableRow>;
             })}
             {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Aucun élève</TableCell></TableRow>}
           </TableBody></Table></div>
