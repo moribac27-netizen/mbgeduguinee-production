@@ -66,7 +66,8 @@ export function canPayWithOffer(
   relation: { parentOfStudent?: boolean; studentSelf?: boolean } = {},
 ): boolean {
   if (isSuperAdmin) return true;
-  if (!offer) return false;
+  // Pas d'offre enregistrée : conditions historiques, le serveur tranche (ne rien bloquer à tort côté interface).
+  if (!offer) return true;
   const allowed = new Set(offer.payer_roles ?? []);
   return roles.some((r) => {
     if (!allowed.has(r)) return false;

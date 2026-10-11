@@ -68,6 +68,9 @@ describe("qui peut payer", () => {
     expect(canPayWithOffer(["eleve"], false, premium, { studentSelf: true })).toBe(true);
     expect(canPayWithOffer(["eleve"], false, premium, { studentSelf: false })).toBe(false);
   });
+  it("école sans offre enregistrée : l'interface ne bloque pas (le serveur tranche)", () => {
+    expect(canPayWithOffer(["parent"], false, null, { parentOfStudent: true })).toBe(true);
+  });
   it("seul le Super Admin finalise", () => {
     expect(canFinalizePayment(true)).toBe(true);
     expect(canFinalizePayment(false)).toBe(false);
