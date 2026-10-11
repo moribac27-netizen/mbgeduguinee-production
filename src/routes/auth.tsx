@@ -15,9 +15,9 @@ import { School, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { logLogin } from "@/lib/audit";
 import { loadUserContext, resolveUserHome } from "@/lib/auth-redirect";
+import { usePublicOffers } from "@/hooks/usePublicOffers";
+import { familyFeeText } from "@/lib/public-offers";
 
-// Montant fixe configurable (en GNF)
-const STUDENT_FEE = 50000;
 
 const emptySignUp = { email: "", password: "", fullName: "", phone: "", schoolName: "", schoolAddress: "", schoolPhone: "" };
 const emptyFamilySignUp = { code: "", email: "", password: "", fullName: "", phone: "", asRole: "parent" as "parent" | "eleve" };
@@ -56,6 +56,8 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
+  // Montant réel des offres (modifiable par le Super Admin) : jamais écrit en dur.
+  const feeText = familyFeeText(usePublicOffers());
   const navigate = useNavigate();
   const authContext = readAuthContext();
   const authSpace = authContext.space;
@@ -260,14 +262,14 @@ function AuthPage() {
       setFamilyLoading(false);
 
       if (signInErr) {
-        toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${formatNumber(STUDENT_FEE)} GNF validé par l'école.`);
+        toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${feeText} validé par l'école.`);
         setFamilySignUp(emptyFamilySignUp);
         setFamilyMode("signin");
         if (authSpace) setDedicatedMode("signin");
         return;
       }
 
-      toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${formatNumber(STUDENT_FEE)} GNF validé par l'école.`);
+      toast.success(`✅ Compte créé avec succès. Votre dossier sera accessible une fois le paiement de ${feeText} validé par l'école.`);
       setFamilySignUp(emptyFamilySignUp);
       setFamilyMode("signin");
       if (authSpace) setDedicatedMode("signin");
@@ -425,7 +427,7 @@ function AuthPage() {
                         <div><Label>Téléphone</Label><Input value={familySignUp.phone} onChange={(e) => setFamilySignUp({ ...familySignUp, phone: e.target.value })} placeholder="+224..." /></div>
                         <div><Label>Email *</Label><Input type="email" required value={familySignUp.email} onChange={(e) => setFamilySignUp({ ...familySignUp, email: e.target.value })} /></div>
                         <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={familySignUp.password} onChange={(e) => setFamilySignUp({ ...familySignUp, password: e.target.value })} /></div>
-                        <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-900 dark:text-amber-200"><div className="flex gap-2"><AlertCircle className="size-4 flex-shrink-0 mt-0.5" /><div><p className="font-medium">Montant à payer : <span className="font-bold">{formatNumber(STUDENT_FEE)} GNF</span></p><p className="mt-1">Votre dossier sera accessible une fois ce montant validé par l'école.</p></div></div></div>
+                        <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-900 dark:text-amber-200"><div className="flex gap-2"><AlertCircle className="size-4 flex-shrink-0 mt-0.5" /><div><p className="font-medium">Montant à payer : <span className="font-bold">{feeText}</span></p><p className="mt-1">Votre dossier sera accessible une fois ce montant validé par l'école.</p></div></div></div>
                         <Button type="submit" className="w-full" disabled={familyLoading}>{familyLoading ? "Création en cours..." : "Créer mon compte"}</Button>
                         <Button type="button" variant="link" className="w-full text-xs" onClick={() => setDedicatedMode("signin")}>Vous avez déjà un compte ? Se connecter</Button>
                       </form>
@@ -555,7 +557,7 @@ function AuthPage() {
                                     <div className="flex gap-2">
                                       <AlertCircle className="size-4 flex-shrink-0 mt-0.5" />
                                       <div>
-                                        <p className="font-medium">Montant à payer : <span className="font-bold">{formatNumber(STUDENT_FEE)} GNF</span></p>
+                                        <p className="font-medium">Montant à payer : <span className="font-bold">{feeText}</span></p>
                                         <p className="mt-1">Votre dossier sera accessible une fois ce montant validé par l'école.</p>
                                       </div>
                                     </div>

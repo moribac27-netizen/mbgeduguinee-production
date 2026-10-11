@@ -44,6 +44,9 @@ export function usePerStudentPlan() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["annual-contribution-access"],
     staleTime: 15_000,
+    // Les conditions de l'offre (prix, commission, droits) peuvent changer : relecture automatique.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<PerStudentPlanInfo> => {
       const { data: sid, error: sidError } = await supabase.rpc("current_school_id");
       if (sidError) throw sidError;

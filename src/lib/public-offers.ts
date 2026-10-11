@@ -50,3 +50,44 @@ export function offerFeatures(o: PublicOffer): Array<{ label: string; included: 
     { label: "Paiement de la cotisation par les élèves", included: o.studentPays },
   ];
 }
+
+export const numberFr = (n: number) => Math.round(n).toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ");
+
+/** Offre « Premium » (ou la plus chère si elle n'existe plus) : sert au détail de la page publique. */
+export function premiumOf(offers: PublicOffer[]): PublicOffer {
+  return offers.find((o) => o.code === "premium") ?? [...offers].sort((a, b) => b.price - a.price)[0] ?? DEFAULT_PUBLIC_OFFERS[2];
+}
+
+/** Plus petit et plus grand tarif annuel des offres affichées. */
+export function priceRange(offers: PublicOffer[]): { min: number; max: number } {
+  const prices = offers.map((o) => o.price).filter((n) => Number.isFinite(n));
+  return prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : { min: 0, max: 0 };
+}
+
+/**
+ * Remplace les repères {prix_min} {prix_max} {prix_basique} {prix_standard} {prix_premium} {part_premium} {prix_liste}
+ * par les valeurs réelles des offres : aucun montant n'est écrit en dur dans les textes de la page publique.
+ */
+export function fillOfferText(text: string, offers: PublicOffer[]): string {
+  const by = (code: string) => offers.find((o) => o.code === code) ?? DEFAULT_PUBLIC_OFFERS.find((o) => o.code === code)!;
+  const { min, max } = priceRange(offers);
+  const list = offers.map((o) => numberFr(o.price));
+  const map: Record<string, string> = {
+    prix_min: formatPublicGNF(min),
+    prix_max: formatPublicGNF(max),
+    prix_basique: formatPublicGNF(by("basique").price),
+    prix_standard: formatPublicGNF(by("standard").price),
+    prix_premium: formatPublicGNF(by("premium").price),
+    part_premium: formatPublicGNF(by("premium").commission),
+    prix_liste: list.length > 1 ? `${list.slice(0, -1).join(", ")} ou ${list[list.length - 1]} GNF` : `${list[0] ?? ""} GNF`,
+  };
+  return text.replace(/\{(\w+)\}/g, (m, k) => (k in map ? map[k] : m));
+}
+
+/** Montant à payer affiché à l'inscription d'un parent / élève : il dépend de l'offre de l'école, donc on montre la fourchette réelle. */
+export function familyFeeText(offers: PublicOffer[]): string {
+  const prices = offers.filter((o) => o.parentLogin || o.studentLogin).map((o) => o.price);
+  if (!prices.length) return "selon l'offre de l'école";
+  const min = Math.min(...prices), max = Math.max(...prices);
+  return min === max ? formatPublicGNF(min) : `${numberFr(min)} à ${formatPublicGNF(max)} selon l'offre de l'école`;
+}

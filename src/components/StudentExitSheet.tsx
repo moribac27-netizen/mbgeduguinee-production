@@ -99,7 +99,7 @@ export function StudentExitSheet({ studentId }: { studentId: string }) {
           <div className="mbg-stat-grid">
             <DocumentStat label="Moyenne générale" value={avg == null ? "—" : `${avg.toFixed(2)} / 20`} tone={avg != null && avg >= 10 ? "success" : "default"} />
             <DocumentStat label="Résultat" value={result} />
-            <DocumentStat label="Cotisation annuelle" value={data.payment ? fmtMoney(Number(data.payment.amount || 50000)) : "Non validée"} tone={data.payment ? "success" : "warning"} />
+            <DocumentStat label="Cotisation annuelle" value={data.payment ? fmtMoney(Number(data.payment.amount ?? 0)) : "Non validée"} tone={data.payment ? "success" : "warning"} />
             <DocumentStat label="Année scolaire" value={school?.academic_year ?? "—"} />
           </div>
         </section>
