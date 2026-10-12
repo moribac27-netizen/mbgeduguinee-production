@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DEFAULT_PUBLIC_OFFERS } from "../src/lib/public-offers";
 import { offerConditions, resolveSignupOffer } from "../src/lib/signup-offer";
 
