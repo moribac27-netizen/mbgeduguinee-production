@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DefinirMotDePasseRouteImport } from './routes/definir-mot-de-passe'
+import { Route as CreerEtablissementRouteImport } from './routes/creer-etablissement'
 import { Route as AuthenticatedAffectationsRouteImport } from './routes/_authenticated/affectations'
 import { Route as AuthenticatedAnalyseScolaireRouteImport } from './routes/_authenticated/analyse-scolaire'
 import { Route as AuthenticatedAnnoncesRouteImport } from './routes/_authenticated/annonces'
@@ -74,6 +75,11 @@ const AuthRoute = AuthRouteImport.update({
 const DefinirMotDePasseRoute = DefinirMotDePasseRouteImport.update({
   id: '/definir-mot-de-passe',
   path: '/definir-mot-de-passe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreerEtablissementRoute = CreerEtablissementRouteImport.update({
+  id: '/creer-etablissement',
+  path: '/creer-etablissement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAffectationsRoute =
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
+  '/creer-etablissement': typeof CreerEtablissementRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
   '/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
@@ -357,6 +364,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
+  '/creer-etablissement': typeof CreerEtablissementRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
   '/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
@@ -407,6 +415,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
+  '/creer-etablissement': typeof CreerEtablissementRoute
   '/_authenticated/affectations': typeof AuthenticatedAffectationsRoute
   '/_authenticated/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/_authenticated/annonces': typeof AuthenticatedAnnoncesRoute
@@ -457,6 +466,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/definir-mot-de-passe'
+    | '/creer-etablissement'
     | '/affectations'
     | '/analyse-scolaire'
     | '/annonces'
@@ -505,6 +515,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/definir-mot-de-passe'
+    | '/creer-etablissement'
     | '/affectations'
     | '/analyse-scolaire'
     | '/annonces'
@@ -554,6 +565,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/definir-mot-de-passe'
+    | '/creer-etablissement'
     | '/_authenticated/affectations'
     | '/_authenticated/analyse-scolaire'
     | '/_authenticated/annonces'
@@ -604,6 +616,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   DefinirMotDePasseRoute: typeof DefinirMotDePasseRoute
+  CreerEtablissementRoute: typeof CreerEtablissementRoute
   VerifierRecuNumberRoute: typeof VerifierRecuNumberRoute
   ApiCronBackupsRoute: typeof ApiCronBackupsRoute
 }
@@ -636,6 +649,13 @@ declare module '@tanstack/react-router' {
       path: '/definir-mot-de-passe'
       fullPath: '/definir-mot-de-passe'
       preLoaderRoute: typeof DefinirMotDePasseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/creer-etablissement': {
+      id: '/creer-etablissement'
+      path: '/creer-etablissement'
+      fullPath: '/creer-etablissement'
+      preLoaderRoute: typeof CreerEtablissementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/affectations': {
@@ -1039,6 +1059,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   DefinirMotDePasseRoute: DefinirMotDePasseRoute,
+  CreerEtablissementRoute: CreerEtablissementRoute,
   VerifierRecuNumberRoute: VerifierRecuNumberRoute,
   ApiCronBackupsRoute: ApiCronBackupsRoute,
 }
