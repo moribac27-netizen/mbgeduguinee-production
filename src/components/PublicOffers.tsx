@@ -41,7 +41,7 @@ export function PublicOffers() {
                   ))}
                 </ul>
                 <Button className="mt-7" variant={featured ? "default" : "outline"} asChild>
-                  <Link to="/auth?role=etablissement&mode=signup">Créer mon établissement</Link>
+                  <Link to="/creer-etablissement">Créer mon établissement</Link>
                 </Button>
               </CardContent>
             </Card>

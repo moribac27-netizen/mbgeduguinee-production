@@ -17,6 +17,8 @@ import { logLogin } from "@/lib/audit";
 import { loadUserContext, resolveUserHome } from "@/lib/auth-redirect";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
 import { familyFeeText } from "@/lib/public-offers";
+import { SignupOfferGate } from "@/components/SignupOfferGate";
+import { clearSignupOfferCode, readSignupOfferCode, resolveSignupOffer } from "@/lib/signup-offer";
 
 
 const emptySignUp = { email: "", password: "", fullName: "", phone: "", schoolName: "", schoolAddress: "", schoolPhone: "" };
@@ -57,7 +59,10 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   // Montant réel des offres (modifiable par le Super Admin) : jamais écrit en dur.
-  const feeText = familyFeeText(usePublicOffers());
+  const publicOffers = usePublicOffers();
+  const feeText = familyFeeText(publicOffers);
+  // Offre choisie à l'étape précédente (page « Créer un établissement ») ; null = formulaire de création bloqué.
+  const signupOffer = resolveSignupOffer(readSignupOfferCode(), publicOffers);
   const navigate = useNavigate();
   const authContext = readAuthContext();
   const authSpace = authContext.space;
@@ -177,6 +182,11 @@ function AuthPage() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     if (loading) return;
+    if (!signupOffer) {
+      toast.error("Choisissez d'abord une offre pour créer votre établissement.");
+      void navigate({ to: "/creer-etablissement", replace: true });
+      return;
+    }
     setLoading(true);
     try {
       const res = await registerSchool({
@@ -188,6 +198,7 @@ function AuthPage() {
           schoolName: signUp.schoolName.trim(),
           schoolAddress: signUp.schoolAddress.trim() || null,
           schoolPhone: signUp.schoolPhone.trim() || null,
+          offerCode: signupOffer.code,
         },
       });
       if (!res.ok) {
@@ -200,12 +211,14 @@ function AuthPage() {
         password: signUp.password,
       });
       if (signInErr) {
+        clearSignupOfferCode();
         toast.success("Compte créé. Connectez-vous avec votre e-mail et mot de passe.");
         setSignUp(emptySignUp);
         setLoading(false);
         return;
       }
       toast.success("Établissement créé avec succès. Bienvenue !");
+      clearSignupOfferCode();
       setSignUp(emptySignUp);
       setLoading(false);
       afterAuth();
@@ -381,7 +394,7 @@ function AuthPage() {
                 </div>
 
                 {authSpace === "etablissement" && dedicatedMode === "signup" ? (
-                  <form onSubmit={handleSignUp} className="space-y-3">
+                  <SignupOfferGate offer={signupOffer}><form onSubmit={handleSignUp} className="space-y-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
                     <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
                     <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>
@@ -393,7 +406,7 @@ function AuthPage() {
                     <div><Label>Mot de passe * (12 caractères min.)</Label><Input type="password" required minLength={12} value={signUp.password} onChange={(e) => setSignUp({ ...signUp, password: e.target.value })} /></div>
                     <Button type="submit" className="w-full" disabled={loading}>{loading ? "Création en cours..." : "Créer mon établissement"}</Button>
                     <Button type="button" variant="link" className="w-full text-xs" onClick={() => setDedicatedMode("signin")}>J'ai déjà un compte établissement</Button>
-                  </form>
+                  </form></SignupOfferGate>
                 ) : authSpace === "etablissement" ? (
                   <form onSubmit={handleSignIn} className="space-y-3">
                     <div><Label>Email</Label><Input type="email" required value={signIn.email} onChange={(e) => setSignIn({ ...signIn, email: e.target.value })} /></div>
@@ -484,7 +497,7 @@ function AuthPage() {
                               </form>
                             </TabsContent>
                             <TabsContent value="signup">
-                              <form onSubmit={handleSignUp} className="space-y-3">
+                              <SignupOfferGate offer={signupOffer}><form onSubmit={handleSignUp} className="space-y-3">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
                                 <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
                                 <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>
@@ -497,7 +510,7 @@ function AuthPage() {
                                 <Button type="submit" className="w-full" disabled={loading}>
                                   {loading ? "Création en cours..." : "Créer mon établissement"}
                                 </Button>
-                              </form>
+                              </form></SignupOfferGate>
                             </TabsContent>
                             <TabsContent value="family">
                               {familyMode === "signin" ? (
