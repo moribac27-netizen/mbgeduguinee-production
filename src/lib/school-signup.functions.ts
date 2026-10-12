@@ -9,6 +9,8 @@ const schema = z.object({
   schoolName: z.string().min(1),
   schoolAddress: z.string().optional().nullable(),
   schoolPhone: z.string().optional().nullable(),
+  // Offre choisie à l'étape « Choix de l'offre » : obligatoire, vérifiée côté serveur.
+  offerCode: z.string().trim().min(1).max(64),
 });
 
 type Result =
@@ -19,6 +21,17 @@ export const registerSchool = createServerFn({ method: "POST" })
   .inputValidator((d) => schema.parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 0. L'offre choisie doit exister et être active (aucune création sans offre valide).
+    const { data: offer, error: offerErr } = await (supabaseAdmin as any)
+      .from("subscription_offers")
+      .select("id,code,name,annual_price_per_student,school_commission_per_student,parent_login_allowed,student_login_allowed,features,payer_roles,is_active")
+      .eq("code", data.offerCode)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (offerErr || !offer) {
+      return { ok: false, error: "Offre invalide ou indisponible. Retournez au choix de l'offre pour en sélectionner une." };
+    }
 
     // 1. Create school first
     const { data: school, error: schoolErr } = await supabaseAdmin
@@ -84,6 +97,19 @@ export const registerSchool = createServerFn({ method: "POST" })
       await supabaseAdmin.auth.admin.deleteUser(userRes.user.id);
       await supabaseAdmin.from("schools").delete().eq("id", school.id);
       return { ok: false, error: `Impossible d'attribuer le rôle: ${roleErr.message}` };
+    }
+
+    // 4. Associe l'offre choisie à l'établissement via la fonction existante de la base (source « registration »).
+    // Ce n'est pas un paiement : les cotisations restent déclarées puis validées comme d'habitude.
+    const { error: subErr } = await (supabaseAdmin as any).rpc("register_school_offer", {
+      _school_id: school.id,
+      _offer_code: offer.code,
+    });
+    if (subErr) {
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", userRes.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(userRes.user.id);
+      await supabaseAdmin.from("schools").delete().eq("id", school.id);
+      return { ok: false, error: `Impossible d'enregistrer l'offre choisie: ${subErr.message}` };
     }
 
     return { ok: true, schoolId: school.id, userId: userRes.user.id, emailConfirmed: true };
