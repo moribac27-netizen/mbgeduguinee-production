@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "node scripts/check-undefined-names.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
