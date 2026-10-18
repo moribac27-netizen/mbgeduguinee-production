@@ -17,6 +17,7 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/comptabilite", roles: ["admin", "directeur", "comptable"] },
   { prefix: "/salaires", roles: ["admin", "directeur", "comptable", "rh"] },
   { prefix: "/paiements", roles: ["admin", "directeur", "comptable"] },
+  { prefix: "/facturation", roles: ["admin", "directeur", "comptable"] }, // forfait de l'établissement (mensuel / annuel)
   { prefix: "/cotisations", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "comptable"] },
   { prefix: "/import-export", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "secretariat"] },
   { prefix: "/resultats-generaux", roles: ["admin", "directeur", "directeur_etudes", "proviseur"] },

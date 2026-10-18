@@ -26,6 +26,7 @@ import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedCollaborateursRouteImport } from './routes/_authenticated/collaborateurs'
 import { Route as AuthenticatedComptabiliteRouteImport } from './routes/_authenticated/comptabilite'
 import { Route as AuthenticatedCotisationsRouteImport } from './routes/_authenticated/cotisations'
+import { Route as AuthenticatedFacturationRouteImport } from './routes/_authenticated/facturation'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDirecteurRouteImport } from './routes/_authenticated/directeur'
 import { Route as AuthenticatedDirectionEtudesRouteImport } from './routes/_authenticated/direction-etudes'
@@ -146,6 +147,12 @@ const AuthenticatedCotisationsRoute =
   AuthenticatedCotisationsRouteImport.update({
     id: '/cotisations',
     path: '/cotisations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFacturationRoute =
+  AuthenticatedFacturationRouteImport.update({
+    id: '/facturation',
+    path: '/facturation',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -328,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/cotisations': typeof AuthenticatedCotisationsRoute
+  '/facturation': typeof AuthenticatedFacturationRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -377,6 +385,7 @@ export interface FileRoutesByTo {
   '/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/cotisations': typeof AuthenticatedCotisationsRoute
+  '/facturation': typeof AuthenticatedFacturationRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -428,6 +437,7 @@ export interface FileRoutesById {
   '/_authenticated/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/_authenticated/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/_authenticated/cotisations': typeof AuthenticatedCotisationsRoute
+  '/_authenticated/facturation': typeof AuthenticatedFacturationRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directeur': typeof AuthenticatedDirecteurRoute
   '/_authenticated/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -479,6 +489,7 @@ export interface FileRouteTypes {
     | '/collaborateurs'
     | '/comptabilite'
     | '/cotisations'
+    | '/facturation'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
@@ -528,6 +539,7 @@ export interface FileRouteTypes {
     | '/collaborateurs'
     | '/comptabilite'
     | '/cotisations'
+    | '/facturation'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
@@ -578,6 +590,7 @@ export interface FileRouteTypes {
     | '/_authenticated/collaborateurs'
     | '/_authenticated/comptabilite'
     | '/_authenticated/cotisations'
+    | '/_authenticated/facturation'
     | '/_authenticated/dashboard'
     | '/_authenticated/directeur'
     | '/_authenticated/direction-etudes'
@@ -740,6 +753,13 @@ declare module '@tanstack/react-router' {
       path: '/cotisations'
       fullPath: '/cotisations'
       preLoaderRoute: typeof AuthenticatedCotisationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/facturation': {
+      id: '/_authenticated/facturation'
+      path: '/facturation'
+      fullPath: '/facturation'
+      preLoaderRoute: typeof AuthenticatedFacturationRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -975,6 +995,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCollaborateursRoute: typeof AuthenticatedCollaborateursRoute
   AuthenticatedComptabiliteRoute: typeof AuthenticatedComptabiliteRoute
   AuthenticatedCotisationsRoute: typeof AuthenticatedCotisationsRoute
+  AuthenticatedFacturationRoute: typeof AuthenticatedFacturationRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirecteurRoute: typeof AuthenticatedDirecteurRoute
   AuthenticatedDirectionEtudesRoute: typeof AuthenticatedDirectionEtudesRoute
@@ -1019,6 +1040,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCollaborateursRoute: AuthenticatedCollaborateursRoute,
   AuthenticatedComptabiliteRoute: AuthenticatedComptabiliteRoute,
   AuthenticatedCotisationsRoute: AuthenticatedCotisationsRoute,
+  AuthenticatedFacturationRoute: AuthenticatedFacturationRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirecteurRoute: AuthenticatedDirecteurRoute,
   AuthenticatedDirectionEtudesRoute: AuthenticatedDirectionEtudesRoute,

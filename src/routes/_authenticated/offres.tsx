@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, Tags, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "@/lib/audit";
 import { PUBLIC_OFFERS_KEY } from "@/hooks/usePublicOffers";
+import { SchoolBillingAdmin } from "@/components/SchoolBillingAdmin";
 import { formatGNF } from "@/lib/orange-money";
 import {
   ALL_PAYER_ROLES, MODULE_LABELS, PAYMENT_STATUS_LABELS, aggregateFinance, isPendingStatus, paymentErrorMessage,
@@ -95,6 +96,7 @@ function OffresPage() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="paiements">Paiements à valider{pending.length ? ` (${pending.length})` : ""}</TabsTrigger>
           <TabsTrigger value="offres">Offres</TabsTrigger>
+          <TabsTrigger value="forfaits">Forfaits établissement</TabsTrigger>
           <TabsTrigger value="ecoles">Établissements</TabsTrigger>
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="stats">Statistiques</TabsTrigger>
@@ -103,6 +105,7 @@ function OffresPage() {
 
         <TabsContent value="paiements" className="mt-4"><PendingPayments pending={pending} schoolName={schoolName} studentOf={studentOf} onDone={refreshAll} /></TabsContent>
         <TabsContent value="offres" className="mt-4"><OffersEditor offers={offers.rows as any[]} onDone={refreshAll} /></TabsContent>
+        <TabsContent value="forfaits" className="mt-4"><SchoolBillingAdmin /></TabsContent>
         <TabsContent value="ecoles" className="mt-4"><SchoolsTab schools={schools.rows as any[]} offers={offers.rows as any[]} offerById={offerById} payments={payments.rows as any[]} commissions={commissions.rows as any[]} onDone={refreshAll} /></TabsContent>
         <TabsContent value="commissions" className="mt-4"><CommissionsTab commissions={commissions.rows as any[]} payouts={payouts.rows as any[]} schoolName={schoolName} studentOf={studentOf} onDone={refreshAll} /></TabsContent>
         <TabsContent value="stats" className="mt-4"><StatsTab payments={payments.rows as any[]} commissions={commissions.rows as any[]} schoolName={schoolName} /></TabsContent>

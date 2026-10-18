@@ -45,6 +45,7 @@ const STAFF_NAV = [
   { to: "/sortie-eleve", label: "Fiches de sortie", icon: FileText },
   { to: "/paiements", label: "Paiements", icon: CreditCard },
   { to: "/cotisations", label: "Cotisations", icon: Coins },
+  { to: "/facturation", label: "Forfait & facturation", icon: CreditCard },
   { to: "/comptabilite", label: "Comptabilité", icon: Calculator },
   { to: "/salaires", label: "Salaires", icon: Wallet },
   { to: "/bibliotheque", label: "Bibliothèque", icon: Library },
