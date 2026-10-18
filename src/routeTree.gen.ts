@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DefinirMotDePasseRouteImport } from './routes/definir-mot-de-passe'
 import { Route as CreerEtablissementRouteImport } from './routes/creer-etablissement'
+import { Route as OffresEtablissementRouteImport } from './routes/offres-etablissement'
 import { Route as AuthenticatedAffectationsRouteImport } from './routes/_authenticated/affectations'
 import { Route as AuthenticatedAnalyseScolaireRouteImport } from './routes/_authenticated/analyse-scolaire'
 import { Route as AuthenticatedAnnoncesRouteImport } from './routes/_authenticated/annonces'
@@ -26,6 +27,7 @@ import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedCollaborateursRouteImport } from './routes/_authenticated/collaborateurs'
 import { Route as AuthenticatedComptabiliteRouteImport } from './routes/_authenticated/comptabilite'
 import { Route as AuthenticatedCotisationsRouteImport } from './routes/_authenticated/cotisations'
+import { Route as AuthenticatedMonForfaitRouteImport } from './routes/_authenticated/mon-forfait'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDirecteurRouteImport } from './routes/_authenticated/directeur'
 import { Route as AuthenticatedDirectionEtudesRouteImport } from './routes/_authenticated/direction-etudes'
@@ -80,6 +82,11 @@ const DefinirMotDePasseRoute = DefinirMotDePasseRouteImport.update({
 const CreerEtablissementRoute = CreerEtablissementRouteImport.update({
   id: '/creer-etablissement',
   path: '/creer-etablissement',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OffresEtablissementRoute = OffresEtablissementRouteImport.update({
+  id: '/offres-etablissement',
+  path: '/offres-etablissement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAffectationsRoute =
@@ -146,6 +153,12 @@ const AuthenticatedCotisationsRoute =
   AuthenticatedCotisationsRouteImport.update({
     id: '/cotisations',
     path: '/cotisations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMonForfaitRoute =
+  AuthenticatedMonForfaitRouteImport.update({
+    id: '/mon-forfait',
+    path: '/mon-forfait',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -316,6 +329,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/creer-etablissement': typeof CreerEtablissementRoute
+  '/offres-etablissement': typeof OffresEtablissementRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
   '/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
@@ -328,6 +342,7 @@ export interface FileRoutesByFullPath {
   '/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/cotisations': typeof AuthenticatedCotisationsRoute
+  '/mon-forfait': typeof AuthenticatedMonForfaitRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -365,6 +380,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/creer-etablissement': typeof CreerEtablissementRoute
+  '/offres-etablissement': typeof OffresEtablissementRoute
   '/affectations': typeof AuthenticatedAffectationsRoute
   '/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/annonces': typeof AuthenticatedAnnoncesRoute
@@ -377,6 +393,7 @@ export interface FileRoutesByTo {
   '/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/cotisations': typeof AuthenticatedCotisationsRoute
+  '/mon-forfait': typeof AuthenticatedMonForfaitRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -416,6 +433,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/definir-mot-de-passe': typeof DefinirMotDePasseRoute
   '/creer-etablissement': typeof CreerEtablissementRoute
+  '/offres-etablissement': typeof OffresEtablissementRoute
   '/_authenticated/affectations': typeof AuthenticatedAffectationsRoute
   '/_authenticated/analyse-scolaire': typeof AuthenticatedAnalyseScolaireRoute
   '/_authenticated/annonces': typeof AuthenticatedAnnoncesRoute
@@ -428,6 +446,7 @@ export interface FileRoutesById {
   '/_authenticated/collaborateurs': typeof AuthenticatedCollaborateursRoute
   '/_authenticated/comptabilite': typeof AuthenticatedComptabiliteRoute
   '/_authenticated/cotisations': typeof AuthenticatedCotisationsRoute
+  '/_authenticated/mon-forfait': typeof AuthenticatedMonForfaitRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directeur': typeof AuthenticatedDirecteurRoute
   '/_authenticated/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -467,6 +486,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/definir-mot-de-passe'
     | '/creer-etablissement'
+    | '/offres-etablissement'
     | '/affectations'
     | '/analyse-scolaire'
     | '/annonces'
@@ -479,6 +499,7 @@ export interface FileRouteTypes {
     | '/collaborateurs'
     | '/comptabilite'
     | '/cotisations'
+    | '/mon-forfait'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
@@ -516,6 +537,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/definir-mot-de-passe'
     | '/creer-etablissement'
+    | '/offres-etablissement'
     | '/affectations'
     | '/analyse-scolaire'
     | '/annonces'
@@ -528,6 +550,7 @@ export interface FileRouteTypes {
     | '/collaborateurs'
     | '/comptabilite'
     | '/cotisations'
+    | '/mon-forfait'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
@@ -566,6 +589,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/definir-mot-de-passe'
     | '/creer-etablissement'
+    | '/offres-etablissement'
     | '/_authenticated/affectations'
     | '/_authenticated/analyse-scolaire'
     | '/_authenticated/annonces'
@@ -578,6 +602,7 @@ export interface FileRouteTypes {
     | '/_authenticated/collaborateurs'
     | '/_authenticated/comptabilite'
     | '/_authenticated/cotisations'
+    | '/_authenticated/mon-forfait'
     | '/_authenticated/dashboard'
     | '/_authenticated/directeur'
     | '/_authenticated/direction-etudes'
@@ -617,6 +642,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DefinirMotDePasseRoute: typeof DefinirMotDePasseRoute
   CreerEtablissementRoute: typeof CreerEtablissementRoute
+  OffresEtablissementRoute: typeof OffresEtablissementRoute
   VerifierRecuNumberRoute: typeof VerifierRecuNumberRoute
   ApiCronBackupsRoute: typeof ApiCronBackupsRoute
 }
@@ -656,6 +682,13 @@ declare module '@tanstack/react-router' {
       path: '/creer-etablissement'
       fullPath: '/creer-etablissement'
       preLoaderRoute: typeof CreerEtablissementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offres-etablissement': {
+      id: '/offres-etablissement'
+      path: '/offres-etablissement'
+      fullPath: '/offres-etablissement'
+      preLoaderRoute: typeof OffresEtablissementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/affectations': {
@@ -740,6 +773,13 @@ declare module '@tanstack/react-router' {
       path: '/cotisations'
       fullPath: '/cotisations'
       preLoaderRoute: typeof AuthenticatedCotisationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/mon-forfait': {
+      id: '/_authenticated/mon-forfait'
+      path: '/mon-forfait'
+      fullPath: '/mon-forfait'
+      preLoaderRoute: typeof AuthenticatedMonForfaitRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -975,6 +1015,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCollaborateursRoute: typeof AuthenticatedCollaborateursRoute
   AuthenticatedComptabiliteRoute: typeof AuthenticatedComptabiliteRoute
   AuthenticatedCotisationsRoute: typeof AuthenticatedCotisationsRoute
+  AuthenticatedMonForfaitRoute: typeof AuthenticatedMonForfaitRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirecteurRoute: typeof AuthenticatedDirecteurRoute
   AuthenticatedDirectionEtudesRoute: typeof AuthenticatedDirectionEtudesRoute
@@ -1019,6 +1060,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCollaborateursRoute: AuthenticatedCollaborateursRoute,
   AuthenticatedComptabiliteRoute: AuthenticatedComptabiliteRoute,
   AuthenticatedCotisationsRoute: AuthenticatedCotisationsRoute,
+  AuthenticatedMonForfaitRoute: AuthenticatedMonForfaitRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirecteurRoute: AuthenticatedDirecteurRoute,
   AuthenticatedDirectionEtudesRoute: AuthenticatedDirectionEtudesRoute,
@@ -1060,6 +1102,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DefinirMotDePasseRoute: DefinirMotDePasseRoute,
   CreerEtablissementRoute: CreerEtablissementRoute,
+  OffresEtablissementRoute: OffresEtablissementRoute,
   VerifierRecuNumberRoute: VerifierRecuNumberRoute,
   ApiCronBackupsRoute: ApiCronBackupsRoute,
 }

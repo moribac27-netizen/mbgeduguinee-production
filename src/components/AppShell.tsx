@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth, useRoles, primaryRole } from "@/hooks/useAuth";
+import { useMyFlatOffer } from "@/hooks/useMyFlatOffer";
+import { FlatOfferBanner } from "@/components/FlatOfferBanner";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { canAccess, homeForRoles } from "@/lib/access";
 import { NotificationsBell } from "@/components/NotificationsBell";
@@ -45,6 +47,7 @@ const STAFF_NAV = [
   { to: "/sortie-eleve", label: "Fiches de sortie", icon: FileText },
   { to: "/paiements", label: "Paiements", icon: CreditCard },
   { to: "/cotisations", label: "Cotisations", icon: Coins },
+  { to: "/mon-forfait", label: "Mon forfait", icon: Coins },
   { to: "/comptabilite", label: "Comptabilité", icon: Calculator },
   { to: "/salaires", label: "Salaires", icon: Wallet },
   { to: "/bibliotheque", label: "Bibliothèque", icon: Library },
@@ -87,9 +90,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { isSuperAdmin } = useSuperAdmin();
   const { school } = useSchool();
   const { info: planInfo } = usePerStudentPlan();
+  const { flat: myFlat } = useMyFlatOffer();
   const role = primaryRole(roles);
   const BASE_NAV = role === "parent" ? PARENT_NAV : role === "eleve" ? STUDENT_NAV : STAFF_NAV;
-  const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin) && !pathBlockedByOffer(item.to, planInfo.offer, isSuperAdmin));
+  const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin) && (item.to !== "/mon-forfait" || !!myFlat) && !pathBlockedByOffer(item.to, planInfo.offer, isSuperAdmin));
   const homePath = homeForRoles(roles, isSuperAdmin);
 
   async function handleSignOut() {
@@ -173,6 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         <main key={pathname} className="flex-1 p-4 lg:p-8 max-w-[1400px] w-full mx-auto page-fade-in">
           <SchoolIdentityHeader />
+          <FlatOfferBanner />
           {children}
         </main>
       </div>

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
+import { FlatOffersLink } from "@/components/FlatOffersLink";
 import { formatPublicGNF, offerFeatures } from "@/lib/public-offers";
 
 /** Offres Basique / Standard / Premium pour les visiteurs. Prix lus depuis Supabase et rafraîchis automatiquement. */
@@ -48,6 +49,7 @@ export function PublicOffers() {
           );
         })}
       </div>
+      <FlatOffersLink className="mt-8" />
       <p className="mt-6 text-center text-xs text-muted-foreground">Le personnel de l'établissement (direction, enseignants, administration) se connecte avec toutes les offres. Les paiements sont validés par l'administration de la plateforme.</p>
     </section>
   );

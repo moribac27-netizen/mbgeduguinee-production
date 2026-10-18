@@ -8,6 +8,7 @@ export const PEDAGOGIC_DIRECTION: AppRole[] = ["directeur_etudes", "proviseur"];
 export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/super-admin", roles: [] }, // super admin only
   { prefix: "/offres", roles: [] }, // offres, paiements à valider, commissions : super admin only
+  { prefix: "/mon-forfait", roles: ["admin", "directeur", "comptable"] }, // forfait établissement : déclaration des paiements
   { prefix: "/directeur", roles: ["admin"] },
   { prefix: "/sauvegarde", roles: ["admin", "directeur"] },
   { prefix: "/journal", roles: ["admin", "directeur"] },

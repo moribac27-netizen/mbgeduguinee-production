@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
+import { useSignupOffersState } from "@/hooks/useSignupOffers";
+import { FlatOffersLink } from "@/components/FlatOffersLink";
 import { formatPublicGNF, offerFeatures, type PublicOffer } from "@/lib/public-offers";
 import { OFFER_DURATION_TEXT, offerConditions, readSignupOfferCode, resolveSignupOffer, saveSignupOfferCode, clearSignupOfferCode } from "@/lib/signup-offer";
 
@@ -59,13 +61,15 @@ function FeatureList({ offer }: { offer: PublicOffer }) {
 
 function CreateSchoolOffer() {
   const offers = usePublicOffers();
+  // Pour retrouver l'offre choisie (offre par élève OU offre établissement, ex. depuis /offres-etablissement).
+  const { offers: signupOffers, loading: offersLoading } = useSignupOffersState();
   const { offre } = Route.useSearch();
   // Le choix est conservé dans la session : retour arrière, rechargement ou changement de page ne le font pas perdre.
   const [code, setCode] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const fromUrl = offre ? resolveSignupOffer(offre, offers) : null;
+    const fromUrl = offre ? resolveSignupOffer(offre, signupOffers) : null;
     if (fromUrl) saveSignupOfferCode(fromUrl.code);
     setCode(fromUrl ? fromUrl.code : readSignupOfferCode());
     setReady(true);
@@ -73,15 +77,23 @@ function CreateSchoolOffer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selected = resolveSignupOffer(code, offers);
+  // Lien direct /creer-etablissement?offre=etablissement_a : on attend que les offres établissement soient chargées.
+  useEffect(() => {
+    if (!offre || code) return;
+    const f = resolveSignupOffer(offre, signupOffers);
+    if (f) { saveSignupOfferCode(f.code); setCode(f.code); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signupOffers.length]);
+
+  const selected = resolveSignupOffer(code, signupOffers);
 
   // Offre mémorisée mais retirée entre-temps par le Super Admin : on oublie le choix et on revient à la liste.
   useEffect(() => {
-    if (ready && code && !selected) {
+    if (ready && !offersLoading && code && !selected) {
       clearSignupOfferCode();
       setCode(null);
     }
-  }, [ready, code, selected]);
+  }, [ready, offersLoading, code, selected]);
 
   function choose(o: PublicOffer) {
     saveSignupOfferCode(o.code);
@@ -141,6 +153,7 @@ function CreateSchoolOffer() {
                 );
               })}
             </div>
+            <FlatOffersLink className="mt-8" />
           </>
         ) : (
           <>
@@ -154,8 +167,17 @@ function CreateSchoolOffer() {
                 <CardContent className="p-7 sm:p-9">
                   <div className="text-sm font-medium text-muted-foreground">Offre choisie</div>
                   <div className="mt-1 font-display text-2xl font-bold">{selected.name}</div>
-                  <div className="mt-3 font-display text-4xl font-bold">{formatPublicGNF(selected.price).replace(" GNF", "")} <span className="text-lg">GNF</span></div>
-                  <div className="mt-1 text-sm text-muted-foreground">par élève / an — {OFFER_DURATION_TEXT.toLowerCase()}</div>
+                  {selected.flat ? (
+                    <>
+                      <div className="mt-3 font-display text-4xl font-bold">{formatPublicGNF(selected.flat.monthlyPrice).replace(" GNF", "")} <span className="text-lg">GNF / mois</span></div>
+                      <div className="mt-1 text-sm text-muted-foreground">Paiement annuel : {formatPublicGNF(selected.flat.annualPrice)} ({selected.flat.freeMonths} mois offerts) — {selected.flat.minStudents} à {selected.flat.maxStudents} élèves</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mt-3 font-display text-4xl font-bold">{formatPublicGNF(selected.price).replace(" GNF", "")} <span className="text-lg">GNF</span></div>
+                      <div className="mt-1 text-sm text-muted-foreground">par élève / an — {OFFER_DURATION_TEXT.toLowerCase()}</div>
+                    </>
+                  )}
                   <div className="mt-6"><FeatureList offer={selected} /></div>
                   <div className="mt-6 space-y-2 rounded-xl bg-[#EEF4FA] p-4 text-sm leading-6">
                     {offerConditions(selected).map((c) => <p key={c}>{c}</p>)}

@@ -25,11 +25,14 @@ export const registerSchool = createServerFn({ method: "POST" })
     // 0. L'offre choisie doit exister et être active (aucune création sans offre valide).
     const { data: offer, error: offerErr } = await (supabaseAdmin as any)
       .from("subscription_offers")
-      .select("id,code,name,annual_price_per_student,school_commission_per_student,parent_login_allowed,student_login_allowed,features,payer_roles,is_active")
+      .select("*")
       .eq("code", data.offerCode)
       .eq("is_active", true)
       .maybeSingle();
-    if (offerErr || !offer) {
+    const today = new Date().toISOString().slice(0, 10);
+    // Offre par établissement : valable seulement dans sa période de validité (contrôlé aussi par la base).
+    const flatExpired = !!offer && offer.offer_type === "per_school" && !(offer.valid_from <= today && today <= offer.valid_until);
+    if (offerErr || !offer || flatExpired) {
       return { ok: false, error: "Offre invalide ou indisponible. Retournez au choix de l'offre pour en sélectionner une." };
     }
 

@@ -44,6 +44,12 @@ export const OFFER_DURATION_TEXT = "Cotisation annuelle, par élève et par ann�
 /** Conditions particulières déduites de l'offre réelle (aucune règle inventée). */
 export function offerConditions(o: PublicOffer): string[] {
   const out: string[] = [];
+  if (o.flat) {
+    out.push(`Forfait de l'établissement, sans cotisation par élève, valable pour l'année académique ${o.flat.yearLabel}.`);
+    out.push(`Un effectif ${o.flat.minStudents}–${o.flat.maxStudents} élèves est prévu ; au-delà, il faudra passer à l'offre supérieure.`);
+    out.push("Choisir une offre n'est pas un paiement : les paiements (mensuels ou annuel) sont déclarés puis validés par l'administration de la plateforme.");
+    return out;
+  }
   out.push(
     o.commission > 0
       ? "Une part est reversée à l'établissement pour chaque cotisation validée."

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { logLogin } from "@/lib/audit";
 import { loadUserContext, resolveUserHome } from "@/lib/auth-redirect";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
+import { useSignupOffersState } from "@/hooks/useSignupOffers";
 import { familyFeeText } from "@/lib/public-offers";
 import { SignupOfferGate } from "@/components/SignupOfferGate";
 import { clearSignupOfferCode, readSignupOfferCode, resolveSignupOffer } from "@/lib/signup-offer";
@@ -60,9 +61,10 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   // Montant réel des offres (modifiable par le Super Admin) : jamais écrit en dur.
   const publicOffers = usePublicOffers();
+  const { offers: signupOffers, loading: signupOffersLoading } = useSignupOffersState();
   const feeText = familyFeeText(publicOffers);
   // Offre choisie à l'étape précédente (page « Créer un établissement ») ; null = formulaire de création bloqué.
-  const signupOffer = resolveSignupOffer(readSignupOfferCode(), publicOffers);
+  const signupOffer = resolveSignupOffer(readSignupOfferCode(), signupOffers);
   const navigate = useNavigate();
   const authContext = readAuthContext();
   const authSpace = authContext.space;
@@ -394,7 +396,7 @@ function AuthPage() {
                 </div>
 
                 {authSpace === "etablissement" && dedicatedMode === "signup" ? (
-                  <SignupOfferGate offer={signupOffer}><form onSubmit={handleSignUp} className="space-y-3">
+                  <SignupOfferGate offer={signupOffer} loading={signupOffersLoading}><form onSubmit={handleSignUp} className="space-y-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
                     <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
                     <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>
@@ -497,7 +499,7 @@ function AuthPage() {
                               </form>
                             </TabsContent>
                             <TabsContent value="signup">
-                              <SignupOfferGate offer={signupOffer}><form onSubmit={handleSignUp} className="space-y-3">
+                              <SignupOfferGate offer={signupOffer} loading={signupOffersLoading}><form onSubmit={handleSignUp} className="space-y-3">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
                                 <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
                                 <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>

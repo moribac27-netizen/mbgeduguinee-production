@@ -9,6 +9,8 @@ export interface PublicOffer {
   parentPays: boolean;
   studentPays: boolean;
   modules: { cantine: boolean; infirmerie: boolean; bibliotheque: boolean };
+  /** Renseigné uniquement pour une offre par établissement (forfait) choisie à la création. */
+  flat?: import("@/lib/flat-offers").FlatOffer;
 }
 
 export const DEFAULT_PUBLIC_OFFERS: PublicOffer[] = [
@@ -22,7 +24,8 @@ const ORDER = ["basique", "standard", "premium"];
 /** Convertit les lignes `subscription_offers` ; renvoie les valeurs par défaut si les données sont absentes ou invalides. */
 export function toPublicOffers(rows: any[] | null | undefined): PublicOffer[] {
   const list = (rows ?? [])
-    .filter((r) => r && typeof r.code === "string" && Number.isFinite(Number(r.annual_price_per_student)))
+    // Les offres « par établissement » (forfait) ont leur propre affichage : jamais mélangées aux offres par élève.
+    .filter((r) => r && r.offer_type !== "per_school" && typeof r.code === "string" && Number.isFinite(Number(r.annual_price_per_student)))
     .map((r): PublicOffer => ({
       code: r.code,
       name: String(r.name ?? r.code),
@@ -42,6 +45,14 @@ export const formatPublicGNF = (n: number) => `${Math.round(n).toLocaleString("f
 
 /** Lignes « inclus / non inclus » affichées sous chaque offre. */
 export function offerFeatures(o: PublicOffer): Array<{ label: string; included: boolean }> {
+  if (o.flat) {
+    return [
+      { label: "Cantine, Infirmerie et Bibliothèque", included: o.modules.cantine && o.modules.infirmerie && o.modules.bibliotheque },
+      { label: "Connexion des parents", included: o.parentLogin },
+      { label: "Connexion des élèves", included: o.studentLogin },
+      { label: "Aucune cotisation par élève : le forfait de l'établissement la remplace", included: true },
+    ];
+  }
   return [
     { label: "Cantine, Infirmerie et Bibliothèque", included: o.modules.cantine && o.modules.infirmerie && o.modules.bibliotheque },
     { label: "Connexion des parents", included: o.parentLogin },
@@ -90,4 +101,13 @@ export function familyFeeText(offers: PublicOffer[]): string {
   if (!prices.length) return "selon l'offre de l'école";
   const min = Math.min(...prices), max = Math.max(...prices);
   return min === max ? formatPublicGNF(min) : `${numberFr(min)} à ${formatPublicGNF(max)} selon l'offre de l'école`;
+}
+
+/** Convertit une offre par établissement en « offre choisissable » à la création (même parcours que les offres par élève). */
+export function flatToPublicOffer(f: import("@/lib/flat-offers").FlatOffer): PublicOffer {
+  return {
+    code: f.code, name: f.name, price: f.annualPrice, commission: 0,
+    parentLogin: f.parentLogin, studentLogin: f.studentLogin, parentPays: false, studentPays: false,
+    modules: f.modules, flat: f,
+  };
 }
