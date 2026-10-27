@@ -9,7 +9,9 @@ export interface MyFlatOffer {
   free_months: number;
   annual_price: number;
   min_students: number;
-  max_students: number;
+  /** null = illimité */
+  max_students: number | null;
+  expired?: boolean;
   students_count: number;
   over_tranche: boolean;
   valid_until: string;

@@ -57,7 +57,7 @@ export function FlatOffersAdmin() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Offres par établissement (temporaires)</CardTitle>
+          <CardTitle className="text-base">Plans par établissement (offre exceptionnelle)</CardTitle>
           <CardDescription>Modifiables à tout moment. Une modification s'applique à la page publique et au choix à la création ; les établissements déjà inscrits gardent leurs conditions d'origine. Le prix annuel est calculé automatiquement.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-2">
@@ -96,20 +96,21 @@ export function FlatOffersAdmin() {
         <CardHeader><CardTitle className="text-base">Établissements sous forfait</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
-            <TableHeader><TableRow><TableHead>Établissement</TableHead><TableHead>Offre</TableHead><TableHead>Effectif</TableHead><TableHead>Encaissé (validé)</TableHead><TableHead>En attente</TableHead><TableHead>Fin de validité</TableHead><TableHead>État</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Établissement</TableHead><TableHead>Offre</TableHead><TableHead>Effectif</TableHead><TableHead>Encaissé (validé)</TableHead><TableHead>En attente</TableHead><TableHead>Fin de validité</TableHead><TableHead>À migrer</TableHead><TableHead>État</TableHead></TableRow></TableHeader>
             <TableBody>
               {(overview.data ?? []).map((r) => (
                 <TableRow key={r.school_id}>
                   <TableCell>{r.school_name}</TableCell>
                   <TableCell>{r.offer_name}</TableCell>
-                  <TableCell>{r.students_count} / {r.max_students}{r.over_tranche && <Badge className="ml-2 bg-red-100 text-red-900">Tranche dépassée</Badge>}</TableCell>
+                  <TableCell>{r.students_count} / {r.max_students ?? "illimité"}{r.over_tranche && <Badge className="ml-2 bg-red-100 text-red-900">Tranche dépassée</Badge>}</TableCell>
                   <TableCell>{formatPublicGNF(Number(r.validated_total))}</TableCell>
                   <TableCell>{r.pending_count}</TableCell>
                   <TableCell>{r.valid_until}</TableCell>
+                  <TableCell>{r.to_migrate ? <Badge className="bg-amber-100 text-amber-900">Plan par élève requis</Badge> : "—"}</TableCell>
                   <TableCell><Badge className={r.in_good_standing ? "bg-emerald-100 text-emerald-900" : "bg-red-100 text-red-900"}>{r.in_good_standing ? "En règle" : "En retard"}</Badge></TableCell>
                 </TableRow>
               ))}
-              {!(overview.data ?? []).length && <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground">Aucun établissement sous forfait. Pour en attribuer un : onglet « Établissements ».</TableCell></TableRow>}
+              {!(overview.data ?? []).length && <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground">Aucun établissement sous forfait. Pour en attribuer un : onglet « Établissements ».</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -120,7 +121,7 @@ export function FlatOffersAdmin() {
 
 function FlatOfferCard({ offer, onDone }: { offer: any; onDone: () => void }) {
   const [f, setF] = useState({
-    name: String(offer.name ?? ""), min: String(offer.min_students ?? 0), max: String(offer.max_students ?? 0),
+    name: String(offer.name ?? ""), min: String(offer.min_students ?? 0), max: offer.max_students === null || offer.max_students === undefined ? "" : String(offer.max_students),
     monthly: String(offer.monthly_price ?? 0), free: String(offer.free_months_annual ?? 0),
     from: String(offer.valid_from ?? ""), until: String(offer.valid_until ?? ""), active: !!offer.is_active,
   });
@@ -130,10 +131,10 @@ function FlatOfferCard({ offer, onDone }: { offer: any; onDone: () => void }) {
   const visible = f.active && f.from <= today && today <= f.until;
 
   async function save() {
-    const min = Number(f.min), max = Number(f.max), monthly = Number(f.monthly), free = Number(f.free);
+    const min = Number(f.min), max = f.max.trim() === "" ? null : Number(f.max), monthly = Number(f.monthly), free = Number(f.free);
     if (!f.name.trim()) return void toast.error("Le nom est obligatoire.");
     if (!(monthly > 0)) return void toast.error("Le prix mensuel doit être supérieur à 0.");
-    if (!(Number.isInteger(min) && Number.isInteger(max) && min >= 0 && max >= min)) return void toast.error("Tranche d'élèves invalide (le maximum doit être au moins égal au minimum).");
+    if (!(Number.isInteger(min) && min >= 0 && (max === null || (Number.isInteger(max) && max >= min)))) return void toast.error("Capacité invalide (laissez le maximum vide pour « illimité » ; sinon il doit être au moins égal au minimum).");
     if (!(Number.isInteger(free) && free >= 0 && free <= 11)) return void toast.error("Les mois offerts doivent être compris entre 0 et 11.");
     if (!f.from || !f.until || f.until < f.from) return void toast.error("Période de validité invalide.");
     setBusy(true);
@@ -157,7 +158,7 @@ function FlatOfferCard({ offer, onDone }: { offer: any; onDone: () => void }) {
       <div className="space-y-1.5"><Label>Nom</Label><Input value={f.name} onChange={set("name")} /></div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5"><Label>Élèves (min)</Label><Input type="number" min={0} value={f.min} onChange={set("min")} /></div>
-        <div className="space-y-1.5"><Label>Élèves (max)</Label><Input type="number" min={0} value={f.max} onChange={set("max")} /></div>
+        <div className="space-y-1.5"><Label>Capacité max (vide = illimité)</Label><Input type="number" min={0} value={f.max} onChange={set("max")} /></div>
         <div className="space-y-1.5"><Label>Prix mensuel (GNF)</Label><Input type="number" min={0} value={f.monthly} onChange={set("monthly")} /></div>
         <div className="space-y-1.5"><Label>Mois offerts (paiement annuel)</Label><Input type="number" min={0} max={11} value={f.free} onChange={set("free")} /></div>
         <div className="space-y-1.5"><Label>Valable du</Label><Input type="date" value={f.from} onChange={set("from")} /></div>

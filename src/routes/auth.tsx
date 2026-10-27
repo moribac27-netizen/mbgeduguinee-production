@@ -19,7 +19,7 @@ import { usePublicOffers } from "@/hooks/usePublicOffers";
 import { useSignupOffersState } from "@/hooks/useSignupOffers";
 import { familyFeeText } from "@/lib/public-offers";
 import { SignupOfferGate } from "@/components/SignupOfferGate";
-import { clearSignupOfferCode, readSignupOfferCode, resolveSignupOffer } from "@/lib/signup-offer";
+import { clearSignupOfferCode, readSignupOfferCode, readSignupOfferSnapshot, resolveSignupOffer } from "@/lib/signup-offer";
 
 
 const emptySignUp = { email: "", password: "", fullName: "", phone: "", schoolName: "", schoolAddress: "", schoolPhone: "" };
@@ -61,10 +61,13 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   // Montant réel des offres (modifiable par le Super Admin) : jamais écrit en dur.
   const publicOffers = usePublicOffers();
-  const { offers: signupOffers, loading: signupOffersLoading } = useSignupOffersState();
+  const { offers: signupOffers, loading: signupOffersLoading, failed: signupOffersFailed } = useSignupOffersState();
   const feeText = familyFeeText(publicOffers);
   // Offre choisie à l'étape précédente (page « Créer un établissement ») ; null = formulaire de création bloqué.
-  const signupOffer = resolveSignupOffer(readSignupOfferCode(), signupOffers);
+  const storedOfferCode = readSignupOfferCode();
+  // Si la liste des offres est lente ou indisponible, on s'appuie sur la copie de l'offre choisie (le serveur revalide de toute façon).
+  const signupOffer = resolveSignupOffer(storedOfferCode, signupOffers)
+    ?? (signupOffersLoading || signupOffersFailed ? readSignupOfferSnapshot(storedOfferCode) : null);
   const navigate = useNavigate();
   const authContext = readAuthContext();
   const authSpace = authContext.space;

@@ -1,41 +1,53 @@
 import { describe, expect, it } from "vitest";
-import { flatAnnualPrice, flatOffersNotice, isFlatOfferAvailable, toFlatOffers, yearLabelOf } from "./flat-offers";
+import { capacityState, flatAnnualPrice, flatCategoryMessage, flatCategoryTitle, isFlatOfferAvailable, studentRangeText, toFlatOffers, yearLabelOf } from "./flat-offers";
 import { toPublicOffers } from "./public-offers";
 import { monthsOfAcademicYear } from "./flat-payments";
 
 const row = (o: Partial<any> = {}) => ({
-  id: "1", code: "etablissement_a", name: "Établissement A", offer_type: "per_school", is_active: true,
-  min_students: 0, max_students: 600, monthly_price: 150000, free_months_annual: 2,
-  valid_from: "2026-09-01", valid_until: "2027-08-31", features: {}, parent_login_allowed: true, student_login_allowed: true, ...o,
+  id: "1", code: "etablissement_basique", name: "Basique", offer_type: "per_school", is_active: true,
+  min_students: 0, max_students: 200, monthly_price: 100000, free_months_annual: 0,
+  valid_from: "2026-09-01", valid_until: "2027-08-31", features: {}, parent_login_allowed: false, student_login_allowed: false, ...o,
 });
+const three = () => [
+  row(),
+  row({ id: "2", code: "etablissement_standard", name: "Standard", max_students: 600, monthly_price: 150000 }),
+  row({ id: "3", code: "etablissement_premium", name: "Premium", max_students: null, monthly_price: 200000 }),
+];
 
-describe("offres établissement", () => {
-  it("calcule le prix annuel : 1 500 000 et 2 000 000 GNF", () => {
+describe("plans par établissement", () => {
+  it("expose les trois plans avec leurs prix et capacités", () => {
+    const l = toFlatOffers(three(), "2026-10-27");
+    expect(l.map((o) => [o.name, o.monthlyPrice, o.maxStudents])).toEqual([["Basique", 100000, 200], ["Standard", 150000, 600], ["Premium", 200000, null]]);
+  });
+  it("affiche la capacité, illimitée pour le Premium", () => {
+    const l = toFlatOffers(three(), "2026-10-27");
+    expect(studentRangeText(l[0])).toBe("Capacité maximale : 200 élèves");
+    expect(studentRangeText(l[2])).toBe("Nombre d'élèves illimité");
+  });
+  it("calcule le prix annuel quand des mois sont offerts", () => {
     expect(flatAnnualPrice(150000, 2)).toBe(1_500_000);
-    expect(flatAnnualPrice(200000, 2)).toBe(2_000_000);
-    expect(flatAnnualPrice(200000, 0)).toBe(2_400_000);
+    expect(flatAnnualPrice(100000, 0)).toBe(1_200_000);
   });
-  it("affiche l'offre dans sa période de validité seulement", () => {
-    expect(isFlatOfferAvailable(row(), "2026-10-18")).toBe(true);
-    expect(isFlatOfferAvailable(row(), "2027-09-01")).toBe(false);
-    expect(isFlatOfferAvailable(row(), "2026-08-31")).toBe(false);
+  it("n'affiche les plans que dans la période de validité et s'ils sont actifs", () => {
+    expect(isFlatOfferAvailable(row(), "2026-10-27")).toBe(true);
+    expect(toFlatOffers(three(), "2027-09-02")).toHaveLength(0);
+    expect(toFlatOffers([row({ is_active: false })], "2026-10-27")).toHaveLength(0);
   });
-  it("masque une offre désactivée", () => {
-    expect(toFlatOffers([row({ is_active: false })], "2026-10-18")).toHaveLength(0);
+  it("titre et message : l'année vient de la période de validité", () => {
+    const l = toFlatOffers(three(), "2026-10-27");
+    expect(flatCategoryTitle(l)).toBe("PLANS PAR ÉTABLISSEMENT — OFFRE EXCEPTIONNELLE POUR L'ANNÉE SCOLAIRE 2026-2027");
+    expect(flatCategoryMessage(l)).toContain("exclusivement valable pour l'année scolaire 2026-2027");
+    expect(flatCategoryMessage(l)).toContain("ne seront pas reconduits");
+    expect(yearLabelOf("2027-09-01", "2028-08-31")).toBe("2027-2028");
   });
-  it("retire toutes les offres à la fin de validité : le lien disparaît", () => {
-    expect(toFlatOffers([row(), row({ id: "2", code: "etablissement_b" })], "2027-09-02")).toHaveLength(0);
+  it("alerte de capacité : proche, atteinte, dépassée, illimitée", () => {
+    expect(capacityState(150, 200)).toBe("ok");
+    expect(capacityState(180, 200)).toBe("near");
+    expect(capacityState(200, 200)).toBe("full");
+    expect(capacityState(201, 200)).toBe("over");
+    expect(capacityState(5000, null)).toBe("ok");
   });
-  it("trie par tranche et calcule l'année affichée depuis la période", () => {
-    const l = toFlatOffers([row({ id: "2", code: "etablissement_b", min_students: 601, max_students: 1000, monthly_price: 200000 }), row()], "2026-10-18");
-    expect(l.map((o) => o.code)).toEqual(["etablissement_a", "etablissement_b"]);
-    expect(l[1].annualPrice).toBe(2_000_000);
-    expect(yearLabelOf("2026-09-01", "2027-08-31")).toBe("2026-2027");
-    expect(flatOffersNotice(l)).toContain("(2026-2027)");
-    const l2 = toFlatOffers([row({ valid_from: "2027-09-01", valid_until: "2028-08-31" })], "2027-10-01");
-    expect(flatOffersNotice(l2)).toContain("(2027-2028)");
-  });
-  it("ne mélange jamais un forfait avec les trois offres par élève", () => {
+  it("ne mélange jamais un plan établissement avec les trois plans par élève", () => {
     const perStudent = [{ code: "basique", name: "Basique", annual_price_per_student: 20000, school_commission_per_student: 0 }];
     const res = toPublicOffers([...perStudent, { ...row(), annual_price_per_student: 0, school_commission_per_student: 0 }]);
     expect(res.map((o) => o.code)).toEqual(["basique"]);

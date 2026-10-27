@@ -8,8 +8,8 @@ export const FLAT_OFFERS_KEY = ["flat-offers"];
  * Offres par établissement disponibles aujourd'hui (actives et dans leur période de validité).
  * Rafraîchies toutes les minutes ; liste vide en cas d'erreur (la page publique reste alors sur les trois offres par élève).
  */
-export function useFlatOffersState(): { offers: FlatOffer[]; loading: boolean } {
-  const { data, isLoading } = useQuery({
+export function useFlatOffersState(): { offers: FlatOffer[]; loading: boolean; failed: boolean } {
+  const { data, isLoading, isError } = useQuery({
     queryKey: FLAT_OFFERS_KEY,
     staleTime: 20_000,
     refetchInterval: 60_000,
@@ -21,7 +21,7 @@ export function useFlatOffersState(): { offers: FlatOffer[]; loading: boolean } 
       return toFlatOffers(data);
     },
   });
-  return { offers: data ?? [], loading: isLoading };
+  return { offers: data ?? [], loading: isLoading, failed: isError };
 }
 
 export function useFlatOffers(): FlatOffer[] {

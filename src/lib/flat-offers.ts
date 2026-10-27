@@ -4,7 +4,8 @@ export interface FlatOffer {
   code: string;
   name: string;
   minStudents: number;
-  maxStudents: number;
+  /** null = nombre d'élèves illimité. */
+  maxStudents: number | null;
   monthlyPrice: number;
   freeMonths: number;
   annualPrice: number;
@@ -53,7 +54,7 @@ export function toFlatOffers(rows: any[] | null | undefined, today: string = tod
       code: String(r.code),
       name: String(r.name ?? r.code),
       minStudents: Number(r.min_students) || 0,
-      maxStudents: Number(r.max_students) || 0,
+      maxStudents: r.max_students === null || r.max_students === undefined ? null : Number(r.max_students),
       monthlyPrice: Number(r.monthly_price),
       freeMonths: Number(r.free_months_annual) || 0,
       annualPrice: flatAnnualPrice(Number(r.monthly_price), Number(r.free_months_annual)),
@@ -68,17 +69,32 @@ export function toFlatOffers(rows: any[] | null | undefined, today: string = tod
     .sort((a, b) => a.minStudents - b.minStudents || a.monthlyPrice - b.monthlyPrice);
 }
 
-export function studentRangeText(o: Pick<FlatOffer, "minStudents" | "maxStudents">): string {
-  return `de ${o.minStudents.toLocaleString("fr-FR")} à ${o.maxStudents.toLocaleString("fr-FR")} élèves`.replace(/[  ]/g, " ");
+/** Capacité affichée : « Capacité maximale : 200 élèves » ou « Nombre d'élèves illimité ». */
+export function studentRangeText(o: Pick<FlatOffer, "maxStudents">): string {
+  return o.maxStudents === null ? "Nombre d'élèves illimité" : `Capacité maximale : ${o.maxStudents.toLocaleString("fr-FR")} élèves`.replace(/[\u202f\u00a0]/g, " ");
 }
 
-/** Mention affichée sous les offres par élève. L'année vient de la période de validité réglée par le Super Admin. */
-export function flatOffersNotice(offers: FlatOffer[]): string {
+/** Titre de la catégorie ; l'année vient de la période de validité réglée par le Super Admin. */
+export function flatCategoryTitle(offers: FlatOffer[]): string {
   const y = offers[0]?.yearLabel;
-  return `Offres par établissement disponibles uniquement pour l'année académique en cours${y ? ` (${y})` : ""}. Dès l'année prochaine, les établissements devront choisir l'une des trois offres par élève.`;
+  return `PLANS PAR ÉTABLISSEMENT — OFFRE EXCEPTIONNELLE POUR L'ANNÉE SCOLAIRE ${y ?? ""}`.trim();
 }
 
-export const FLAT_OFFERS_TOP_MESSAGE =
-  "Choisissez les offres par établissement uniquement pour cette année académique en cours. Dès l'année prochaine, le choix se fera parmi les trois offres par élève.";
+/** Message affiché juste sous le titre de la catégorie. */
+export const FLAT_CATEGORY_MESSAGE =
+  "Cette offre exceptionnelle est exclusivement valable pour l'année scolaire en cours. À la fin de cette année scolaire, les établissements devront obligatoirement choisir l'un des plans d'abonnement par élève pour poursuivre leur utilisation de MBGEduGuinée. Les plans par établissement ne seront pas reconduits pour l'année scolaire suivante.";
+
+export function flatCategoryMessage(offers: FlatOffer[]): string {
+  const y = offers[0]?.yearLabel;
+  return y ? FLAT_CATEGORY_MESSAGE.replace("l'année scolaire en cours", `l'année scolaire ${y}`) : FLAT_CATEGORY_MESSAGE;
+}
+
+/** Alerte de capacité : proche du plafond (90 %) ou atteint. */
+export function capacityState(count: number, max: number | null): "ok" | "near" | "full" | "over" {
+  if (max === null) return "ok";
+  if (count > max) return "over";
+  if (count === max) return "full";
+  return count >= Math.floor(max * 0.9) ? "near" : "ok";
+}
 
 export const FLAT_OFFERS_PATH = "/offres-etablissement";

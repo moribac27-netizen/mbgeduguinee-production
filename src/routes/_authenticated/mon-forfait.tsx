@@ -46,6 +46,12 @@ function MonForfaitPage() {
 
   if (loading) return <Loader2 className="size-5 animate-spin" />;
   if (!flat) return <p className="text-sm text-muted-foreground">Votre établissement n'est pas sous une offre établissement.</p>;
+  if (flat.expired) return (
+    <div className="space-y-3">
+      <h1 className="font-display text-2xl font-bold">Mon forfait établissement</h1>
+      <p className="text-sm">L'offre exceptionnelle « {flat.offer_name} » ({flat.academic_year}) est terminée. Choisissez l'un des trois plans par élève en contactant l'administration de la plateforme. Vos données et l'historique de vos paiements sont conservés.</p>
+    </div>
+  );
 
   const months = monthsOfAcademicYear(flat.academic_year);
   const amount = type === "annual" ? flat.annual_price : flat.monthly_price;
@@ -75,8 +81,8 @@ function MonForfaitPage() {
       <Card>
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
           <div><div className="text-xs text-muted-foreground">Mensuel</div><div className="font-semibold">{formatPublicGNF(flat.monthly_price)}</div></div>
-          <div><div className="text-xs text-muted-foreground">Annuel ({flat.free_months} mois offerts)</div><div className="font-semibold">{formatPublicGNF(flat.annual_price)}</div></div>
-          <div><div className="text-xs text-muted-foreground">Effectif / tranche</div><div className="font-semibold">{flat.students_count} / {flat.min_students}–{flat.max_students}</div></div>
+          <div><div className="text-xs text-muted-foreground">Annuel{flat.free_months > 0 ? ` (${flat.free_months} mois offerts)` : ""}</div><div className="font-semibold">{formatPublicGNF(flat.annual_price)}</div></div>
+          <div><div className="text-xs text-muted-foreground">Élèves / capacité</div><div className="font-semibold">{flat.students_count} / {flat.max_students === null ? "illimité" : flat.max_students}</div></div>
           <div><div className="text-xs text-muted-foreground">État</div><Badge className={flat.in_good_standing ? "bg-emerald-100 text-emerald-900" : "bg-red-100 text-red-900"}>{flat.in_good_standing ? "En règle" : "Paiement en retard"}</Badge></div>
         </CardContent>
       </Card>
@@ -94,7 +100,7 @@ function MonForfaitPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="monthly">Mensuel</SelectItem>
-                  <SelectItem value="annual">Annuel ({flat.free_months} mois offerts)</SelectItem>
+                  <SelectItem value="annual">Annuel{flat.free_months > 0 ? ` (${flat.free_months} mois offerts)` : ""}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

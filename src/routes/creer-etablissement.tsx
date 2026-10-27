@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
 import { useSignupOffersState } from "@/hooks/useSignupOffers";
-import { FlatOffersLink } from "@/components/FlatOffersLink";
-import { formatPublicGNF, offerFeatures, type PublicOffer } from "@/lib/public-offers";
+import { FlatOffersSection } from "@/components/FlatOffersSection";
+import { flatToPublicOffer, formatPublicGNF, offerFeatures, type PublicOffer } from "@/lib/public-offers";
 import { OFFER_DURATION_TEXT, offerConditions, readSignupOfferCode, resolveSignupOffer, saveSignupOfferCode, clearSignupOfferCode } from "@/lib/signup-offer";
 
 export const Route = createFileRoute("/creer-etablissement")({
@@ -96,7 +96,7 @@ function CreateSchoolOffer() {
   }, [ready, offersLoading, code, selected]);
 
   function choose(o: PublicOffer) {
-    saveSignupOfferCode(o.code);
+    saveSignupOfferCode(o.code, o);
     setCode(o.code);
     window.scrollTo?.({ top: 0 });
   }
@@ -106,7 +106,7 @@ function CreateSchoolOffer() {
   }
   function next() {
     if (!selected) return;
-    saveSignupOfferCode(selected.code);
+    saveSignupOfferCode(selected.code, selected);
     // /auth lit son contexte (espace + mode) dans l'URL : navigation complète, le choix reste dans la session.
     window.location.assign("/auth?role=etablissement&mode=signup");
   }
@@ -153,7 +153,7 @@ function CreateSchoolOffer() {
                 );
               })}
             </div>
-            <FlatOffersLink className="mt-8" />
+            <FlatOffersSection onChoose={(f) => choose(flatToPublicOffer(f))} />
           </>
         ) : (
           <>

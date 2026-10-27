@@ -22,9 +22,24 @@ export function readSignupOfferCode(): string | null {
   }
 }
 
-export function saveSignupOfferCode(code: string): void {
+/** Copie de l'offre choisie : sert d'affichage de secours si la liste des offres est lente ou indisponible sur la page suivante. */
+export const SIGNUP_OFFER_SNAPSHOT_KEY = "mbg.signup.offer.snapshot";
+
+export function readSignupOfferSnapshot(code: string | null): PublicOffer | null {
+  try {
+    if (!code || typeof window === "undefined") return null;
+    const raw = window.sessionStorage.getItem(SIGNUP_OFFER_SNAPSHOT_KEY);
+    const o = raw ? (JSON.parse(raw) as PublicOffer) : null;
+    return o && typeof o.code === "string" && o.code.toLowerCase() === code.trim().toLowerCase() ? o : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSignupOfferCode(code: string, offer?: PublicOffer): void {
   try {
     window.sessionStorage.setItem(SIGNUP_OFFER_KEY, code);
+    if (offer) window.sessionStorage.setItem(SIGNUP_OFFER_SNAPSHOT_KEY, JSON.stringify(offer));
   } catch {
     /* stockage indisponible : le choix reste valable dans la page courante */
   }
@@ -33,6 +48,7 @@ export function saveSignupOfferCode(code: string): void {
 export function clearSignupOfferCode(): void {
   try {
     window.sessionStorage.removeItem(SIGNUP_OFFER_KEY);
+    window.sessionStorage.removeItem(SIGNUP_OFFER_SNAPSHOT_KEY);
   } catch {
     /* rien à faire */
   }
@@ -46,7 +62,9 @@ export function offerConditions(o: PublicOffer): string[] {
   const out: string[] = [];
   if (o.flat) {
     out.push(`Forfait de l'établissement, sans cotisation par élève, valable pour l'année académique ${o.flat.yearLabel}.`);
-    out.push(`Un effectif ${o.flat.minStudents}–${o.flat.maxStudents} élèves est prévu ; au-delà, il faudra passer à l'offre supérieure.`);
+    out.push(o.flat.maxStudents === null
+      ? "Nombre d'élèves illimité (sous réserve des limites techniques générales de la plateforme)."
+      : `Capacité maximale : ${o.flat.maxStudents} élèves. Au-delà, les nouvelles inscriptions sont refusées : passez à une formule supérieure.`);
     out.push("Choisir une offre n'est pas un paiement : les paiements (mensuels ou annuel) sont déclarés puis validés par l'administration de la plateforme.");
     return out;
   }

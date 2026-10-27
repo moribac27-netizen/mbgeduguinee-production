@@ -279,7 +279,7 @@ function SchoolsTab({ schools, offers, offerById, payments, commissions, onDone 
               <TableCell className="min-w-44">
                 <Select value={offerId} onValueChange={(v) => v !== offerId && setChange({ school: s, offerId: v })}>
                   <SelectTrigger><SelectValue placeholder="Conditions actuelles (Premium par défaut)" /></SelectTrigger>
-                  <SelectContent>{offers.map((o) => <SelectItem key={o.id} value={o.id} disabled={!o.is_active && o.id !== offerId}>{o.name}{o.is_active ? "" : " (désactivée)"}</SelectItem>)}</SelectContent>
+                  <SelectContent>{offers.map((o) => <SelectItem key={o.id} value={o.id} disabled={!o.is_active && o.id !== offerId}>{o.name}{o.offer_type === "per_school" ? " (plan établissement)" : " (par élève)"}{o.is_active ? "" : " (désactivée)"}</SelectItem>)}</SelectContent>
                 </Select>
               </TableCell>
               <TableCell>{mine.length}</TableCell>

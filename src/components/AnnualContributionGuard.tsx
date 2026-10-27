@@ -22,7 +22,7 @@ export function AnnualContributionGuard() {
     if (saLoading || accessLoading || flatLoading || isSuperAdmin || error) return;
     if (info.accessMode === "RESTRICTED" && matches(pathname, BLOCKED_WHEN_RESTRICTED)) {
       // Établissement sous forfait : la page de régularisation est « Mon forfait », pas les cotisations par élève.
-      navigate({ to: flat ? "/mon-forfait" : "/cotisations", replace: true });
+      navigate({ to: flat && !flat.expired ? "/mon-forfait" : "/cotisations", replace: true });
     }
   }, [pathname, saLoading, accessLoading, flatLoading, flat, isSuperAdmin, error, info.accessMode, navigate]);
 
