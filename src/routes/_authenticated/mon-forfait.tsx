@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMyFlatOffer, MY_FLAT_OFFER_KEY } from "@/hooks/useMyFlatOffer";
 import { formatPublicGNF } from "@/lib/public-offers";
-import { flatPaymentErrorMessage, monthsOfAcademicYear } from "@/lib/flat-payments";
+import { flatPaymentErrorMessage, monthsOfAcademicYear, printFlatReceipt } from "@/lib/flat-payments";
+import { useSchool } from "@/hooks/useSchool";
 
 export const Route = createFileRoute("/_authenticated/mon-forfait")({
   head: () => ({ meta: [{ title: "Mon forfait — MBGEduGuinée" }] }),
@@ -29,6 +30,7 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 function MonForfaitPage() {
   const qc = useQueryClient();
   const { flat, loading } = useMyFlatOffer();
+  const { school } = useSchool();
   const [type, setType] = useState<"monthly" | "annual">("monthly");
   const [month, setMonth] = useState("");
   const [ref, setRef] = useState("");
@@ -129,7 +131,7 @@ function MonForfaitPage() {
         <CardHeader><CardTitle className="text-base">Mes paiements</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
-            <TableHeader><TableRow><TableHead>Référence</TableHead><TableHead>Période</TableHead><TableHead>Montant</TableHead><TableHead>Réf. paiement</TableHead><TableHead>Statut</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Référence</TableHead><TableHead>Période</TableHead><TableHead>Montant</TableHead><TableHead>Réf. paiement</TableHead><TableHead>Statut</TableHead><TableHead /></TableRow></TableHeader>
             <TableBody>
               {(payments.data ?? []).map((p) => (
                 <TableRow key={p.id}>
@@ -138,9 +140,10 @@ function MonForfaitPage() {
                   <TableCell>{formatPublicGNF(Number(p.amount))}</TableCell>
                   <TableCell>{p.payer_reference}</TableCell>
                   <TableCell><Badge className={STATUS[p.status]?.cls}>{STATUS[p.status]?.label ?? p.status}</Badge>{p.review_note ? <div className="mt-1 text-xs text-muted-foreground">{p.review_note}</div> : null}</TableCell>
+                  <TableCell>{p.status === "VALIDATED" ? <Button size="sm" variant="outline" onClick={() => printFlatReceipt(p, (school as any)?.name ?? "", flat.offer_name)}>Reçu</Button> : null}</TableCell>
                 </TableRow>
               ))}
-              {!(payments.data ?? []).length && <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground">Aucun paiement déclaré.</TableCell></TableRow>}
+              {!(payments.data ?? []).length && <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground">Aucun paiement déclaré.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
