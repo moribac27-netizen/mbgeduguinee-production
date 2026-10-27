@@ -1,5 +1,5 @@
 -- Trois plans « par établissement » (offre exceptionnelle 2026-2027) : Basique 200 élèves, Standard 600, Premium illimité.
--- Remplace les deux offres A/B de la migration 20261018200000 (aucune école n'y était abonnée : elles sont désactivées, pas supprimées).
+-- Remplace les deux offres A/B de la migration 20261018200000 (aucune école n'y était abonnée : elles sont supprimées).
 -- Ajoute le plafond d'élèves en base, l'expiration par année scolaire et le suivi après expiration.
 -- Les trois plans par élève, leurs commissions et leurs paiements ne sont pas modifiés.
 -- À exécuter manuellement dans le SQL Editor de Supabase. Idempotent.
@@ -18,7 +18,15 @@ alter table public.school_offer_subscriptions add column if not exists offer_typ
 
 -- 2. Les trois plans (valeurs initiales, ensuite modifiables par le Super Admin) -------------------------------------------
 -- Droits alignés sur les plans par élève de même nom (aucune restriction inventée) ; pas de cotisation par élève (payer_roles vide).
-update public.subscription_offers set is_active = false where code in ('etablissement_a','etablissement_b');
+-- Les offres A/B sont supprimées (aucune école n'y est abonnée) ; garde-fou : arrêt si une souscription existe.
+do $$
+begin
+  if exists (select 1 from public.school_offer_subscriptions s join public.subscription_offers o on o.id = s.offer_id where o.code in ('etablissement_a','etablissement_b')) then
+    raise exception 'Des établissements sont abonnés aux offres A/B : suppression annulée.';
+  end if;
+  delete from public.subscription_offer_history where offer_id in (select id from public.subscription_offers where code in ('etablissement_a','etablissement_b'));
+  delete from public.subscription_offers where code in ('etablissement_a','etablissement_b');
+end $$;
 
 insert into public.subscription_offers
   (code, name, sort_order, annual_price_per_student, school_commission_per_student, currency, is_active,
