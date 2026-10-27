@@ -34,11 +34,11 @@ insert into public.subscription_offers
    offer_type, min_students, max_students, monthly_price, free_months_annual, valid_from, valid_until)
 values
   ('etablissement_basique',  'Basique',  10, 0, 0, 'GNF', true, false, false,
-   '{"cantine":false,"infirmerie":false,"bibliotheque":false}'::jsonb, '{}', 'per_school', 0, 200,  100000, 0, date '2026-09-01', date '2027-08-31'),
+   '{"cantine":false,"infirmerie":false,"bibliotheque":false}'::jsonb, '{}', 'per_school', 0, 200,  100000, 2, date '2026-09-01', date '2027-08-31'),
   ('etablissement_standard', 'Standard', 11, 0, 0, 'GNF', true, true,  false,
-   '{"cantine":true,"infirmerie":true,"bibliotheque":true}'::jsonb,  '{}', 'per_school', 0, 600,  150000, 0, date '2026-09-01', date '2027-08-31'),
+   '{"cantine":true,"infirmerie":true,"bibliotheque":true}'::jsonb,  '{}', 'per_school', 0, 600,  150000, 2, date '2026-09-01', date '2027-08-31'),
   ('etablissement_premium',  'Premium',  12, 0, 0, 'GNF', true, true,  true,
-   '{"cantine":true,"infirmerie":true,"bibliotheque":true}'::jsonb,  '{}', 'per_school', 0, null, 200000, 0, date '2026-09-01', date '2027-08-31')
+   '{"cantine":true,"infirmerie":true,"bibliotheque":true}'::jsonb,  '{}', 'per_school', 0, null, 200000, 2, date '2026-09-01', date '2027-08-31')
 on conflict (code) do nothing;
 
 -- 3. Un forfait ne s'applique que pendant son année scolaire (pas de reconduction) ----------------------------------------
