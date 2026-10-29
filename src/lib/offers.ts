@@ -112,6 +112,7 @@ export function paymentErrorMessage(raw?: string | null): string {
     REFERENCE_REQUIRED: "La référence de transaction est obligatoire.",
     ALREADY_VALIDATED: "Ce paiement est déjà validé.",
     ALREADY_PENDING: "Un paiement est déjà en attente de validation pour cet élève.",
+    FLAT_OFFER_NO_STUDENT_PAYMENT: "Votre établissement est sous un plan par établissement : aucune cotisation par élève n'est nécessaire.",
     REASON_REQUIRED: "Le motif du refus est obligatoire.",
     INVALID_AMOUNT: "Le montant du paiement ne correspond pas aux conditions de l'offre.",
     INVALID_STATUS: "Ce paiement n'est plus en attente de validation.",

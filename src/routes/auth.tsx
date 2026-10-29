@@ -16,9 +16,10 @@ import { toast } from "sonner";
 import { logLogin } from "@/lib/audit";
 import { loadUserContext, resolveUserHome } from "@/lib/auth-redirect";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
+import { useSignupOffersState } from "@/hooks/useSignupOffers";
 import { familyFeeText } from "@/lib/public-offers";
 import { SignupOfferGate } from "@/components/SignupOfferGate";
-import { clearSignupOfferCode, readSignupOfferCode, resolveSignupOffer } from "@/lib/signup-offer";
+import { clearSignupOfferCode, readSignupOfferCode, readSignupOfferSnapshot, resolveSignupOffer } from "@/lib/signup-offer";
 
 
 const emptySignUp = { email: "", password: "", fullName: "", phone: "", schoolName: "", schoolAddress: "", schoolPhone: "" };
@@ -60,9 +61,13 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   // Montant réel des offres (modifiable par le Super Admin) : jamais écrit en dur.
   const publicOffers = usePublicOffers();
+  const { offers: signupOffers, loading: signupOffersLoading, failed: signupOffersFailed } = useSignupOffersState();
   const feeText = familyFeeText(publicOffers);
   // Offre choisie à l'étape précédente (page « Créer un établissement ») ; null = formulaire de création bloqué.
-  const signupOffer = resolveSignupOffer(readSignupOfferCode(), publicOffers);
+  const storedOfferCode = readSignupOfferCode();
+  // Si la liste des offres est lente ou indisponible, on s'appuie sur la copie de l'offre choisie (le serveur revalide de toute façon).
+  const signupOffer = resolveSignupOffer(storedOfferCode, signupOffers)
+    ?? (signupOffersLoading || signupOffersFailed ? readSignupOfferSnapshot(storedOfferCode) : null);
   const navigate = useNavigate();
   const authContext = readAuthContext();
   const authSpace = authContext.space;
@@ -199,6 +204,7 @@ function AuthPage() {
           schoolAddress: signUp.schoolAddress.trim() || null,
           schoolPhone: signUp.schoolPhone.trim() || null,
           offerCode: signupOffer.code,
+          expectedPrice: signupOffer.flat ? signupOffer.flat.monthlyPrice : signupOffer.price,
         },
       });
       if (!res.ok) {
@@ -217,11 +223,14 @@ function AuthPage() {
         setLoading(false);
         return;
       }
-      toast.success("Établissement créé avec succès. Bienvenue !");
+      const wasFlat = !!signupOffer.flat;
+      toast.success(wasFlat ? "Établissement créé. Finalisez maintenant votre abonnement." : "Établissement créé avec succès. Bienvenue !");
       clearSignupOfferCode();
       setSignUp(emptySignUp);
       setLoading(false);
-      afterAuth();
+      // Forfait : l'établissement est créé AVANT le paiement ; on l'amène directement à la page de finalisation.
+      if (wasFlat) void navigate({ to: "/mon-forfait", search: { finaliser: "1" }, replace: true });
+      else afterAuth();
     } catch (err: any) {
       setLoading(false);
       toast.error(err?.message ?? "Échec de l'inscription");
@@ -394,7 +403,7 @@ function AuthPage() {
                 </div>
 
                 {authSpace === "etablissement" && dedicatedMode === "signup" ? (
-                  <SignupOfferGate offer={signupOffer}><form onSubmit={handleSignUp} className="space-y-3">
+                  <SignupOfferGate offer={signupOffer} loading={signupOffersLoading}><form onSubmit={handleSignUp} className="space-y-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
                     <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
                     <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>
@@ -497,7 +506,7 @@ function AuthPage() {
                               </form>
                             </TabsContent>
                             <TabsContent value="signup">
-                              <SignupOfferGate offer={signupOffer}><form onSubmit={handleSignUp} className="space-y-3">
+                              <SignupOfferGate offer={signupOffer} loading={signupOffersLoading}><form onSubmit={handleSignUp} className="space-y-3">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Établissement</div>
                                 <div><Label>Nom de l'établissement *</Label><Input required value={signUp.schoolName} onChange={(e) => setSignUp({ ...signUp, schoolName: e.target.value })} placeholder="Ex : École Les Palmiers" /></div>
                                 <div><Label>Adresse</Label><Input value={signUp.schoolAddress} onChange={(e) => setSignUp({ ...signUp, schoolAddress: e.target.value })} placeholder="Ville, quartier" /></div>

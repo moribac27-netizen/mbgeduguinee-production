@@ -19,7 +19,7 @@ export function usePublicOffers(): PublicOffer[] {
     queryFn: async (): Promise<PublicOffer[]> => {
       const { data, error } = await (supabase as any)
         .from("subscription_offers")
-        .select("code,name,annual_price_per_student,school_commission_per_student,parent_login_allowed,student_login_allowed,features,payer_roles,is_active")
+        .select("*")
         .eq("is_active", true);
       if (error) throw error;
       return toPublicOffers(data);

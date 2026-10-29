@@ -299,6 +299,7 @@ function toPayload(kind: ImportKind, v: Record<string, any>, isCreate: boolean) 
 
 function friendly(err: any): string {
   const m = String(err?.message ?? err ?? "");
+  if (/STUDENT_LIMIT_REACHED/.test(m)) return "Capacité de l'offre atteinte : passez à une formule supérieure pour inscrire d'autres élèves.";
   if (/duplicate key|unique/i.test(m)) return "Valeur déjà utilisée (matricule ou nom en doublon).";
   if (/row-level security|permission/i.test(m)) return "Droits insuffisants ou établissement en accès limité.";
   return "Ligne refusée par la base de données.";
