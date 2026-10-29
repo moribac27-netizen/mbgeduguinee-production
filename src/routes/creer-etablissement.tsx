@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
 import { useSignupOffersState } from "@/hooks/useSignupOffers";
 import { FlatOffersSection } from "@/components/FlatOffersSection";
+import { formatDateFr, studentRangeText } from "@/lib/flat-offers";
 import { flatToPublicOffer, formatPublicGNF, offerFeatures, type PublicOffer } from "@/lib/public-offers";
 import { OFFER_DURATION_TEXT, offerConditions, readSignupOfferCode, resolveSignupOffer, saveSignupOfferCode, clearSignupOfferCode } from "@/lib/signup-offer";
 
@@ -153,7 +154,7 @@ function CreateSchoolOffer() {
                 );
               })}
             </div>
-            <FlatOffersSection onChoose={(f) => choose(flatToPublicOffer(f))} />
+            <FlatOffersSection onChoose={(f) => choose(flatToPublicOffer(f))} selectedCode={code} />
           </>
         ) : (
           <>
@@ -170,7 +171,10 @@ function CreateSchoolOffer() {
                   {selected.flat ? (
                     <>
                       <div className="mt-3 font-display text-4xl font-bold">{formatPublicGNF(selected.flat.monthlyPrice).replace(" GNF", "")} <span className="text-lg">GNF / mois</span></div>
-                      <div className="mt-1 text-sm text-muted-foreground">Paiement annuel : {formatPublicGNF(selected.flat.annualPrice)} ({selected.flat.freeMonths} mois offerts) — {selected.flat.minStudents} à {selected.flat.maxStudents} élèves</div>
+                      <div className="mt-1 text-sm font-semibold">{studentRangeText(selected.flat)}</div>
+                      <div className="mt-1 text-sm text-muted-foreground">Facturation mensuelle · valable du {formatDateFr(selected.flat.validFrom)} au {formatDateFr(selected.flat.validUntil)} (année scolaire {selected.flat.yearLabel})</div>
+                      {selected.flat.freeMonths > 0 && <div className="mt-1 text-sm text-muted-foreground">Paiement annuel possible : {formatPublicGNF(selected.flat.annualPrice)} ({selected.flat.freeMonths} mois offerts)</div>}
+                      <p className="mt-3 rounded-lg border border-[#19B5A5]/40 bg-[#F3FBF9] p-3 text-xs">Votre établissement sera créé maintenant ; le paiement se fait à l'étape suivante, sur la page « Finalisez votre abonnement ».</p>
                     </>
                   ) : (
                     <>

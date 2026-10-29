@@ -59,3 +59,18 @@ describe("plans par établissement", () => {
     expect(m[11].value).toBe("2027-08-01");
   });
 });
+
+import { formatDateFr } from "./flat-offers";
+describe("description et dates", () => {
+  it("lit la description d'un plan et la valeur illimitée", () => {
+    const [o] = toFlatOffers([{ id: "1", code: "x", name: "X", offer_type: "per_school", is_active: true, valid_from: "2026-09-01", valid_until: "2027-08-31",
+      monthly_price: 200000, free_months_annual: 2, max_students: null, min_students: 0, description: "  Pour grands établissements ", features: {} }], "2026-10-29");
+    expect(o.description).toBe("Pour grands établissements");
+    expect(o.maxStudents).toBeNull();
+    expect(o.annualPrice).toBe(2000000);
+  });
+  it("formate une date sans décalage de fuseau", () => {
+    expect(formatDateFr("2026-09-01")).toContain("2026");
+    expect(formatDateFr("2026-09-01")).toContain("1");
+  });
+});

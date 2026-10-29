@@ -20,6 +20,25 @@ export interface MyFlatOffer {
   paid_months: string[];
   annual_paid: boolean;
   pending_count: number;
+  payment_status?: "pending_payment" | "under_review" | "active" | "overdue" | "expired";
+  subscribed_at?: string;
+  remaining_capacity?: number | null;
+  next_due_month?: string | null;
+  next_due_date?: string | null;
+  grace_end_date?: string | null;
+  grace_days_left?: number | null;
+  payment_methods?: PaymentMethod[];
+}
+
+export interface PaymentMethod {
+  code: string;
+  label: string;
+  enabled?: boolean;
+  number?: string;
+  local?: string;
+  holder?: string;
+  ussd?: string;
+  instructions?: string[];
 }
 
 export const MY_FLAT_OFFER_KEY = ["my-flat-offer"];

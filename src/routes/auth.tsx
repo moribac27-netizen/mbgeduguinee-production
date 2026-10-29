@@ -204,6 +204,7 @@ function AuthPage() {
           schoolAddress: signUp.schoolAddress.trim() || null,
           schoolPhone: signUp.schoolPhone.trim() || null,
           offerCode: signupOffer.code,
+          expectedPrice: signupOffer.flat ? signupOffer.flat.monthlyPrice : signupOffer.price,
         },
       });
       if (!res.ok) {
@@ -222,11 +223,14 @@ function AuthPage() {
         setLoading(false);
         return;
       }
-      toast.success("Établissement créé avec succès. Bienvenue !");
+      const wasFlat = !!signupOffer.flat;
+      toast.success(wasFlat ? "Établissement créé. Finalisez maintenant votre abonnement." : "Établissement créé avec succès. Bienvenue !");
       clearSignupOfferCode();
       setSignUp(emptySignUp);
       setLoading(false);
-      afterAuth();
+      // Forfait : l'établissement est créé AVANT le paiement ; on l'amène directement à la page de finalisation.
+      if (wasFlat) void navigate({ to: "/mon-forfait", search: { finaliser: "1" }, replace: true });
+      else afterAuth();
     } catch (err: any) {
       setLoading(false);
       toast.error(err?.message ?? "Échec de l'inscription");

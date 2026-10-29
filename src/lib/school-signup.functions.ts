@@ -11,6 +11,9 @@ const schema = z.object({
   schoolPhone: z.string().optional().nullable(),
   // Offre choisie à l'étape « Choix de l'offre » : obligatoire, vérifiée côté serveur.
   offerCode: z.string().trim().min(1).max(64),
+  // Prix affiché à l'utilisateur (mensuel pour un forfait, annuel par élève sinon). Jamais utilisé comme prix : sert uniquement
+  // à refuser la création si le tarif a changé entre l'affichage et la validation. Le prix retenu est toujours celui de la base.
+  expectedPrice: z.number().finite().nonnegative().optional().nullable(),
 });
 
 type Result =
@@ -34,6 +37,14 @@ export const registerSchool = createServerFn({ method: "POST" })
     const flatExpired = !!offer && offer.offer_type === "per_school" && !(offer.valid_from <= today && today <= offer.valid_until);
     if (offerErr || !offer || flatExpired) {
       return { ok: false, error: "Offre invalide ou indisponible. Retournez au choix de l'offre pour en sélectionner une." };
+    }
+
+    // Le tarif affiché doit être le tarif actuel (jamais de prix fourni par le navigateur).
+    if (data.expectedPrice !== undefined && data.expectedPrice !== null) {
+      const current = Number(offer.offer_type === "per_school" ? offer.monthly_price : offer.annual_price_per_student);
+      if (Math.round(current) !== Math.round(data.expectedPrice)) {
+        return { ok: false, error: "Les tarifs de cette offre ont été mis à jour. Retournez au choix de l'offre pour consulter le tarif actuel." };
+      }
     }
 
     // 1. Create school first

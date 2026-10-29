@@ -17,6 +17,8 @@ export interface FlatOffer {
   modules: { cantine: boolean; infirmerie: boolean; bibliotheque: boolean };
   parentLogin: boolean;
   studentLogin: boolean;
+  /** Description libre saisie par le Super Admin (facultative). */
+  description: string;
 }
 
 /** Prix annuel calculé : (12 − mois offerts) × prix mensuel. Jamais saisi à la main. */
@@ -65,6 +67,7 @@ export function toFlatOffers(rows: any[] | null | undefined, today: string = tod
       modules: { cantine: r.features?.cantine !== false, infirmerie: r.features?.infirmerie !== false, bibliotheque: r.features?.bibliotheque !== false },
       parentLogin: !!r.parent_login_allowed,
       studentLogin: !!r.student_login_allowed,
+      description: typeof r.description === "string" ? r.description.trim() : "",
     }))
     .sort((a, b) => a.minStudents - b.minStudents || a.monthlyPrice - b.monthlyPrice);
 }
@@ -98,3 +101,9 @@ export function capacityState(count: number, max: number | null): "ok" | "near" 
 }
 
 export const FLAT_OFFERS_PATH = "/offres-etablissement";
+
+/** Date lisible (« 1 septembre 2026 ») à partir de AAAA-MM-JJ, sans décalage de fuseau. */
+export function formatDateFr(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
