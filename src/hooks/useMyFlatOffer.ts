@@ -20,7 +20,11 @@ export interface MyFlatOffer {
   paid_months: string[];
   annual_paid: boolean;
   pending_count: number;
-  payment_status?: "pending_payment" | "under_review" | "active" | "overdue" | "expired";
+  payment_status?: "pending_payment" | "under_review" | "active" | "overdue" | "unpaid" | "expired";
+  phase?: "active" | "trial" | "unpaid" | "overdue" | "none";
+  trial_end_date?: string;
+  trial_days_left?: number;
+  trial_max_students?: number;
   subscribed_at?: string;
   remaining_capacity?: number | null;
   next_due_month?: string | null;

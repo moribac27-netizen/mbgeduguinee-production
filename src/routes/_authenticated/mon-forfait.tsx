@@ -156,6 +156,9 @@ function MonForfaitPage() {
           <div><div className="text-xs text-muted-foreground">Année scolaire</div><div className="font-semibold">{flat.academic_year} (jusqu'au {formatDateFr(flat.valid_until)})</div></div>
           <div><div className="text-xs text-muted-foreground">Date de souscription</div><div className="font-semibold">{flat.subscribed_at ? new Date(flat.subscribed_at).toLocaleDateString("fr-FR") : "—"}</div></div>
           <div><div className="text-xs text-muted-foreground">Statut du paiement</div><Badge className={pst?.cls}>{pst?.label}</Badge></div>
+          {flat.phase === "trial" && flat.trial_end_date && (
+            <div className="sm:col-span-2 lg:col-span-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Période d'essai jusqu'au {formatDateFr(flat.trial_end_date)} ({Math.max(flat.trial_days_left ?? 0, 0)} jour(s) restant(s)), limitée à {flat.trial_max_students ?? 10} élèves. Les notes, bulletins et examens sont activés après validation de votre premier paiement.</div>
+          )}
           {flat.next_due_date && !flat.annual_paid && (
             <div className="sm:col-span-2"><div className="text-xs text-muted-foreground">Prochaine échéance</div>
               <div className="font-semibold">{formatDateFr(flat.next_due_date)}{flat.grace_end_date ? ` — tolérance jusqu'au ${formatDateFr(flat.grace_end_date)}` : ""}{typeof flat.grace_days_left === "number" ? (flat.grace_days_left >= 0 ? ` (${flat.grace_days_left} jour(s) restant(s))` : " (délai dépassé)") : ""}</div></div>
