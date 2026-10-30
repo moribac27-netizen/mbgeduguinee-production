@@ -105,10 +105,10 @@ function Dashboard() {
         supabase.from("teachers").select("id", { count: "exact", head: true }),
         supabase.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "parent"),
         supabase.from("classes").select("id, name, annual_fee"),
-        supabase.from("payments").select("amount, paid_at, payment_type"),
-        supabase.from("students").select("id, full_name, class_id, classes(name, annual_fee), payments(amount)"),
+        supabase.from("payments").select("amount, paid_at, payment_type").eq("validation_status", "validé"),
+        supabase.from("students").select("id, full_name, class_id, classes(name, annual_fee), payments(amount, validation_status)"),
         supabase.from("student_attendance").select("status").eq("date", today),
-        supabase.from("expenses").select("amount, expense_date"),
+        (supabase as any).from("expenses").select("amount, occurred_at").is("voided_at", null),
         supabase.from("exams").select("id, name, exam_date, subject_id, class_id, classes(name)").gte("exam_date", today).order("exam_date", { ascending: true }).limit(5),
         supabase.from("announcements").select("id, title, created_at, target_role").order("created_at", { ascending: false }).limit(5),
         supabase.from("payments").select("id, amount, paid_at, payment_type, students(full_name)").order("paid_at", { ascending: false }).limit(5),
@@ -131,11 +131,11 @@ function Dashboard() {
         .reduce((s, p: any) => s + Number(p.amount), 0);
       const dayCount = allPayments.filter((p: any) => String(p.paid_at).slice(0, 10) === today).length;
       const monthExpenses = allExpenses
-        .filter((e: any) => String(e.expense_date) >= monthStartISO)
+        .filter((e: any) => String(e.occurred_at) >= monthStartISO)
         .reduce((s: number, e: any) => s + Number(e.amount), 0);
 
       const late = (studentsWithPay.data ?? []).filter((s: any) => {
-        const paid = (s.payments ?? []).reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+        const paid = (s.payments ?? []).filter((p: any) => p.validation_status === "validé").reduce((sum: number, p: any) => sum + Number(p.amount), 0);
         const due = Number(s.classes?.annual_fee ?? 0);
         return due > 0 && paid < due * 0.5;
       });
@@ -154,7 +154,7 @@ function Dashboard() {
           .reduce((s, p: any) => s + Number(p.amount), 0);
         const depenses = allExpenses
           .filter((e: any) => {
-            const pd = new Date(e.expense_date);
+            const pd = new Date(e.occurred_at);
             return pd.getMonth() === d.getMonth() && pd.getFullYear() === d.getFullYear();
           })
           .reduce((s: number, e: any) => s + Number(e.amount), 0);
