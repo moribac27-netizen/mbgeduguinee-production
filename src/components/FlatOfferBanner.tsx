@@ -15,7 +15,9 @@ export function FlatOfferBanner() {
   if (flat.expired) {
     msgs.push("L'offre exceptionnelle par établissement est terminée. Pour poursuivre l'utilisation de MBGEduGuinée, choisissez l'un des trois plans par élève en contactant l'administration de la plateforme. Toutes vos données sont conservées.");
   } else {
-    if (!flat.in_good_standing) msgs.push("Un paiement de votre forfait est en retard : l'accès aux notes, bulletins et examens est restreint jusqu'à validation du paiement par l'administration.");
+    if (flat.phase === "trial") msgs.push(`Période d'essai : il vous reste ${Math.max(flat.trial_days_left ?? 0, 0)} jour(s) et ${flat.trial_max_students ?? 10} élèves maximum. Les notes, bulletins et examens sont activés dès que votre premier paiement est validé par l'administration.`);
+    else if (flat.phase === "unpaid") msgs.push("Votre période d'essai est terminée : réglez votre forfait pour inscrire des élèves et accéder aux notes, bulletins et examens.");
+    else if (!flat.in_good_standing) msgs.push("Un paiement de votre forfait est en retard : les nouvelles inscriptions et l'accès aux notes, bulletins et examens sont suspendus jusqu'à validation du paiement par l'administration.");
     const cap = capacityState(flat.students_count, flat.max_students);
     if (cap === "over") msgs.push(`Votre effectif (${flat.students_count} élèves) dépasse la capacité de votre plan (${flat.max_students}). Les nouvelles inscriptions sont refusées : passez à une formule supérieure.`);
     else if (cap === "full") msgs.push(`La capacité de votre plan est atteinte (${flat.max_students} élèves) : les nouvelles inscriptions sont refusées. Passez à une formule supérieure pour inscrire d'autres élèves.`);

@@ -244,12 +244,14 @@ function TextsForm({ value, onDone }: { value: any; onDone: () => void }) {
 }
 
 function BillingForm({ value, onDone }: { value: any; onDone: () => void }) {
-  const [b, setB] = useState({ due: String(value.due_day ?? 5), grace: String(value.grace_days ?? 15), exp: String(value.expiry_grace_days ?? 30) });
+  const [b, setB] = useState({ due: String(value.due_day ?? 5), grace: String(value.grace_days ?? 15), exp: String(value.expiry_grace_days ?? 30), trialDays: String(value.trial_days ?? 7), trialMax: String(value.trial_max_students ?? 10) });
   function save() {
     const due = Number(b.due), grace = Number(b.grace), exp = Number(b.exp);
     if (!(Number.isInteger(due) && due >= 1 && due <= 28)) return void toast.error("Le jour d'échéance doit être entre 1 et 28.");
     if (!(Number.isInteger(grace) && grace >= 0 && grace <= 90) || !(Number.isInteger(exp) && exp >= 0 && exp <= 180)) return void toast.error("Délais invalides.");
-    void saveSetting("billing.flat", { due_day: due, grace_days: grace, expiry_grace_days: exp }, onDone);
+    const td = Number(b.trialDays), tm = Number(b.trialMax);
+    if (!(Number.isInteger(td) && td >= 0 && td <= 60) || !(Number.isInteger(tm) && tm >= 0 && tm <= 1000)) return void toast.error("Essai invalide (0 à 60 jours, 0 à 1000 élèves).");
+    void saveSetting("billing.flat", { due_day: due, grace_days: grace, expiry_grace_days: exp, trial_days: td, trial_max_students: tm }, onDone);
   }
   return (
     <div className="space-y-2 rounded-xl border p-4">
@@ -258,6 +260,8 @@ function BillingForm({ value, onDone }: { value: any; onDone: () => void }) {
         <div className="space-y-1.5"><Label>Jour d'échéance mensuelle</Label><Input type="number" value={b.due} onChange={(e) => setB({ ...b, due: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Jours de tolérance après échéance</Label><Input type="number" value={b.grace} onChange={(e) => setB({ ...b, grace: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Jours de grâce après fin de l'offre</Label><Input type="number" value={b.exp} onChange={(e) => setB({ ...b, exp: e.target.value })} /></div>
+        <div className="space-y-1.5"><Label>Jours d'essai avant le 1er paiement</Label><Input type="number" value={b.trialDays} onChange={(e) => setB({ ...b, trialDays: e.target.value })} /></div>
+        <div className="space-y-1.5"><Label>Élèves max pendant l'essai</Label><Input type="number" value={b.trialMax} onChange={(e) => setB({ ...b, trialMax: e.target.value })} /></div>
       </div>
       <Button size="sm" onClick={save}>Enregistrer les délais</Button>
     </div>

@@ -57,6 +57,7 @@ export function printFlatReceipt(p: { reference: string; period_type: string; pe
 export const PAYMENT_STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pending_payment: { label: "Paiement en attente", cls: "bg-amber-100 text-amber-900" },
   under_review: { label: "Paiement en cours de vérification", cls: "bg-blue-100 text-blue-900" },
+  unpaid: { label: "Essai terminé — paiement requis", cls: "bg-red-100 text-red-900" },
   active: { label: "Abonnement actif", cls: "bg-emerald-100 text-emerald-900" },
   overdue: { label: "Paiement en retard", cls: "bg-red-100 text-red-900" },
   expired: { label: "Offre expirée", cls: "bg-slate-200 text-slate-800" },
