@@ -528,9 +528,9 @@ function FinanceReport() {
     (async () => {
       setLoading(true);
       const [{ data: rev }, { data: exp }] = await Promise.all([
-        supabase.from("revenues").select("amount,type,occurred_at,description")
+        (supabase as any).from("revenues").select("amount,type,occurred_at,description").is("voided_at", null)
           .gte("occurred_at", from).lte("occurred_at", to + "T23:59:59"),
-        supabase.from("expenses").select("amount,type,occurred_at,description")
+        (supabase as any).from("expenses").select("amount,type,occurred_at,description").is("voided_at", null)
           .gte("occurred_at", from).lte("occurred_at", to + "T23:59:59"),
       ]);
       setRevenues((rev || []).map((r: any) => ({ date: r.occurred_at?.slice(0, 10), category: r.type, description: r.description, amount: r.amount })));

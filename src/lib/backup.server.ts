@@ -6,7 +6,7 @@ export const BACKUP_TABLES = [
   "students", "student_parents", "student_access_codes",
   "schedule_slots", "exams", "grades", "student_attendance", "teacher_attendance",
   "payments", "student_plan_payments", "cotisation_payment_audit",
-  "financial_accounts", "revenues", "expenses",
+  "financial_accounts", "revenues", "expenses", "account_transfers",
   "employee_contracts", "employee_leaves", "payslips",
   "library_categories", "library_books", "library_loans",
   "medical_records", "medical_visits", "medicines", "treatments", "accidents",
