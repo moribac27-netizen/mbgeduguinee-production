@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import QRCode from "qrcode";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText } from "lucide-react";
+import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
@@ -58,9 +58,35 @@ function PaymentsPage() {
     },
   });
 
+  // Liaison avec la Comptabilité (réservée à l'administration/direction/comptabilité : en cas d'erreur d'accès, la colonne est masquée).
+  const { data: postedIds, isError: noAccounting } = useQuery({
+    queryKey: ["payments-posted"],
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("revenues").select("payment_id").not("payment_id", "is", null).is("voided_at", null);
+      if (error) throw error;
+      return new Set<string>((data ?? []).map((r: any) => r.payment_id));
+    },
+  });
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["payments-accounts"],
+    retry: false,
+    enabled: !noAccounting,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("accounting_balances");
+      if (error) throw error;
+      return (data ?? []) as Array<{ account_id: string; name: string; type: string; is_active?: boolean }>;
+    },
+  });
+  const [postTarget, setPostTarget] = useState<PaymentRow | null>(null);
+  const showAccounting = !noAccounting && !!postedIds;
+  const isPosted = (id: string) => !!postedIds?.has(id);
+
   const pending = payments.filter((p: PaymentRow) => p.validation_status === "en_attente");
   const validated = payments.filter((p: PaymentRow) => p.validation_status === "validé");
   const totalRevenue = validated.reduce((s: number, p: PaymentRow) => s + Number(p.amount), 0);
+  const toPost = validated.filter((p: PaymentRow) => Number(p.amount) > 0 && !isPosted(p.id));
+  const toPostTotal = toPost.reduce((s: number, p: PaymentRow) => s + Number(p.amount), 0);
   const pendingTotal = pending.reduce((s: number, p: PaymentRow) => s + Number(p.amount), 0);
 
   const lateStudents = useMemo(
@@ -95,8 +121,9 @@ function PaymentsPage() {
     }
     const { error } = await supabase.from("payments").update(patch).eq("id", p.id);
     if (error) return toast.error(error.message);
-    toast.success("Paiement validé");
+    toast.success("Paiement validé", showAccounting ? { action: { label: "Comptabiliser", onClick: () => setPostTarget({ ...p, ...patch }) } } : undefined);
     qc.invalidateQueries({ queryKey: ["payments"] });
+    qc.invalidateQueries({ queryKey: ["students-payments"] });
   }
 
   async function rejectPayment(p: PaymentRow) {
@@ -122,6 +149,12 @@ function PaymentsPage() {
             {pending.length > 0 && (
               <span className="ml-3 text-amber-600">
                 • En attente : <span className="font-semibold">{fmt(pendingTotal)} GNF</span> ({pending.length})
+              </span>
+            )}
+            {showAccounting && toPost.length > 0 && (
+              <span className="ml-3 text-sky-700">
+                • À comptabiliser : <span className="font-semibold">{fmt(toPostTotal)} GNF</span> ({toPost.length}){" "}
+                <Link to="/comptabilite" className="underline">Ouvrir la comptabilité</Link>
               </span>
             )}
           </p>
@@ -223,11 +256,12 @@ function PaymentsPage() {
                   <TableHead>Méthode</TableHead>
                   <TableHead>Référence</TableHead>
                   <TableHead>Montant</TableHead>
+                  {showAccounting && <TableHead>Comptabilité</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Aucun paiement</TableCell></TableRow>}
+                {rows.length === 0 && <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Aucun paiement</TableCell></TableRow>}
                 {rows.map((p: PaymentRow) => (
                   <TableRow key={p.id} data-state={selected.has(p.id) ? "selected" : undefined}>
                     <TableCell><input type="checkbox" checked={selected.has(p.id)} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(p.id) : n.delete(p.id); setSelected(n); }} /></TableCell>
@@ -238,6 +272,13 @@ function PaymentsPage() {
                     <TableCell className="text-sm">{p.payment_method}</TableCell>
                     <TableCell className="font-mono text-xs">{p.transaction_reference ?? "—"}</TableCell>
                     <TableCell className="font-semibold">{fmt(p.amount)} GNF</TableCell>
+                    {showAccounting && (
+                      <TableCell className="whitespace-nowrap">
+                        {p.validation_status !== "validé" ? <span className="text-xs text-muted-foreground">Après validation</span>
+                          : isPosted(p.id) ? <Badge variant="outline" className="gap-1 text-emerald-700"><Landmark className="size-3" />Comptabilisé</Badge>
+                          : <Button size="sm" variant="outline" className="gap-1" onClick={() => setPostTarget(p)}><Landmark className="size-3.5" />Comptabiliser</Button>}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right space-x-1 whitespace-nowrap">
                       {p.validation_status === "en_attente" ? (
                         <>
@@ -257,7 +298,54 @@ function PaymentsPage() {
 
         </CardContent>
       </Card>
+      <PostPaymentDialog payment={postTarget} accounts={accounts} onClose={() => setPostTarget(null)} onDone={() => { setPostTarget(null); qc.invalidateQueries({ queryKey: ["payments-posted"] }); qc.invalidateQueries({ queryKey: ["acc"] }); }} />
     </div>
+  );
+}
+
+/** Choix du compte puis écriture de la recette correspondante en Comptabilité (une seule fois par paiement). */
+function defaultAccountFor(method: string, accounts: Array<{ account_id: string; name: string; type: string; is_active?: boolean }>) {
+  const wanted: Record<string, string[]> = {
+    "espèces": ["caisse"], "Orange Money": ["orange_money", "mobile_money"], "MTN MoMo": ["mtn_momo", "mobile_money"],
+    "virement": ["banque"], "chèque": ["banque", "caisse"], "PayPal": ["banque"], "Stripe": ["banque"],
+  };
+  const list = accounts.filter((a) => a.is_active !== false);
+  for (const t of wanted[method] ?? []) { const a = list.find((x) => x.type === t); if (a) return a.account_id; }
+  return list[0]?.account_id ?? "";
+}
+function PostPaymentDialog({ payment, accounts, onClose, onDone }: { payment: PaymentRow | null; accounts: Array<{ account_id: string; name: string; type: string; is_active?: boolean }>; onClose: () => void; onDone: () => void }) {
+  const [accountId, setAccountId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const open = !!payment;
+  const chosen = accountId || (payment ? defaultAccountFor(payment.payment_method, accounts) : "");
+  async function post() {
+    if (!payment || !chosen || busy) return;
+    setBusy(true);
+    const { error } = await (supabase as any).rpc("post_payment_to_revenue", { _payment_id: payment.id, _account_id: chosen });
+    setBusy(false);
+    if (error) return void toast.error(error.message === "ALREADY_POSTED" ? "Ce paiement est déjà comptabilisé." : error.message === "PAYMENT_NOT_VALIDATED" ? "Le paiement doit d'abord être validé." : error.message);
+    toast.success("Paiement comptabilisé"); setAccountId(""); onDone();
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { setAccountId(""); onClose(); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Comptabiliser ce paiement</DialogTitle>
+          <DialogDescription>{payment ? `${payment.students?.full_name ?? "Élève"} — ${fmt(Number(payment.amount))} GNF (${payment.payment_method})` : ""}. Une recette sera créée dans le compte choisi ; son solde augmentera.</DialogDescription>
+        </DialogHeader>
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucun compte financier. Créez d'abord vos comptes dans <Link to="/comptabilite" className="underline">Comptabilité</Link> (bouton « Comptes usuels »).</p>
+        ) : (
+          <div><Label>Compte qui reçoit l'argent</Label>
+            <Select value={chosen} onValueChange={setAccountId}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+              <SelectContent>{accounts.filter((a) => a.is_active !== false).map((a) => <SelectItem key={a.account_id} value={a.account_id}>{a.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        )}
+        <DialogFooter><Button onClick={post} disabled={busy || !chosen}>Comptabiliser</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
