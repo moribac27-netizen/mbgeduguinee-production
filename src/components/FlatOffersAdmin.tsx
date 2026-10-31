@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { INSTALL_REQUIRED_KEY } from "@/components/InstallGate";
 import { FLAT_OFFERS_KEY } from "@/hooks/useFlatOffers";
 import { FLAT_TEXTS_KEY } from "@/hooks/usePlatformSettings";
 import { MY_FLAT_OFFER_KEY } from "@/hooks/useMyFlatOffer";
@@ -208,6 +209,7 @@ function FlatSettingsAdmin() {
         <CardDescription>Les modifications s'appliquent immédiatement à la page publique, à la création et à la page de paiement. Elles sont historisées.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <InstallRequiredForm value={v["public.install_required"] ?? { enabled: true }} onDone={done} />
         <TextsForm value={v["public.flat_offers_texts"] ?? {}} onDone={done} />
         <BillingForm value={v["billing.flat"] ?? { due_day: 5, grace_days: 15, expiry_grace_days: 30 }} onDone={done} />
         <MethodsForm value={(v["payment.methods"] ?? [])[0] ?? { code: "orange_money", label: "Orange Money Guinée", enabled: true }} all={v["payment.methods"] ?? []} onDone={done} />
@@ -228,6 +230,18 @@ async function saveSetting(key: string, value: unknown, done: () => void) {
   if (error) { toast.error("Enregistrement impossible : " + error.message); return; }
   toast.success("Paramètre enregistré.");
   done();
+}
+
+function InstallRequiredForm({ value, onDone }: { value: any; onDone: () => void }) {
+  const qc2 = useQueryClient();
+  const enabled = value?.enabled !== false;
+  return (
+    <div className="space-y-2 rounded-xl border p-4">
+      <div className="text-sm font-semibold">Installation de l'application avant la connexion</div>
+      <p className="text-xs text-muted-foreground">Actuellement : <b>{enabled ? "obligatoire" : "facultative"}</b>. Quand elle est obligatoire, chaque personne doit installer l'application sur son appareil (ordinateur, Android, iPhone, tablette) avant sa première connexion. Les navigateurs qui ne savent pas installer d'application ne sont jamais bloqués.</p>
+      <Button size="sm" variant={enabled ? "outline" : "default"} onClick={() => saveSetting("public.install_required", { enabled: !enabled }, () => { void qc2.invalidateQueries({ queryKey: INSTALL_REQUIRED_KEY }); onDone(); })}>{enabled ? "Rendre facultative" : "Rendre obligatoire"}</Button>
+    </div>
+  );
 }
 
 function TextsForm({ value, onDone }: { value: any; onDone: () => void }) {
