@@ -13,9 +13,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Printer, Wallet, ArrowDownCircle, ArrowUpCircle, Scale, Download, ArrowLeftRight, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useSchool } from "@/hooks/useSchool";
+import { getAcademicYearOptions, getCurrentAcademicYear } from "@/lib/academic-year";
 import {
-  ACCOUNT_LABELS, EXPENSE_LABELS, METHOD_LABELS, REVENUE_LABELS, accountingErrorMessage, isNegative, periodRange, toCsv,
-  type CsvColumn, type PeriodPreset,
+  ACCOUNT_CATALOG, ACCOUNT_LABELS, EXPENSE_LABELS, METHOD_LABELS, REVENUE_LABELS, accountingErrorMessage, budgetProgress, categoryLabel, isNegative,
+  missingTemplates, periodRange, printEntryReceipt, selectableCategories, toCsv, validateCategoryInput,
+  type AccountingCategory, type CsvColumn, type PeriodPreset,
 } from "@/lib/accounting";
 
 export const Route = createFileRoute("/_authenticated/comptabilite")({
@@ -29,8 +32,12 @@ const dateFr = (d: string) => new Date(String(d).slice(0, 10) + "T00:00:00").toL
 const today = () => new Date().toISOString().slice(0, 10);
 const ROW_LIMIT = 1000;
 
-const REVENUE_TYPES = Object.keys(REVENUE_LABELS);
-const EXPENSE_TYPES = Object.keys(EXPENSE_LABELS);
+/** Lignes du compte de résultat : par catégorie du plan comptable si disponible, sinon par type historique. */
+function byCat(cats: any, types: Record<string, number> | undefined, labels: Record<string, string>): Array<{ key: string; label: string; total: number }> {
+  if (Array.isArray(cats) && cats.length) return cats.map((c: any, i: number) => ({ key: String(c.category_id ?? "none" + i), label: categoryLabel(c) || c.label, total: Number(c.total) }));
+  return Object.keys(labels).map((t) => ({ key: t, label: labels[t], total: Number(types?.[t] ?? 0) }));
+}
+
 const ACCOUNT_TYPES = Object.keys(ACCOUNT_LABELS);
 const METHODS = Object.keys(METHOD_LABELS);
 
@@ -55,6 +62,10 @@ function AccountingPage() {
     const { data, error } = await db.rpc("accounting_balances"); if (error) throw error; return (data ?? []) as any[];
   } });
   const accounts = balances.data ?? [];
+  const categoriesQ = useQuery({ queryKey: ["acc", "categories"], queryFn: async () => {
+    const { data, error } = await db.from("accounting_categories").select("*").order("kind").order("sort_order"); if (error) throw error; return (data ?? []) as AccountingCategory[];
+  } });
+  const categories = categoriesQ.data ?? [];
   const summary = useQuery({ queryKey: ["acc", "summary", range, accountId], queryFn: async () => {
     const { data, error } = await db.rpc("accounting_summary", { _from: range.from, _to: range.to, _account_id: accountId === "all" ? null : accountId });
     if (error) throw error; return data as any;
@@ -62,7 +73,7 @@ function AccountingPage() {
 
   function useEntries(table: "revenues" | "expenses" | "account_transfers") {
     return useQuery({ queryKey: ["acc", table, range, accountId, showVoided], queryFn: async () => {
-      let q = db.from(table).select(table === "account_transfers" ? "*, from:financial_accounts!account_transfers_from_account_id_fkey(name), to:financial_accounts!account_transfers_to_account_id_fkey(name)" : "*, financial_accounts(name)").order("occurred_at", { ascending: false }).limit(ROW_LIMIT);
+      let q = db.from(table).select(table === "account_transfers" ? "*, from:financial_accounts!account_transfers_from_account_id_fkey(name), to:financial_accounts!account_transfers_to_account_id_fkey(name)" : "*, financial_accounts(name), accounting_categories(code,label)").order("occurred_at", { ascending: false }).limit(ROW_LIMIT);
       if (range.from) q = q.gte("occurred_at", range.from);
       if (range.to) q = q.lte("occurred_at", range.to);
       if (accountId !== "all") q = table === "account_transfers" ? q.or(`from_account_id.eq.${accountId},to_account_id.eq.${accountId}`) : q.eq("account_id", accountId);
@@ -85,8 +96,8 @@ function AccountingPage() {
   const activeAccounts = accounts.filter((a: any) => a.is_active);
 
   const journal = useMemo(() => [
-    ...revenues.map((r) => ({ id: r.id, date: r.occurred_at, label: `Recette ${REVENUE_LABELS[r.type] ?? r.type}${r.description ? " — " + r.description : ""}`, account: r.financial_accounts?.name, reference: r.reference, debit: Number(r.amount), credit: 0, voided: !!r.voided_at })),
-    ...expenses.map((e) => ({ id: e.id, date: e.occurred_at, label: `Dépense ${EXPENSE_LABELS[e.type] ?? e.type}${e.description ? " — " + e.description : ""}`, account: e.financial_accounts?.name, reference: e.reference, debit: 0, credit: Number(e.amount), voided: !!e.voided_at })),
+    ...revenues.map((r) => ({ id: r.id, date: r.occurred_at, label: `Recette ${r.accounting_categories?.label ?? REVENUE_LABELS[r.type] ?? r.type}${r.description ? " — " + r.description : ""}`, account: r.financial_accounts?.name, reference: r.reference, debit: Number(r.amount), credit: 0, voided: !!r.voided_at })),
+    ...expenses.map((e) => ({ id: e.id, date: e.occurred_at, label: `Dépense ${e.accounting_categories?.label ?? EXPENSE_LABELS[e.type] ?? e.type}${e.description ? " — " + e.description : ""}`, account: e.financial_accounts?.name, reference: e.reference, debit: 0, credit: Number(e.amount), voided: !!e.voided_at })),
     ...transfers.map((t) => ({ id: t.id, date: t.occurred_at, label: `Virement ${t.from?.name ?? ""} → ${t.to?.name ?? ""}${t.note ? " — " + t.note : ""}`, account: "—", reference: t.reference, debit: 0, credit: 0, voided: !!t.voided_at })),
   ].sort((a, b) => (a.date === b.date ? 0 : a.date > b.date ? -1 : 1)), [revenues, expenses, transfers]);
 
@@ -147,13 +158,18 @@ function AccountingPage() {
           <TabsTrigger value="expenses">Dépenses</TabsTrigger>
           <TabsTrigger value="transfers">Virements</TabsTrigger>
           <TabsTrigger value="post">À comptabiliser</TabsTrigger>
+          <TabsTrigger value="budget">Budget</TabsTrigger>
+          <TabsTrigger value="plan">Plan comptable</TabsTrigger>
           <TabsTrigger value="journal">Journal</TabsTrigger>
           <TabsTrigger value="report">Compte de résultat</TabsTrigger>
           <TabsTrigger value="audit">Historique</TabsTrigger>
         </TabsList>
 
         <TabsContent value="accounts" className="space-y-4">
-          <div className="flex justify-end"><AccountDialog onSaved={refreshAll} /></div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <SetupAccountsDialog existing={accounts.map((a: any) => a.name)} onSaved={refreshAll} />
+            <AccountDialog existing={accounts.map((a: any) => a.name)} onSaved={refreshAll} />
+          </div>
           <Card><CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Solde initial</TableHead><TableHead className="text-right">Recettes</TableHead><TableHead className="text-right">Dépenses</TableHead><TableHead className="text-right">Virements (net)</TableHead><TableHead className="text-right">Solde actuel</TableHead><TableHead /></TableRow></TableHeader>
@@ -184,11 +200,11 @@ function AccountingPage() {
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showVoided} onChange={(e) => setShowVoided(e.target.checked)} /> Afficher les écritures annulées</label>
             <div className="flex gap-2">
               <Button variant="outline" className="gap-2" onClick={() => exportCsv("recettes", revenues, [
-                { label: "Date", value: (r) => r.occurred_at }, { label: "Type", value: (r) => REVENUE_LABELS[r.type] ?? r.type }, { label: "Compte", value: (r) => r.financial_accounts?.name },
+                { label: "Date", value: (r) => r.occurred_at }, { label: "Catégorie", value: (r) => categoryLabel(r.accounting_categories) || (REVENUE_LABELS[r.type] ?? r.type) }, { label: "Compte", value: (r) => r.financial_accounts?.name },
                 { label: "Description", value: (r) => r.description }, { label: "Référence", value: (r) => r.reference }, { label: "Mode", value: (r) => METHOD_LABELS[r.method] ?? r.method },
                 { label: "Montant", value: (r) => Number(r.amount) }, { label: "Statut", value: (r) => (r.voided_at ? "Annulée : " + (r.void_reason ?? "") : "Valide") },
               ])}><Download className="size-4" />CSV</Button>
-              <TxDialog kind="revenue" accounts={activeAccounts} onSaved={refreshAll} />
+              <TxDialog kind="revenue" accounts={activeAccounts} categories={categories} onSaved={refreshAll} />
             </div>
           </div>
           <EntryTable rows={revenues} kind="revenue" onChanged={refreshAll} loading={revenuesQ.isLoading} />
@@ -199,11 +215,11 @@ function AccountingPage() {
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showVoided} onChange={(e) => setShowVoided(e.target.checked)} /> Afficher les écritures annulées</label>
             <div className="flex gap-2">
               <Button variant="outline" className="gap-2" onClick={() => exportCsv("depenses", expenses, [
-                { label: "Date", value: (r) => r.occurred_at }, { label: "Type", value: (r) => EXPENSE_LABELS[r.type] ?? r.type }, { label: "Compte", value: (r) => r.financial_accounts?.name },
+                { label: "Date", value: (r) => r.occurred_at }, { label: "Catégorie", value: (r) => categoryLabel(r.accounting_categories) || (EXPENSE_LABELS[r.type] ?? r.type) }, { label: "Compte", value: (r) => r.financial_accounts?.name },
                 { label: "Bénéficiaire", value: (r) => r.beneficiary }, { label: "Description", value: (r) => r.description }, { label: "Référence", value: (r) => r.reference },
                 { label: "Montant", value: (r) => Number(r.amount) }, { label: "Statut", value: (r) => (r.voided_at ? "Annulée : " + (r.void_reason ?? "") : "Valide") },
               ])}><Download className="size-4" />CSV</Button>
-              <TxDialog kind="expense" accounts={activeAccounts} onSaved={refreshAll} />
+              <TxDialog kind="expense" accounts={activeAccounts} categories={categories} onSaved={refreshAll} />
             </div>
           </div>
           <EntryTable rows={expenses} kind="expense" onChanged={refreshAll} loading={expensesQ.isLoading} />
@@ -232,6 +248,9 @@ function AccountingPage() {
         <TabsContent value="post" className="space-y-4">
           <PostingPanel accounts={activeAccounts} onDone={refreshAll} />
         </TabsContent>
+
+        <TabsContent value="budget"><BudgetPanel /></TabsContent>
+        <TabsContent value="plan"><CategoriesPanel categories={categories} onChanged={refreshAll} /></TabsContent>
 
         <TabsContent value="journal">
           <div className="mb-3 flex justify-end print:hidden">
@@ -263,12 +282,12 @@ function AccountingPage() {
             <CardContent className="space-y-6">
               <div>
                 <h3 className="font-semibold mb-2">Recettes par catégorie</h3>
-                {REVENUE_TYPES.map((t) => <div key={t} className="flex justify-between py-1 border-b text-sm"><span>{REVENUE_LABELS[t]}</span><span className="text-success">{fmt(Number(sum.revenue_by_type?.[t] ?? 0))} GNF</span></div>)}
+                {byCat(sum.revenue_by_category, sum.revenue_by_type, REVENUE_LABELS).map((l) => <div key={l.key} className="flex justify-between py-1 border-b text-sm"><span>{l.label}</span><span className="text-success">{fmt(l.total)} GNF</span></div>)}
                 <div className="flex justify-between py-2 font-bold"><span>Total recettes</span><span className="text-success">{fmt(sum.revenue_total)} GNF</span></div>
               </div>
               <div>
                 <h3 className="font-semibold mb-2">Dépenses par catégorie</h3>
-                {EXPENSE_TYPES.map((t) => <div key={t} className="flex justify-between py-1 border-b text-sm"><span>{EXPENSE_LABELS[t]}</span><span className="text-destructive">{fmt(Number(sum.expense_by_type?.[t] ?? 0))} GNF</span></div>)}
+                {byCat(sum.expense_by_category, sum.expense_by_type, EXPENSE_LABELS).map((l) => <div key={l.key} className="flex justify-between py-1 border-b text-sm"><span>{l.label}</span><span className="text-destructive">{fmt(l.total)} GNF</span></div>)}
                 <div className="flex justify-between py-2 font-bold"><span>Total dépenses</span><span className="text-destructive">{fmt(sum.expense_total)} GNF</span></div>
               </div>
               <div className="flex justify-between py-3 border-t-2 border-primary font-bold text-lg">
@@ -310,17 +329,24 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: s
 function EntryTable({ rows, kind, onChanged, loading }: { rows: any[]; kind: "revenue" | "expense"; onChanged: () => void; loading: boolean }) {
   const table = kind === "revenue" ? "revenues" : "expenses";
   const labels = kind === "revenue" ? REVENUE_LABELS : EXPENSE_LABELS;
+  const { school } = useSchool();
+  const typeOf = (r: any) => categoryLabel(r.accounting_categories) || labels[r.type] || r.type;
+  const receipt = (r: any) => printEntryReceipt({
+    kind, id: r.id, date: r.occurred_at, amount: Number(r.amount), typeLabel: typeOf(r), accountName: r.financial_accounts?.name,
+    methodLabel: METHOD_LABELS[r.method] ?? r.method, reference: r.reference, description: r.description, beneficiary: r.beneficiary, voidReason: r.void_reason,
+    school: { name: (school as any)?.name, address: [(school as any)?.address, (school as any)?.city].filter(Boolean).join(", "), phone: (school as any)?.phone },
+  });
   return (
     <Card><CardContent className="p-0 overflow-x-auto">
       <Table>
         <TableHeader><TableRow>
-          <TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Compte</TableHead>{kind === "expense" && <TableHead>Bénéficiaire</TableHead>}<TableHead>Description</TableHead><TableHead>Réf.</TableHead><TableHead>Mode</TableHead><TableHead className="text-right">Montant</TableHead><TableHead />
+          <TableHead>Date</TableHead><TableHead>Catégorie</TableHead><TableHead>Compte</TableHead>{kind === "expense" && <TableHead>Bénéficiaire</TableHead>}<TableHead>Description</TableHead><TableHead>Réf.</TableHead><TableHead>Mode</TableHead><TableHead className="text-right">Montant</TableHead><TableHead />
         </TableRow></TableHeader>
         <TableBody>
           {rows.map((r) => (
             <TableRow key={r.id} className={r.voided_at ? "opacity-50" : ""}>
               <TableCell>{dateFr(r.occurred_at)}</TableCell>
-              <TableCell>{labels[r.type] ?? r.type}</TableCell>
+              <TableCell className="max-w-[16rem]">{typeOf(r)}</TableCell>
               <TableCell>{r.financial_accounts?.name}</TableCell>
               {kind === "expense" && <TableCell>{r.beneficiary}</TableCell>}
               <TableCell className="max-w-xs truncate">{r.description}{r.voided_at && <div className="text-xs text-destructive">Annulée : {r.void_reason}</div>}</TableCell>
@@ -328,6 +354,7 @@ function EntryTable({ rows, kind, onChanged, loading }: { rows: any[]; kind: "re
               <TableCell>{METHOD_LABELS[r.method] ?? r.method}</TableCell>
               <TableCell className={"text-right font-medium " + (r.voided_at ? "line-through" : kind === "revenue" ? "text-success" : "text-destructive")}>{kind === "revenue" ? "+" : "-"}{fmt(Number(r.amount))} GNF</TableCell>
               <TableCell className="text-right whitespace-nowrap print:hidden">
+                <Button size="sm" variant="ghost" className="gap-1" onClick={() => receipt(r)}><Printer className="size-3.5" />{kind === "revenue" ? "Reçu" : "Bon"}</Button>
                 {r.voided_at ? <Badge variant="outline">Annulée</Badge> : (<>
                   <EditNoteButton table={table} row={r} onDone={onChanged} />
                   <VoidButton table={table} id={r.id} onDone={onChanged} />
@@ -401,11 +428,17 @@ function ArchiveButton({ account, onDone }: { account: any; onDone: () => void }
   return <Button size="sm" variant="ghost" onClick={toggle}>{account.is_active ? "Archiver" : "Réactiver"}</Button>;
 }
 
-function AccountDialog({ onSaved }: { onSaved: () => void }) {
+function AccountDialog({ existing, onSaved }: { existing: string[]; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", type: "caisse", initial_balance: "0" });
+  const templates = missingTemplates(existing);
+  function pick(name: string) {
+    const t = ACCOUNT_CATALOG.find((x) => x.name === name);
+    if (t) setForm((f) => ({ ...f, name: t.name, type: t.type }));
+  }
   async function save() {
     if (!form.name.trim()) return void toast.error("Le nom du compte est obligatoire.");
+    if (existing.some((n) => n.trim().toLowerCase() === form.name.trim().toLowerCase())) return void toast.error("Un compte porte déjà ce nom.");
     const { error } = await db.from("financial_accounts").insert({ name: form.name.trim(), type: form.type, initial_balance: Number(form.initial_balance) || 0 });
     if (error) return void toast.error(accountingErrorMessage(error.message));
     toast.success("Compte créé"); setOpen(false); setForm({ name: "", type: "caisse", initial_balance: "0" }); onSaved();
@@ -414,8 +447,17 @@ function AccountDialog({ onSaved }: { onSaved: () => void }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button className="gap-2"><Plus className="size-4" />Nouveau compte</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Nouveau compte financier</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Nouveau compte financier</DialogTitle><DialogDescription>Un compte est un endroit où l'argent est gardé (caisse, banque, Orange Money…). Choisissez un modèle ou saisissez le vôtre.</DialogDescription></DialogHeader>
         <div className="space-y-3">
+          {templates.length > 0 && (
+            <div><Label>Modèle de compte</Label>
+              <Select onValueChange={pick}>
+                <SelectTrigger><SelectValue placeholder="Choisir un modèle (facultatif)" /></SelectTrigger>
+                <SelectContent>{templates.map((t) => <SelectItem key={t.name} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
+              </Select>
+              {form.name && ACCOUNT_CATALOG.find((t) => t.name === form.name) && <p className="mt-1 text-xs text-muted-foreground">{ACCOUNT_CATALOG.find((t) => t.name === form.name)!.description}</p>}
+            </div>
+          )}
           <div><Label>Nom</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Caisse principale" /></div>
           <div><Label>Type</Label>
             <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
@@ -423,7 +465,8 @@ function AccountDialog({ onSaved }: { onSaved: () => void }) {
               <SelectContent>{ACCOUNT_TYPES.map((t) => <SelectItem key={t} value={t}>{ACCOUNT_LABELS[t]}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div><Label>Solde initial (GNF)</Label><Input type="number" value={form.initial_balance} onChange={(e) => setForm({ ...form, initial_balance: e.target.value })} /></div>
+          <div><Label>Solde initial (GNF)</Label><Input type="number" value={form.initial_balance} onChange={(e) => setForm({ ...form, initial_balance: e.target.value })} />
+            <p className="mt-1 text-xs text-muted-foreground">Ce qu'il y a dans le compte le jour où vous commencez. Il ne sera plus modifiable dès la première écriture.</p></div>
         </div>
         <DialogFooter><Button onClick={save}>Créer</Button></DialogFooter>
       </DialogContent>
@@ -431,20 +474,58 @@ function AccountDialog({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-function TxDialog({ kind, accounts, onSaved }: { kind: "revenue" | "expense"; accounts: any[]; onSaved: () => void }) {
+/** Crée d'un coup plusieurs comptes usuels (solde initial 0) en cochant dans le catalogue. */
+function SetupAccountsDialog({ existing, onSaved }: { existing: string[]; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
-  const labels = kind === "revenue" ? REVENUE_LABELS : EXPENSE_LABELS;
-  const types = Object.keys(labels);
-  const blank = () => ({ account_id: "", type: types[0], amount: "", method: "especes", description: "", reference: "", beneficiary: "", occurred_at: today() });
+  const templates = missingTemplates(existing);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState(false);
+  const isOn = (t: { name: string; base?: boolean }) => checked[t.name] ?? !!t.base;
+  async function create() {
+    const rows = templates.filter(isOn).map((t) => ({ name: t.name, type: t.type, initial_balance: 0 }));
+    if (!rows.length) return void toast.error("Cochez au moins un compte.");
+    setBusy(true);
+    const { error } = await db.from("financial_accounts").insert(rows);
+    setBusy(false);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    toast.success(`${rows.length} compte(s) créé(s). Vous pourrez saisir leur solde de départ en créant une recette d'ouverture si besoin.`); setOpen(false); setChecked({}); onSaved();
+  }
+  if (!templates.length) return null;
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button variant="outline" className="gap-2"><Plus className="size-4" />Comptes usuels</Button></DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Créer les comptes usuels</DialogTitle><DialogDescription>Cochez les comptes que votre établissement tient réellement. Les comptes de base sont déjà cochés ; ils sont créés avec un solde de 0 GNF.</DialogDescription></DialogHeader>
+        <div className="space-y-2">
+          {templates.map((t) => (
+            <label key={t.name} className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm">
+              <input type="checkbox" className="mt-1" checked={isOn(t)} onChange={(e) => setChecked({ ...checked, [t.name]: e.target.checked })} />
+              <span><span className="font-medium">{t.name}</span> <Badge variant="outline" className="ml-1">{ACCOUNT_LABELS[t.type]}</Badge><span className="block text-xs text-muted-foreground">{t.description}</span></span>
+            </label>
+          ))}
+        </div>
+        <DialogFooter><Button onClick={create} disabled={busy}>Créer les comptes cochés</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TxDialog({ kind, accounts, categories, onSaved }: { kind: "revenue" | "expense"; accounts: any[]; categories: AccountingCategory[]; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const cats = selectableCategories(categories, kind === "revenue" ? "recette" : "depense");
+  const blank = () => ({ account_id: "", category_id: "", amount: "", method: "especes", description: "", reference: "", beneficiary: "", occurred_at: today() });
   const [form, setForm] = useState<any>(blank);
   const [busy, setBusy] = useState(false);
   async function save() {
     if (busy) return;
     if (!form.account_id) return void toast.error("Choisissez un compte.");
+    if (cats.length && !form.category_id) return void toast.error("Choisissez une catégorie.");
     const amount = Number(form.amount);
     if (!(amount > 0)) return void toast.error("Le montant doit être supérieur à 0.");
     if (form.occurred_at > today()) return void toast.error("La date ne peut pas être dans le futur.");
-    const payload: any = { account_id: form.account_id, type: form.type, amount, method: form.method, description: form.description.trim() || null, reference: form.reference.trim() || null, occurred_at: form.occurred_at };
+    // Le type historique est déduit automatiquement de la catégorie par la base ; « autres » n'est qu'une valeur de repli.
+    const payload: any = { account_id: form.account_id, type: "autres", amount, method: form.method, description: form.description.trim() || null, reference: form.reference.trim() || null, occurred_at: form.occurred_at };
+    if (form.category_id) payload.category_id = form.category_id;
     if (kind === "expense") payload.beneficiary = form.beneficiary.trim() || null;
     setBusy(true);
     const { error } = await db.from(kind === "revenue" ? "revenues" : "expenses").insert(payload);
@@ -455,28 +536,26 @@ function TxDialog({ kind, accounts, onSaved }: { kind: "revenue" | "expense"; ac
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button className="gap-2"><Plus className="size-4" />{kind === "revenue" ? "Nouvelle recette" : "Nouvelle dépense"}</Button></DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{kind === "revenue" ? "Nouvelle recette" : "Nouvelle dépense"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div><Label>Compte</Label>
             <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={accounts.length ? "Sélectionner" : "Créez d'abord un compte"} /></SelectTrigger>
               <SelectContent>{accounts.map((a: any) => <SelectItem key={a.account_id} value={a.account_id}>{a.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{types.map((t) => <SelectItem key={t} value={t}>{labels[t]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div><Label>Mode</Label>
-              <Select value={form.method} onValueChange={(v) => setForm({ ...form, method: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{METHODS.map((t) => <SelectItem key={t} value={t}>{METHOD_LABELS[t]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+          <div><Label>Catégorie</Label>
+            <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner la catégorie" /></SelectTrigger>
+              <SelectContent>{cats.map((c) => <SelectItem key={c.id} value={c.id}>{categoryLabel(c)}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div><Label>Mode de paiement</Label>
+            <Select value={form.method} onValueChange={(v) => setForm({ ...form, method: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{METHODS.map((t) => <SelectItem key={t} value={t}>{METHOD_LABELS[t]}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Montant (GNF)</Label><Input type="number" min={1} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
@@ -639,5 +718,155 @@ function AuditPanel() {
         </Table>
       </CardContent>
     </Card>
+  );
+}
+
+/** Budget prévisionnel par catégorie et par année scolaire, comparé au réalisé (écritures non annulées). */
+function BudgetPanel() {
+  const qc = useQueryClient();
+  const [year, setYear] = useState(getCurrentAcademicYear());
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const q = useQuery({ queryKey: ["acc", "budget", year], queryFn: async () => {
+    const { data, error } = await db.rpc("accounting_budget_status", { _year: year }); if (error) throw error;
+    return (data ?? []) as Array<{ category_id: string; kind: "recette" | "depense"; code: string; label: string; budget: number; actual: number }>;
+  } });
+  const rows = q.data ?? [];
+  const dirty = Object.keys(edits).filter((id) => Number(edits[id] || 0) !== Number(rows.find((r) => r.category_id === id)?.budget ?? 0));
+  async function save() {
+    for (const id of dirty) { const n = Number(edits[id] || 0); if (!(n >= 0) || !Number.isFinite(n)) return void toast.error("Montant de budget invalide."); }
+    setBusy(true);
+    const { data: me } = await db.rpc("current_school_id");
+    const payload = dirty.map((id) => ({ school_id: me, academic_year: year, category_id: id, amount: Number(edits[id] || 0) }));
+    const { error } = await db.from("accounting_budgets").upsert(payload, { onConflict: "school_id,academic_year,category_id" });
+    setBusy(false);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    toast.success("Budget enregistré"); setEdits({}); void qc.invalidateQueries({ queryKey: ["acc", "budget"] });
+  }
+  const section = (kind: "recette" | "depense", title: string) => {
+    const list = rows.filter((r) => r.kind === kind);
+    const tb = list.reduce((s, r) => s + Number(r.budget), 0), ta = list.reduce((s, r) => s + Number(r.actual), 0);
+    return (
+      <Card>
+        <CardHeader><CardTitle className="text-base">{title} <span className="ml-2 text-sm font-normal text-muted-foreground">Prévu {fmt(tb)} · Réalisé {fmt(ta)} GNF</span></CardTitle></CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow><TableHead>Catégorie</TableHead><TableHead className="w-44 text-right">Budget (GNF)</TableHead><TableHead className="text-right">Réalisé</TableHead><TableHead className="w-48">Avancement</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {list.map((r) => {
+                const budget = Number(edits[r.category_id] ?? r.budget);
+                const p = budgetProgress(budget, Number(r.actual), kind === "recette" ? "revenue" : "expense");
+                const color = p.state === "over" ? "bg-destructive" : p.state === "warn" ? "bg-amber-500" : "bg-primary";
+                return (
+                  <TableRow key={r.category_id}>
+                    <TableCell>{categoryLabel(r)}</TableCell>
+                    <TableCell className="text-right"><Input type="number" min={0} className="h-8 text-right" value={edits[r.category_id] ?? String(r.budget)} onChange={(e) => setEdits({ ...edits, [r.category_id]: e.target.value })} /></TableCell>
+                    <TableCell className="text-right">{fmt(Number(r.actual))}</TableCell>
+                    <TableCell>
+                      {p.percent === null ? <span className="text-xs text-muted-foreground">Pas de budget</span> : (
+                        <div><div className="h-2 w-full rounded bg-muted"><div className={"h-2 rounded " + color} style={{ width: Math.min(100, p.percent) + "%" }} /></div>
+                          <span className={"text-xs " + (p.state === "over" ? "text-destructive" : "text-muted-foreground")}>{p.percent} %{p.state === "over" ? " — dépassé" : p.state === "warn" ? " — bientôt atteint" : ""}</span></div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {!q.isLoading && list.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Aucune catégorie.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div><Label>Année scolaire</Label>
+          <Select value={year} onValueChange={(v) => { setYear(v); setEdits({}); }}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>{getAcademicYearOptions().map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <Button onClick={save} disabled={busy || dirty.length === 0}>Enregistrer le budget{dirty.length ? ` (${dirty.length})` : ""}</Button>
+        <p className="text-xs text-muted-foreground">Saisissez ce que vous prévoyez de recevoir ou de dépenser. Le « réalisé » se met à jour tout seul à chaque écriture.</p>
+      </div>
+      {section("recette", "Recettes prévues")}
+      {section("depense", "Dépenses prévues")}
+    </div>
+  );
+}
+
+/** Plan comptable : catégories de recettes et de dépenses proposées aux comptables. */
+function CategoriesPanel({ categories, onChanged }: { categories: AccountingCategory[]; onChanged: () => void }) {
+  const [form, setForm] = useState({ kind: "depense" as "recette" | "depense", code: "", label: "" });
+  const [busy, setBusy] = useState(false);
+  const codes = categories.filter((c) => c.kind === form.kind).map((c) => c.code);
+  async function add() {
+    const err = validateCategoryInput(form.code, form.label, codes);
+    if (err) return void toast.error(err);
+    setBusy(true);
+    const { error } = await db.from("accounting_categories").insert({ kind: form.kind, code: form.code.trim(), label: form.label.trim(), sort_order: 1000 });
+    setBusy(false);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    toast.success("Catégorie ajoutée"); setForm({ ...form, code: "", label: "" }); onChanged();
+  }
+  async function toggle(c: AccountingCategory) {
+    const { error } = await db.from("accounting_categories").update({ is_active: !c.is_active }).eq("id", c.id);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    onChanged();
+  }
+  async function rename(c: AccountingCategory) {
+    const label = window.prompt("Nouveau libellé", c.label)?.trim();
+    if (!label || label === c.label) return;
+    if (label.length < 2 || label.length > 120) return void toast.error("Le libellé doit faire entre 2 et 120 caractères.");
+    const { error } = await db.from("accounting_categories").update({ label }).eq("id", c.id);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    onChanged();
+  }
+  async function restore() {
+    const { error } = await db.rpc("restore_default_accounting_categories");
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    toast.success("Catégories par défaut restaurées"); onChanged();
+  }
+  const list = (kind: "recette" | "depense", title: string) => (
+    <Card>
+      <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
+      <CardContent className="p-0 overflow-x-auto">
+        <Table>
+          <TableHeader><TableRow><TableHead>Catégorie</TableHead><TableHead>Origine</TableHead><TableHead className="text-right" /></TableRow></TableHeader>
+          <TableBody>
+            {categories.filter((c) => c.kind === kind).sort((a, b) => a.sort_order - b.sort_order || a.code.localeCompare(b.code)).map((c) => (
+              <TableRow key={c.id} className={c.is_active ? "" : "opacity-50"}>
+                <TableCell>{categoryLabel(c)}</TableCell>
+                <TableCell><Badge variant="outline">{c.is_system ? "Standard" : "Personnalisée"}</Badge>{!c.is_active && <Badge variant="secondary" className="ml-1">Désactivée</Badge>}</TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  {!c.is_system && <Button size="sm" variant="ghost" onClick={() => rename(c)}>Renommer</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => toggle(c)}>{c.is_active ? "Désactiver" : "Réactiver"}</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+  return (
+    <div className="space-y-4">
+      <Card><CardContent className="flex flex-wrap items-end gap-3 p-4">
+        <div><Label>Type</Label>
+          <Select value={form.kind} onValueChange={(v) => setForm({ ...form, kind: v as "recette" | "depense" })}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="recette">Recette</SelectItem><SelectItem value="depense">Dépense</SelectItem></SelectContent>
+          </Select>
+        </div>
+        <div><Label>Code</Label><Input className="w-28" value={form.code} maxLength={12} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="ex. 7090" /></div>
+        <div className="min-w-56 flex-1"><Label>Libellé</Label><Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="ex. Location de salle" /></div>
+        <Button onClick={add} disabled={busy} className="gap-2"><Plus className="size-4" />Ajouter</Button>
+        <Button variant="outline" onClick={restore}>Restaurer les catégories par défaut</Button>
+      </CardContent></Card>
+      <p className="text-xs text-muted-foreground">Les catégories standard ne peuvent pas être supprimées : désactivez celles dont vous n'avez pas besoin, elles disparaîtront des listes de saisie sans toucher à l'historique.</p>
+      {list("recette", "Catégories de recettes")}
+      {list("depense", "Catégories de dépenses")}
+    </div>
   );
 }
