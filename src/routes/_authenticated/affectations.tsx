@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useSchool } from "@/hooks/useSchool";
+import { assignmentErrorMessage, classesForTeacherType, isTitularType } from "@/lib/teacher-types";
 import { getAcademicYearOptions, getCurrentAcademicYear } from "@/lib/academic-year";
 
 export const Route = createFileRoute("/_authenticated/affectations")({
@@ -49,7 +50,7 @@ function AssignmentsPage() {
 
   const { data: teachers = [] } = useQuery({
     queryKey: ["teachers"],
-    queryFn: async () => (await supabase.from("teachers").select("id, full_name, matricule").order("full_name")).data ?? [],
+    queryFn: async () => (await supabase.from("teachers").select("id, full_name, matricule, teacher_type").order("full_name")).data ?? [],
   });
   const { data: classes = [] } = useQuery({
     queryKey: ["classes"],
@@ -168,7 +169,7 @@ function AssignmentsPage() {
                   <TableCell><Badge variant="secondary">{r.academic_year}</Badge></TableCell>
                   <TableCell className="font-medium">{teacherMap[r.teacher_id]?.full_name ?? "—"}</TableCell>
                   <TableCell>{classMap[r.class_id]?.name ?? "—"}</TableCell>
-                  <TableCell>{r.subject_id ? subjectMap[r.subject_id]?.name ?? "—" : <span className="text-muted-foreground">Toutes</span>}</TableCell>
+                  <TableCell>{r.subject_id ? subjectMap[r.subject_id]?.name ?? "—" : <Badge variant="outline">Titulaire — toutes les matières</Badge>}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="size-4" /></Button>
@@ -213,6 +214,9 @@ function AssignmentDialog({
   const [year, setYear] = useState<string>(currentYear);
   const [saving, setSaving] = useState(false);
   const YEARS = getAcademicYearOptions(currentYear);
+  const teacher = teachers.find((t) => t.id === teacherId);
+  const titular = !!teacher && isTitularType(teacher.teacher_type);
+  const classOptions = teacher ? classesForTeacherType(teacher.teacher_type, classes) : classes;
 
   // Reset when opening
   useMemo(() => {
@@ -242,7 +246,7 @@ function AssignmentDialog({
       return;
     }
     setSaving(true);
-    const subjectList = subjectIds.length ? subjectIds : [null];
+    const subjectList = titular || !subjectIds.length ? [null] : subjectIds;
     const rows = classIds.flatMap((class_id) =>
       subjectList.map((subject_id) => ({
         teacher_id: teacherId,
@@ -274,10 +278,10 @@ function AssignmentDialog({
         .from("teacher_class_assignments")
         .update(r)
         .eq("id", editing.id);
-      if (error) { setSaving(false); return toast.error(error.message); }
+      if (error) { setSaving(false); return toast.error(assignmentErrorMessage(error.message, (error as any).code)); }
     } else {
       const { error } = await supabase.from("teacher_class_assignments").insert(rows);
-      if (error) { setSaving(false); return toast.error(error.message); }
+      if (error) { setSaving(false); return toast.error(assignmentErrorMessage(error.message, (error as any).code)); }
     }
     setSaving(false);
     toast.success(editing ? "Affectation modifiée" : `${rows.length} affectation(s) créée(s)`);
@@ -322,7 +326,7 @@ function AssignmentDialog({
           <div>
             <Label>Classes {editing && <span className="text-xs text-muted-foreground">(1 seule en édition)</span>}</Label>
             <div className="grid grid-cols-3 gap-2 mt-2 max-h-48 overflow-y-auto p-2 border rounded">
-              {classes.map((c) => {
+              {classOptions.map((c) => {
                 const already = assignedClassIds.has(c.id);
                 const checked = classIds.includes(c.id);
                 return (
@@ -342,6 +346,11 @@ function AssignmentDialog({
             </div>
           </div>
 
+          {titular ? (
+            <p className="rounded-lg bg-muted p-3 text-sm">
+              {teacher?.teacher_type === "educatrice" ? "Éducatrice" : "Instituteur"} : l'affectation couvre <b>toutes les matières</b> de la classe, en une seule fois. Une seule personne peut être titulaire d'une classe pour une année.
+            </p>
+          ) : (
           <div>
             <Label>Matières <span className="text-xs text-muted-foreground">(vide = toutes)</span></Label>
             <div className="grid grid-cols-3 gap-2 mt-2 max-h-48 overflow-y-auto p-2 border rounded">
@@ -359,6 +368,7 @@ function AssignmentDialog({
               ))}
             </div>
           </div>
+          )}
 
           <DialogFooter>
             <Button type="submit" disabled={saving}>{editing ? "Enregistrer" : "Créer"}</Button>
