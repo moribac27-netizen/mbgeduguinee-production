@@ -18,6 +18,7 @@ import { loadUserContext, resolveUserHome } from "@/lib/auth-redirect";
 import { usePublicOffers } from "@/hooks/usePublicOffers";
 import { useSignupOffersState } from "@/hooks/useSignupOffers";
 import { familyFeeText } from "@/lib/public-offers";
+import { InstallGate } from "@/components/InstallGate";
 import { SignupOfferGate } from "@/components/SignupOfferGate";
 import { clearSignupOfferCode, readSignupOfferCode, readSignupOfferSnapshot, resolveSignupOffer } from "@/lib/signup-offer";
 
@@ -55,8 +56,12 @@ export const Route = createFileRoute("/auth")({
     if (data.user) throw redirect({ to: await resolveUserHome() });
   },
   head: () => ({ meta: [{ title: "Connexion — MBGEduGuinée" }] }),
-  component: AuthPage,
+  component: AuthPageWithInstallGate,
 });
+
+function AuthPageWithInstallGate() {
+  return <InstallGate><AuthPage /></InstallGate>;
+}
 
 function AuthPage() {
   // Montant réel des offres (modifiable par le Super Admin) : jamais écrit en dur.
