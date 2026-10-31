@@ -23,7 +23,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Users2, Copy } from "lucide-react";
+import { Plus, Users2, Copy, ChevronsUpDown, UserCheck } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { supabase } from "@/integrations/supabase/client";
+import { buildStaffOptions, type StaffOption } from "@/lib/staff-picker";
 import { toast } from "sonner";
 import { fmtDateTime } from "@/lib/reports";
 
@@ -101,9 +105,12 @@ function Collaborateurs() {
           </DialogTrigger>
           <AddCollaboratorDialog
             addFn={addFn}
+            existingNames={collaborators.map((c) => c.fullName)}
             onDone={(result) => {
               setOpen(false);
               qc.invalidateQueries({ queryKey: ["collaborators"] });
+              qc.invalidateQueries({ queryKey: ["collab-staff-options"] });
+              qc.invalidateQueries({ queryKey: ["teachers"] });
               if (result.mode === "direct" && result.tempPassword) {
                 setTempPasswordFor({ email: result.email, password: result.tempPassword });
               }
@@ -208,9 +215,10 @@ function Collaborateurs() {
 }
 
 function AddCollaboratorDialog({
-  addFn, onDone,
+  addFn, onDone, existingNames,
 }: {
   addFn: ReturnType<typeof useServerFn<typeof addCollaborator>>;
+  existingNames: string[];
   onDone: (result: { mode: "invite" | "direct"; email: string; tempPassword?: string }) => void;
 }) {
   const [fullName, setFullName] = useState("");
@@ -219,13 +227,41 @@ function AddCollaboratorDialog({
   const [role, setRole] = useState<string>(ASSIGNABLE_STAFF_ROLES[0].value);
   const [mode, setMode] = useState<"invite" | "direct">("invite");
   const [loading, setLoading] = useState(false);
+  const [teacherId, setTeacherId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<StaffOption | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Personnel déjà enregistré (enseignants et RH) qui n'a pas encore de compte
+  const staff = useQuery({
+    queryKey: ["collab-staff-options"],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const [t, c] = await Promise.all([
+        (supabase as any).from("teachers").select("id, full_name, email, phone, user_id, teacher_type, matricule").order("full_name"),
+        (supabase as any).from("employee_contracts").select("id, teacher_id, full_name, position").order("full_name"),
+      ]);
+      return { teachers: (t.data ?? []) as any[], contracts: (c.data ?? []) as any[] };
+    },
+  });
+  const options = buildStaffOptions(staff.data?.teachers ?? [], staff.data?.contracts ?? [], existingNames);
+
+  function pick(o: StaffOption | null) {
+    setPicked(o);
+    setPickerOpen(false);
+    if (!o) { setTeacherId(null); return; }
+    setTeacherId(o.teacherId);
+    setFullName(o.fullName);
+    setEmail(o.email);
+    setPhone(o.phone);
+    setRole(o.role);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await addFn({
-        data: { fullName: fullName.trim(), email: email.trim(), phone: phone.trim() || null, role: role as any, mode },
+        data: { fullName: fullName.trim(), email: email.trim(), phone: phone.trim() || null, role: role as any, mode, teacherId },
       });
       if (!res.ok) {
         toast.error(res.error);
@@ -252,6 +288,34 @@ function AddCollaboratorDialog({
     <DialogContent className="max-w-lg">
       <DialogHeader><DialogTitle>Ajouter un collaborateur</DialogTitle></DialogHeader>
       <form onSubmit={submit} className="space-y-3">
+        <div>
+          <Label>Choisir dans le personnel déjà enregistré</Label>
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
+                <span className="flex items-center gap-2 truncate">{picked ? <><UserCheck className="size-4 text-primary" />{picked.fullName}</> : <span className="text-muted-foreground">{staff.isLoading ? "Chargement…" : options.length ? `Rechercher parmi ${options.length} personne(s)` : "Aucun personnel sans compte"}</span>}</span>
+                <ChevronsUpDown className="size-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Nom du personnel…" />
+                <CommandList>
+                  <CommandEmpty>Personne trouvée : saisissez les informations ci-dessous.</CommandEmpty>
+                  <CommandGroup>
+                    {options.map((o) => (
+                      <CommandItem key={o.key} value={`${o.fullName} ${o.detail}`} onSelect={() => pick(o)}>
+                        <div><div className="font-medium">{o.fullName}</div><div className="text-xs text-muted-foreground">{o.detail}</div></div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          {picked && <button type="button" className="mt-1 text-xs text-muted-foreground underline" onClick={() => { pick(null); setFullName(""); setEmail(""); setPhone(""); }}>Saisir quelqu'un d'autre manuellement</button>}
+          {!picked && <p className="mt-1 text-xs text-muted-foreground">Enseignants et personnel déjà enregistrés (Enseignants, RH) : nom, téléphone, e-mail et rôle se remplissent tout seuls. Sinon, saisissez ci-dessous.</p>}
+        </div>
         <div><Label>Nom complet</Label><Input required value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
         <div>
           <Label>E-mail</Label>

@@ -109,11 +109,17 @@ export const addCollaborator = createServerFn({ method: "POST" })
       phone: z.string().optional().nullable(),
       role: roleSchema,
       mode: z.enum(["invite", "direct"]),
+      teacherId: z.string().uuid().optional().nullable(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const schoolId = await assertDirectionAndSchool(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Lie le compte à la fiche enseignant choisie (même école, pas encore reliée) pour que ses affectations lui donnent accès à ses classes.
+    const linkTeacher = async (userId: string) => {
+      if (!data.teacherId) return;
+      await supabaseAdmin.from("teachers").update({ user_id: userId }).eq("id", data.teacherId).eq("school_id", schoolId).is("user_id", null);
+    };
 
     if (data.mode === "invite") {
       // inviteUserByEmail() ne permet pas de définir app_metadata directement (seulement
@@ -150,6 +156,7 @@ export const addCollaborator = createServerFn({ method: "POST" })
         .upsert({ user_id: res.user.id, role: data.role }, { onConflict: "user_id,role" });
       if (roleErr) throw new Error(`Impossible d'attribuer le rôle : ${roleErr.message}`);
 
+      await linkTeacher(res.user.id);
       return { ok: true as const, userId: res.user.id, mode: "invite" as const };
     }
 
@@ -185,6 +192,7 @@ export const addCollaborator = createServerFn({ method: "POST" })
       .upsert({ user_id: res.user.id, role: data.role }, { onConflict: "user_id,role" });
     if (roleErr) throw new Error(`Compte créé mais rôle non rattaché : ${roleErr.message}`);
 
+    await linkTeacher(res.user.id);
     return { ok: true as const, userId: res.user.id, mode: "direct" as const, tempPassword };
   });
 
