@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { trialIdentities } from "@/lib/trial-identity";
 
 const schema = z.object({
   email: z.string().email(),
@@ -47,6 +48,28 @@ export const registerSchool = createServerFn({ method: "POST" })
       }
     }
 
+    // 0b. Un seul essai gratuit par e-mail et par numéro de téléphone (réservation atomique : index unique).
+    const identities = trialIdentities({ email: data.email, phone: data.phone, schoolPhone: data.schoolPhone });
+    const claimedIds: string[] = [];
+    const releaseClaims = async () => {
+      if (claimedIds.length) await (supabaseAdmin as any).from("trial_identities").delete().in("id", claimedIds);
+    };
+    for (const idn of identities) {
+      const { data: row, error: claimErr } = await (supabaseAdmin as any)
+        .from("trial_identities")
+        .insert({ kind: idn.kind, value: idn.value, school_name: data.schoolName })
+        .select("id")
+        .single();
+      if (claimErr || !row) {
+        await releaseClaims();
+        if (claimErr?.code === "23505") {
+          return { ok: false, error: "L'essai gratuit a déjà été utilisé avec cet e-mail ou ce numéro de téléphone. Connectez-vous à votre établissement existant ou contactez le support." };
+        }
+        return { ok: false, error: `Impossible de vérifier l'essai gratuit: ${claimErr?.message ?? "erreur inconnue"}` };
+      }
+      claimedIds.push(row.id);
+    }
+
     // 1. Create school first
     const { data: school, error: schoolErr } = await supabaseAdmin
       .from("schools")
@@ -59,6 +82,7 @@ export const registerSchool = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (schoolErr || !school) {
+      await releaseClaims();
       return { ok: false, error: `Impossible de créer l'établissement: ${schoolErr?.message ?? "erreur inconnue"}` };
     }
 
@@ -78,6 +102,7 @@ export const registerSchool = createServerFn({ method: "POST" })
     });
     if (userErr || !userRes.user) {
       await supabaseAdmin.from("schools").delete().eq("id", school.id);
+      await releaseClaims();
       const msg = userErr?.message ?? "";
       if (/already registered|already been registered|exists/i.test(msg)) {
         return { ok: false, error: "Cette adresse e-mail est déjà utilisée. Connectez-vous ou utilisez une autre adresse." };
@@ -101,6 +126,7 @@ export const registerSchool = createServerFn({ method: "POST" })
     if (profileErr) {
       await supabaseAdmin.auth.admin.deleteUser(userRes.user.id);
       await supabaseAdmin.from("schools").delete().eq("id", school.id);
+      await releaseClaims();
       return { ok: false, error: `Impossible de finaliser le profil: ${profileErr.message}` };
     }
 
@@ -110,6 +136,7 @@ export const registerSchool = createServerFn({ method: "POST" })
     if (roleErr) {
       await supabaseAdmin.auth.admin.deleteUser(userRes.user.id);
       await supabaseAdmin.from("schools").delete().eq("id", school.id);
+      await releaseClaims();
       return { ok: false, error: `Impossible d'attribuer le rôle: ${roleErr.message}` };
     }
 
@@ -123,8 +150,11 @@ export const registerSchool = createServerFn({ method: "POST" })
       await supabaseAdmin.from("user_roles").delete().eq("user_id", userRes.user.id);
       await supabaseAdmin.auth.admin.deleteUser(userRes.user.id);
       await supabaseAdmin.from("schools").delete().eq("id", school.id);
+      await releaseClaims();
       return { ok: false, error: `Impossible d'enregistrer l'offre choisie: ${subErr.message}` };
     }
+
+    if (claimedIds.length) await (supabaseAdmin as any).from("trial_identities").update({ school_id: school.id }).in("id", claimedIds);
 
     return { ok: true, schoolId: school.id, userId: userRes.user.id, emailConfirmed: true };
   });
