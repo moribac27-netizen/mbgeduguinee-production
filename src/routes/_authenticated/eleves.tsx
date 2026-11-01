@@ -17,6 +17,7 @@ import { StudentPhotoUpload } from "@/components/StudentPhotoUpload";
 import { EnrollmentWizard } from "@/components/students/EnrollmentWizard";
 import { ChangeClassDialog, ReenrollDialog } from "@/components/students/ClassMoveDialogs";
 import { BulletinPreviewDialog } from "@/components/BulletinPreviewDialog";
+import { useIsClassScoped, useScopedClassOptions } from "@/hooks/useOptions";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 import { fmtDate, fmtDateTime } from "@/lib/reports";
 import { Link } from "@tanstack/react-router";
@@ -56,10 +57,10 @@ function ElevesPage() {
   const { info: planInfo } = usePerStudentPlan();
   const { paidIds, isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
-  const { data: classes = [] } = useQuery({
-    queryKey: ["classes"],
-    queryFn: async () => (await supabase.from("classes").select("id, name, level").order("name")).data ?? [],
-  });
+  // Un enseignant ne voit et n'ajoute des élèves que dans les classes qui lui sont affectées.
+  const classScoped = useIsClassScoped();
+  const { classes } = useScopedClassOptions();
+  const canEnrol = !classScoped || classes.length > 0;
 
   const filtered = students.filter((s: any) =>
     [s.full_name, s.matricule, s.parent_name].some((v) => v?.toLowerCase().includes(search.toLowerCase())),
@@ -78,11 +79,12 @@ function ElevesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Élèves</h1>
-          <p className="text-muted-foreground mt-1">{students.length} élève(s) inscrits</p>
+          <p className="text-muted-foreground mt-1">{students.length} élève(s) {classScoped ? "dans vos classes" : "inscrits"}</p>
+          {classScoped && classes.length === 0 && <p className="mt-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">Aucune classe ne vous est encore affectée. Demandez à la direction de vous affecter à votre classe : vous pourrez alors voir et inscrire vos élèves.</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-        <Button variant="outline" className="gap-2" onClick={() => setReenrollOpen(true)}><RefreshCw className="size-4" /> Réinscriptions</Button>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
+        {!classScoped && <Button variant="outline" className="gap-2" onClick={() => setReenrollOpen(true)}><RefreshCw className="size-4" /> Réinscriptions</Button>}
+        {canEnrol && <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
           <DialogTrigger asChild>
             <Button className="gap-2"><Plus className="size-4" /> Nouvel élève</Button>
           </DialogTrigger>
@@ -96,7 +98,7 @@ function ElevesPage() {
               onView={(matricule) => { setSearch(matricule); setOpen(false); }}
             />
           )}
-        </Dialog>
+        </Dialog>}
         </div>
       </div>
 
