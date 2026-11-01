@@ -50,6 +50,7 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/evenements", roles: "*" },
   { prefix: "/calendrier", roles: "*" },
   { prefix: "/messagerie", roles: "*" },
+  { prefix: "/mon-compte", roles: "*" }, // changer son mot de passe
 ];
 
 // Garde-fou : un préfixe dupliqué fait taire silencieusement la seconde règle
