@@ -218,6 +218,7 @@ function DirecteurPage() {
           </CardContent>
         </Card>
 
+        {contribution.isPerStudent && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Cotisation annuelle de l'école</CardTitle>
@@ -231,6 +232,7 @@ function DirecteurPage() {
             <Row label="Montant / élève" value={fmtMoney(contribution.unitPrice)} />
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   );
