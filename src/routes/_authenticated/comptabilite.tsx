@@ -636,6 +636,7 @@ function PostingPanel({ accounts, onDone }: { accounts: any[]; onDone: () => voi
   const totalSlips = (slips.data ?? []).reduce((s, p) => s + Number(p.net_pay), 0);
   return (
     <div className="space-y-4">
+      <AutoPostCard accounts={accounts} onDone={refresh} />
       <Card><CardContent className="grid gap-3 p-4 sm:grid-cols-[1fr_2fr] sm:items-end">
         <div className="space-y-1.5"><Label>Compte à utiliser</Label>
           <Select value={accountId} onValueChange={setAccountId}>
@@ -924,6 +925,46 @@ function ClosureCard({ onDone }: { onDone: () => void }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </CardContent></Card>
+  );
+}
+
+
+/** Comptabilisation automatique : chaque paiement élève validé / salaire payé est enregistré seul sur le compte choisi. */
+function AutoPostCard({ accounts, onDone }: { accounts: any[]; onDone: () => void }) {
+  const qc = useQueryClient();
+  const { data: current } = useQuery({
+    queryKey: ["acc", "auto-post"],
+    queryFn: async () => {
+      const { data, error } = await db.from("accounting_settings").select("auto_post_account_id").maybeSingle();
+      if (error) throw error;
+      return (data?.auto_post_account_id ?? null) as string | null;
+    },
+  });
+  const [busy, setBusy] = useState(false);
+  async function save(id: string | null) {
+    if (busy) return;
+    setBusy(true);
+    const { error } = await db.rpc("set_accounting_auto_post", { _account_id: id });
+    setBusy(false);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    toast.success(id ? "Comptabilisation automatique activée." : "Comptabilisation automatique désactivée.");
+    void qc.invalidateQueries({ queryKey: ["acc"] });
+    onDone();
+  }
+  return (
+    <Card><CardContent className="grid gap-3 p-4 sm:grid-cols-[2fr_1fr] sm:items-end">
+      <div className="space-y-1.5">
+        <Label>Comptabilisation automatique</Label>
+        <Select value={current ?? "none"} onValueChange={(v) => void save(v === "none" ? null : v)} disabled={busy}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Désactivée (comptabiliser à la main)</SelectItem>
+            {accounts.map((a: any) => <SelectItem key={a.account_id} value={a.account_id}>{a.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-xs text-muted-foreground">Les paiements validés et salaires payés à partir de maintenant sont enregistrés seuls sur ce compte. Les anciens restent à comptabiliser ci-dessous. Si l'écriture est impossible (période clôturée, compte archivé), ils restent ici.</p>
     </CardContent></Card>
   );
 }
