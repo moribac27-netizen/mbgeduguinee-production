@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   CreditCard, Megaphone, LogOut, Menu, X, School, FileText, CalendarDays, UserCheck,
   Calculator, Wallet, ScrollText, Library, Link2, Settings, MessageSquare, BarChart3, History, DatabaseBackup, ShieldCheck,
-  Coins, Tags, Home, IdCard, BookMarked, HeartPulse, Bus, UtensilsCrossed, Baby, Briefcase, ShieldAlert, Users2, Trophy, FileSpreadsheet,
+  Coins, Tags, Home, KeyRound, IdCard, BookMarked, HeartPulse, Bus, UtensilsCrossed, Baby, Briefcase, ShieldAlert, Users2, Trophy, FileSpreadsheet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -158,6 +158,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="border-t border-sidebar-border p-4">
           <InstallPWA className="mb-2" />
           <div className="text-xs text-sidebar-foreground/60 mb-2 truncate">{user?.email}</div>
+          <Link to="/mon-compte" onClick={() => setOpen(false)} className="mb-2 flex items-center gap-2 text-xs text-sidebar-foreground/80 underline-offset-2 hover:underline"><KeyRound className="size-3.5" />Changer mon mot de passe</Link>
           <Button variant="outline" size="sm" className="w-full justify-start gap-2 bg-transparent text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={handleSignOut}>
             <LogOut className="size-4" /> Se déconnecter
           </Button>
@@ -177,6 +178,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NotificationsBell />
         </header>
         <main key={pathname} className="flex-1 p-4 lg:p-8 max-w-[1400px] w-full mx-auto page-fade-in">
+          {(user as any)?.app_metadata?.must_change_password === true && pathname !== "/mon-compte" && (
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Vous utilisez un mot de passe temporaire. Pour la sécurité de votre compte, <Link to="/mon-compte" className="font-semibold underline">choisissez votre propre mot de passe</Link>.
+            </div>
+          )}
           <SchoolIdentityHeader />
           <FlatOfferBanner />
           {children}

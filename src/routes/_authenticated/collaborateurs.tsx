@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  listCollaborators, addCollaborator, updateCollaboratorRole, setCollaboratorActive,
+  listCollaborators, addCollaborator, updateCollaboratorRole, setCollaboratorActive, resetCollaboratorPassword,
 } from "@/lib/collaborators.functions";
 import { ASSIGNABLE_STAFF_ROLES } from "@/lib/staff-roles";
 import { ROLE_LABELS, type AppRole } from "@/hooks/useAuth";
@@ -23,7 +23,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Users2, Copy, ChevronsUpDown, UserCheck } from "lucide-react";
+import { Plus, Users2, Copy, KeyRound, ChevronsUpDown, UserCheck } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +54,7 @@ function Collaborateurs() {
   const addFn = useServerFn(addCollaborator);
   const updateRoleFn = useServerFn(updateCollaboratorRole);
   const setActiveFn = useServerFn(setCollaboratorActive);
+  const resetPwdFn = useServerFn(resetCollaboratorPassword);
 
   const { data: collaborators = [], isLoading } = useQuery({
     queryKey: ["collaborators"],
@@ -71,6 +72,17 @@ function Collaborateurs() {
       qc.invalidateQueries({ queryKey: ["collaborators"] });
     } catch (e: any) {
       toast.error(e?.message ?? "Erreur lors de la mise à jour du rôle");
+    }
+  }
+
+  async function handleResetPassword(c: Collaborator) {
+    if (!window.confirm(`Générer un nouveau mot de passe temporaire pour ${c.fullName} ? L'ancien mot de passe ne fonctionnera plus.`)) return;
+    try {
+      const res = await resetPwdFn({ data: { userId: c.id } });
+      setTempPasswordFor({ email: c.email ?? c.fullName, password: res.tempPassword });
+      logActivity({ action: "update", entity_type: "collaborator", entity_id: c.id, entity_label: c.fullName, metadata: { password_reset: true } });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erreur lors de la réinitialisation");
     }
   }
 
@@ -171,6 +183,11 @@ function Collaborateurs() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
+                        {!isCoreDirection && (
+                          <Button variant="ghost" size="sm" className="mr-1 gap-1" onClick={() => handleResetPassword(c)}>
+                            <KeyRound className="size-3.5" />Nouveau mot de passe
+                          </Button>
+                        )}
                         {!isCoreDirection && (
                           <Button
                             variant="outline" size="sm"

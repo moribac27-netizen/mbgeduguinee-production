@@ -167,7 +167,7 @@ export const addCollaborator = createServerFn({ method: "POST" })
       password: tempPassword,
       email_confirm: true,
       user_metadata: { full_name: data.fullName, phone: data.phone ?? null },
-      app_metadata: { school_id: schoolId, role: data.role },
+      app_metadata: { school_id: schoolId, role: data.role, must_change_password: true },
     });
     if (error || !res.user) {
       const msg = error?.message ?? "erreur inconnue";
@@ -235,4 +235,21 @@ export const setCollaboratorActive = createServerFn({ method: "POST" })
     } as any);
 
     return { ok: true };
+  });
+
+// --- Nouveau mot de passe temporaire pour un collaborateur (perte, adresse e-mail fictive…) ---
+export const resetCollaboratorPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ userId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const schoolId = await assertDirectionAndSchool(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await assertTargetIsManageableStaff(supabaseAdmin, data.userId, schoolId);
+    const tempPassword = genTempPassword();
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: tempPassword,
+      app_metadata: { must_change_password: true },
+    } as any);
+    if (error) throw new Error(`Impossible de réinitialiser le mot de passe : ${error.message}`);
+    return { ok: true as const, tempPassword };
   });
