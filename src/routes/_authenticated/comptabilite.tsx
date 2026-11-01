@@ -160,6 +160,7 @@ function AccountingPage() {
           <TabsTrigger value="expenses">Dépenses</TabsTrigger>
           <TabsTrigger value="transfers">Virements</TabsTrigger>
           <TabsTrigger value="post">À comptabiliser</TabsTrigger>
+          <TabsTrigger value="reconcile">Rapprochement</TabsTrigger>
           <TabsTrigger value="budget">Budget</TabsTrigger>
           <TabsTrigger value="plan">Plan comptable</TabsTrigger>
           <TabsTrigger value="journal">Journal</TabsTrigger>
@@ -245,6 +246,10 @@ function AccountingPage() {
               </TableBody>
             </Table>
           </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="reconcile" className="space-y-4">
+          <ReconciliationPanel accounts={activeAccounts} onDone={refreshAll} />
         </TabsContent>
 
         <TabsContent value="post" className="space-y-4">
@@ -966,5 +971,122 @@ function AutoPostCard({ accounts, onDone }: { accounts: any[]; onDone: () => voi
       </div>
       <p className="text-xs text-muted-foreground">Les paiements validés et salaires payés à partir de maintenant sont enregistrés seuls sur ce compte. Les anciens restent à comptabiliser ci-dessous. Si l'écriture est impossible (période clôturée, compte archivé), ils restent ici.</p>
     </CardContent></Card>
+  );
+}
+
+
+/** Rapprochement : on pointe les écritures qui figurent sur le relevé du compte, puis on compare au solde du relevé. */
+function ReconciliationPanel({ accounts, onDone }: { accounts: any[]; onDone: () => void }) {
+  const qc = useQueryClient();
+  const [accountId, setAccountId] = useState("");
+  const [statementDate, setStatementDate] = useState(today());
+  const [statementBalance, setStatementBalance] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [onlyUnpointed, setOnlyUnpointed] = useState(true);
+
+  const status = useQuery({
+    queryKey: ["acc", "recon-status", accountId],
+    enabled: !!accountId,
+    queryFn: async () => { const { data, error } = await db.rpc("reconciliation_status", { _account_id: accountId }); if (error) throw error; return data as { pointed_balance: number; book_balance: number; unpointed_count: number }; },
+  });
+  const entries = useQuery({
+    queryKey: ["acc", "recon-entries", accountId],
+    enabled: !!accountId,
+    queryFn: async () => {
+      const [rev, exp, tr] = await Promise.all([
+        db.from("revenues").select("id, occurred_at, amount, description, reference, reconciled_at").eq("account_id", accountId).is("voided_at", null).order("occurred_at", { ascending: false }).limit(ROW_LIMIT),
+        db.from("expenses").select("id, occurred_at, amount, description, reference, reconciled_at").eq("account_id", accountId).is("voided_at", null).order("occurred_at", { ascending: false }).limit(ROW_LIMIT),
+        db.from("account_transfers").select("id, occurred_at, amount, note, reference, reconciled_at, from_account_id, to_account_id").or(`from_account_id.eq.${accountId},to_account_id.eq.${accountId}`).is("voided_at", null).order("occurred_at", { ascending: false }).limit(ROW_LIMIT),
+      ]);
+      for (const r of [rev, exp, tr]) if (r.error) throw r.error;
+      const rows = [
+        ...(rev.data ?? []).map((r: any) => ({ kind: "revenue", id: r.id, date: r.occurred_at, label: "Recette" + (r.description ? " — " + r.description : ""), ref: r.reference, signed: Number(r.amount), pointed: !!r.reconciled_at })),
+        ...(exp.data ?? []).map((r: any) => ({ kind: "expense", id: r.id, date: r.occurred_at, label: "Dépense" + (r.description ? " — " + r.description : ""), ref: r.reference, signed: -Number(r.amount), pointed: !!r.reconciled_at })),
+        ...(tr.data ?? []).map((r: any) => ({ kind: "transfer", id: r.id, date: r.occurred_at, label: (r.to_account_id === accountId ? "Virement reçu" : "Virement émis") + (r.note ? " — " + r.note : ""), ref: r.reference, signed: r.to_account_id === accountId ? Number(r.amount) : -Number(r.amount), pointed: !!r.reconciled_at })),
+      ];
+      return rows.sort((a, b) => (a.date === b.date ? 0 : a.date > b.date ? -1 : 1));
+    },
+  });
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ["acc"] }); onDone(); };
+  async function point(rows: any[], value: boolean) {
+    if (busy || !rows.length) return;
+    setBusy(true);
+    let error: any = null;
+    for (const kind of ["revenue", "expense", "transfer"]) {
+      const ids = rows.filter((r) => r.kind === kind).map((r) => r.id);
+      if (!ids.length) continue;
+      const res = await db.rpc("set_reconciled", { _kind: kind, _ids: ids, _value: value });
+      if (res.error) { error = res.error; break; }
+    }
+    setBusy(false);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    refresh();
+  }
+  async function save() {
+    const bal = Number(statementBalance);
+    if (!accountId || statementBalance.trim() === "" || !Number.isFinite(bal)) return void toast.error("Saisissez le solde du relevé.");
+    setBusy(true);
+    const { error } = await db.rpc("save_reconciliation", { _account_id: accountId, _statement_date: statementDate, _statement_balance: bal, _note: note.trim() || null });
+    setBusy(false);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    toast.success("Rapprochement enregistré.");
+    setNote("");
+    refresh();
+  }
+  const rows = (entries.data ?? []).filter((r) => !onlyUnpointed || !r.pointed);
+  const bal = statementBalance.trim() === "" ? null : Number(statementBalance);
+  const diff = status.data && bal !== null && Number.isFinite(bal) ? bal - Number(status.data.pointed_balance) : null;
+  return (
+    <div className="space-y-4">
+      <Card><CardContent className="grid gap-3 p-4 sm:grid-cols-4 sm:items-end">
+        <div className="space-y-1.5"><Label>Compte</Label>
+          <Select value={accountId} onValueChange={setAccountId}>
+            <SelectTrigger><SelectValue placeholder="Choisir un compte" /></SelectTrigger>
+            <SelectContent>{accounts.map((a: any) => <SelectItem key={a.account_id} value={a.account_id}>{a.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5"><Label>Date du relevé</Label><Input type="date" max={today()} value={statementDate} onChange={(e) => setStatementDate(e.target.value)} /></div>
+        <div className="space-y-1.5"><Label>Solde du relevé (GNF)</Label><Input type="number" value={statementBalance} onChange={(e) => setStatementBalance(e.target.value)} /></div>
+        <div className="space-y-1.5"><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Facultatif" /></div>
+      </CardContent></Card>
+
+      {accountId && status.data && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Solde dans les livres" value={fmt(Number(status.data.book_balance)) + " GNF"} icon={Wallet} color="text-primary bg-primary/10" />
+          <StatCard label="Solde pointé" value={fmt(Number(status.data.pointed_balance)) + " GNF"} icon={Scale} color="text-success bg-success/10" />
+          <StatCard label="Écritures non pointées" value={String(status.data.unpointed_count)} icon={AlertTriangle} color="text-amber-700 bg-amber-100" />
+          <StatCard label="Écart avec le relevé" value={diff === null ? "—" : fmt(diff) + " GNF"} icon={ArrowLeftRight} color={diff === 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10"} />
+        </div>
+      )}
+
+      {accountId && (
+        <Card><CardContent className="p-0">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3">
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyUnpointed} onChange={(e) => setOnlyUnpointed(e.target.checked)} /> Seulement les écritures non pointées</label>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={busy || !rows.some((r) => !r.pointed)} onClick={() => void point(rows.filter((r) => !r.pointed), true)}>Tout pointer</Button>
+              <Button size="sm" disabled={busy || bal === null} onClick={() => void save()}>Enregistrer le rapprochement</Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead className="w-12">Pointé</TableHead><TableHead>Date</TableHead><TableHead>Libellé</TableHead><TableHead>Référence</TableHead><TableHead className="text-right">Montant</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.kind + r.id}>
+                    <TableCell><input type="checkbox" disabled={busy} checked={r.pointed} onChange={(e) => void point([r], e.target.checked)} /></TableCell>
+                    <TableCell>{dateFr(r.date)}</TableCell><TableCell>{r.label}</TableCell><TableCell>{r.ref ?? ""}</TableCell>
+                    <TableCell className={"text-right " + (r.signed < 0 ? "text-destructive" : "text-success")}>{fmt(r.signed)}</TableCell>
+                  </TableRow>
+                ))}
+                {rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">{entries.isLoading ? "Chargement…" : onlyUnpointed ? "Toutes les écritures sont pointées." : "Aucune écriture."}</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent></Card>
+      )}
+      <p className="text-xs text-muted-foreground">Cochez les écritures présentes sur votre relevé. L'écart doit être nul : sinon une écriture manque, est en trop ou a un montant différent. Pointer ne modifie jamais une écriture.</p>
+    </div>
   );
 }
