@@ -6,6 +6,12 @@ export interface Option { value: string; label: string }
 
 const STAFF_SEES_ALL_CLASSES: string[] = ["admin", "directeur", "directeur_etudes", "proviseur", "surveillant", "secretariat"];
 
+/** Vrai pour un compte limité à ses propres classes (enseignant « pur »). */
+export function useIsClassScoped(): boolean {
+  const { roles, loading } = useRoles();
+  return !loading && roles.length > 0 && roles.every((r) => !STAFF_SEES_ALL_CLASSES.includes(r));
+}
+
 export function useStudentOptions() {
   const { data } = useQuery({
     queryKey: ["opt-students"],
