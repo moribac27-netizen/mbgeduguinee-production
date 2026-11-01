@@ -151,6 +151,8 @@ function AccountingPage() {
         <StatCard label="Solde consolidé actuel" value={fmt(consolidated) + " GNF"} icon={Wallet} color="text-primary bg-primary/10" />
       </div>
 
+      <ClosureCard onDone={refreshAll} />
+
       <Tabs defaultValue="accounts">
         <TabsList className="flex-wrap h-auto print:hidden">
           <TabsTrigger value="accounts">Comptes</TabsTrigger>
@@ -868,5 +870,60 @@ function CategoriesPanel({ categories, onChanged }: { categories: AccountingCate
       {list("recette", "Catégories de recettes")}
       {list("depense", "Catégories de dépenses")}
     </div>
+  );
+}
+
+
+/** Clôture de période : plus aucune écriture (création, modification, annulation) jusqu'à la date clôturée. */
+function ClosureCard({ onDone }: { onDone: () => void }) {
+  const qc = useQueryClient();
+  const { data: closedUntil } = useQuery({
+    queryKey: ["acc", "closure"],
+    queryFn: async () => {
+      const { data, error } = await db.from("accounting_settings").select("closed_until").maybeSingle();
+      if (error) throw error;
+      return (data?.closed_until ?? null) as string | null;
+    },
+  });
+  const [open, setOpen] = useState(false);
+  const [until, setUntil] = useState(today());
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function save(value: string | null) {
+    if (busy) return;
+    setBusy(true);
+    const { error } = await db.rpc("set_accounting_closure", { _until: value, _note: note.trim() || null });
+    setBusy(false);
+    if (error) return void toast.error(accountingErrorMessage(error.message));
+    toast.success(value ? `Période clôturée jusqu'au ${dateFr(value)}.` : "Clôture levée.");
+    setOpen(false); setNote("");
+    void qc.invalidateQueries({ queryKey: ["acc"] });
+    onDone();
+  }
+  return (
+    <Card><CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="text-sm">
+        {closedUntil
+          ? <><Badge variant="secondary" className="mr-2">Clôturée</Badge>Période clôturée jusqu'au <b>{dateFr(closedUntil)}</b> : aucune écriture ne peut plus y être créée, modifiée ou annulée.</>
+          : <span className="text-muted-foreground">Aucune période clôturée. Clôturez les mois terminés pour figer vos comptes.</span>}
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild><Button variant="outline" size="sm">{closedUntil ? "Modifier la clôture" : "Clôturer une période"}</Button></DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clôture de période</DialogTitle>
+            <DialogDescription>Les écritures datées jusqu'à cette date (incluse) seront figées. Avancer la clôture est libre ; la reculer (rouvrir) est réservé à la direction et demande un motif.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Clôturer jusqu'au (inclus)</Label><Input type="date" max={today()} value={until} onChange={(e) => setUntil(e.target.value)} /></div>
+            <div><Label>Motif (obligatoire pour rouvrir)</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ex. Correction d'une erreur de saisie" /></div>
+          </div>
+          <DialogFooter className="gap-2">
+            {closedUntil && <Button variant="outline" disabled={busy} onClick={() => void save(null)}>Lever la clôture</Button>}
+            <Button disabled={busy || !until} onClick={() => void save(until)}>Enregistrer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </CardContent></Card>
   );
 }
