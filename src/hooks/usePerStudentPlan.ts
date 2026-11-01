@@ -8,7 +8,8 @@ import type { OfferConditions } from "@/lib/offers";
 
 export interface PerStudentPlanInfo {
   schoolId: string | null;
-  isPerStudent: true;
+  /** Vrai seulement pour un établissement en cotisation par élève ; faux sous forfait par établissement (le forfait remplace la cotisation individuelle). */
+  isPerStudent: boolean;
   planName: string;
   unitPrice: number;
   schoolShare: number;
@@ -77,6 +78,18 @@ export function usePerStudentPlan() {
         .maybeSingle();
       if (subError) throw subError;
 
+      // Établissement sous forfait : même règle que le serveur (_school_flat_sub), sans filtre d'année.
+      const { data: flatSub, error: flatError } = await (supabase as any)
+        .from("school_offer_subscriptions")
+        .select("id")
+        .eq("school_id", schoolId)
+        .eq("status", "active")
+        .eq("offer_type", "per_school")
+        .limit(1)
+        .maybeSingle();
+      if (flatError) throw flatError;
+      const isFlat = !!flatSub;
+
       const unitPrice = Number(sub?.annual_price_per_student ?? s.unit_price ?? PER_STUDENT_UNIT_PRICE_GNF);
       const schoolShare = Number(sub?.school_commission_per_student ?? s.school_share ?? PER_STUDENT_SCHOOL_SHARE_GNF);
       const offer: OfferConditions | null = sub
@@ -95,7 +108,7 @@ export function usePerStudentPlan() {
       return {
         schoolId,
         offer,
-        isPerStudent: true,
+        isPerStudent: !isFlat,
         planName: offer ? `Offre ${offer.name}` : "Cotisation annuelle par élève",
         unitPrice,
         schoolShare,
@@ -110,7 +123,8 @@ export function usePerStudentPlan() {
     },
   });
 
-  return { info: data ?? EMPTY, loading: isLoading, error, refetch };
+  // Pendant le chargement, ne pas afficher « Non payée » à un établissement qui serait sous forfait.
+  return { info: data ?? (isLoading ? { ...EMPTY, isPerStudent: false } : EMPTY), loading: isLoading, error, refetch };
 }
 
 export function usePaidStudentIds(schoolId: string | null, academicYear: string, enabled = true) {

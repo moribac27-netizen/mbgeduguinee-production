@@ -90,6 +90,9 @@ export function CotisationCard({ studentId, studentName, matricule, className }:
   const status = payment?.status ?? null;
   const canDeclare = mayPay && status !== "VALIDATED" && status !== "AWAITING_VALIDATION";
 
+  // Établissement sous forfait : aucune cotisation individuelle.
+  if (!info.isPerStudent) return null;
+
   return (
     <Card>
       <CardHeader>
