@@ -18,6 +18,7 @@ import { TEACHER_TYPE_LABELS, isTitularType, type TeacherType } from "@/lib/teac
 
 export const Route = createFileRoute("/_authenticated/personnel")({
   head: () => ({ meta: [{ title: "Personnel — MBGEduGuinée" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ add: s.add === "enseignant" || s.add === "non_enseignant" ? (s.add as "enseignant" | "non_enseignant") : undefined }),
   component: PersonnelPage,
 });
 
@@ -26,6 +27,7 @@ const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n);
 
 function PersonnelPage() {
   const qc = useQueryClient();
+  const search0 = Route.useSearch();
   const [filter, setFilter] = useState<"all" | "enseignant" | "non_enseignant" | "sans_compte">("all");
   const [search, setSearch] = useState("");
   const staff = useQuery({
@@ -59,7 +61,7 @@ function PersonnelPage() {
             <p className="mt-1 text-muted-foreground">{(staff.data ?? []).length} personne(s) · {noAccount} sans compte de connexion</p>
           </div>
         </div>
-        <AddStaffDialog onDone={refresh} />
+        <AddStaffDialog onDone={refresh} initial={search0.add} />
       </div>
 
       <Card>
@@ -95,7 +97,8 @@ function PersonnelPage() {
                     <TableCell className="text-sm">{r.job_title ?? "—"}</TableCell>
                     <TableCell className="text-sm">{r.phone ?? "—"}</TableCell>
                     <TableCell className="text-sm">{r.email ?? "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {r.kind === "non_enseignant" && r.contract_id && <EditStaffDialog row={r} onDone={refresh} />}
                       {r.user_id ? <Badge>Compte créé</Badge> : (
                         <Button asChild size="sm" variant="outline" className="gap-1"><Link to="/collaborateurs" search={{ staff: key }}><UserPlus className="size-3.5" />Créer le compte</Link></Button>
                       )}
@@ -112,9 +115,9 @@ function PersonnelPage() {
 }
 
 /** Une seule fiche pour tout le personnel : enseignant (page Enseignants) ou non enseignant (contrat RH). */
-function AddStaffDialog({ onDone }: { onDone: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [category, setCategory] = useState<"enseignant" | "non_enseignant">("non_enseignant");
+function AddStaffDialog({ onDone, initial }: { onDone: () => void; initial?: "enseignant" | "non_enseignant" }) {
+  const [open, setOpen] = useState(!!initial);
+  const [category, setCategory] = useState<"enseignant" | "non_enseignant">(initial ?? "non_enseignant");
   const blank = { full_name: "", phone: "", email: "", position: "Secrétaire", customPosition: "", salary: "0", teacher_type: "specialise" as TeacherType, start_date: new Date().toISOString().slice(0, 10) };
   const [f, setF] = useState(blank);
   const [busy, setBusy] = useState(false);
@@ -186,6 +189,39 @@ function AddStaffDialog({ onDone }: { onDone: () => void }) {
           )}
           <div><Label>Salaire mensuel (GNF)</Label><Input type="number" min={0} value={f.salary} onChange={(e) => setF({ ...f, salary: e.target.value })} />
             <p className="mt-1 text-xs text-muted-foreground">{fmt(Number(f.salary) || 0)} GNF par mois.</p></div>
+        </div>
+        <DialogFooter><Button onClick={save} disabled={busy}>Enregistrer</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Correction des coordonnées et du poste d'une personne non enseignante (les enseignants se corrigent dans la page Enseignants). */
+function EditStaffDialog({ row, onDone }: { row: StaffRow; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ full_name: row.full_name, phone: row.phone ?? "", email: row.email ?? "", position: row.job_title ?? "" });
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    if (busy) return;
+    if (f.full_name.trim().length < 2) return void toast.error("Le nom complet est obligatoire.");
+    setBusy(true);
+    const { error } = await db.from("employee_contracts").update({ full_name: f.full_name.trim(), phone: f.phone.trim() || null, email: f.email.trim() || null, position: f.position.trim() || null }).eq("id", row.contract_id);
+    setBusy(false);
+    if (error) return void toast.error(error.message);
+    toast.success("Informations modifiées"); setOpen(false); onDone();
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setF({ full_name: row.full_name, phone: row.phone ?? "", email: row.email ?? "", position: row.job_title ?? "" }); }}>
+      <DialogTrigger asChild><Button size="sm" variant="ghost">Modifier</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Modifier {row.full_name}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div><Label>Nom complet</Label><Input value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></div>
+          <div><Label>Poste</Label><Input value={f.position} onChange={(e) => setF({ ...f, position: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Téléphone</Label><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
+            <div><Label>E-mail</Label><Input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
+          </div>
         </div>
         <DialogFooter><Button onClick={save} disabled={busy}>Enregistrer</Button></DialogFooter>
       </DialogContent>
