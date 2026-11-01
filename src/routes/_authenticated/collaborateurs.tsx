@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -27,12 +27,13 @@ import { Plus, Users2, Copy, ChevronsUpDown, UserCheck } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
-import { buildStaffOptions, type StaffOption } from "@/lib/staff-picker";
+import { buildStaffOptions, type StaffOption, type StaffRow } from "@/lib/staff-picker";
 import { toast } from "sonner";
 import { fmtDateTime } from "@/lib/reports";
 
 export const Route = createFileRoute("/_authenticated/collaborateurs")({
   head: () => ({ meta: [{ title: "Collaborateurs — MBGEduGuinée" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ staff: typeof s.staff === "string" ? s.staff : undefined }),
   component: Collaborateurs,
 });
 
@@ -45,7 +46,8 @@ const roleLabel = (r: string) => ROLE_LABELS[r as AppRole] ?? r;
 
 function Collaborateurs() {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const search = Route.useSearch();
+  const [open, setOpen] = useState(!!search.staff);
   const [tempPasswordFor, setTempPasswordFor] = useState<{ email: string; password: string } | null>(null);
 
   const listFn = useServerFn(listCollaborators);
@@ -106,6 +108,7 @@ function Collaborateurs() {
           <AddCollaboratorDialog
             addFn={addFn}
             existingNames={collaborators.map((c) => c.fullName)}
+            initialStaff={search.staff}
             onDone={(result) => {
               setOpen(false);
               qc.invalidateQueries({ queryKey: ["collaborators"] });
@@ -215,8 +218,9 @@ function Collaborateurs() {
 }
 
 function AddCollaboratorDialog({
-  addFn, onDone, existingNames,
+  addFn, onDone, existingNames, initialStaff,
 }: {
+  initialStaff?: string;
   addFn: ReturnType<typeof useServerFn<typeof addCollaborator>>;
   existingNames: string[];
   onDone: (result: { mode: "invite" | "direct"; email: string; tempPassword?: string }) => void;
@@ -228,28 +232,31 @@ function AddCollaboratorDialog({
   const [mode, setMode] = useState<"invite" | "direct">("invite");
   const [loading, setLoading] = useState(false);
   const [teacherId, setTeacherId] = useState<string | null>(null);
+  const [contractId, setContractId] = useState<string | null>(null);
   const [picked, setPicked] = useState<StaffOption | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  // Personnel déjà enregistré (enseignants et RH) qui n'a pas encore de compte
+  // Personnel déjà enregistré (enseignants + personnel non enseignant) qui n'a pas encore de compte
   const staff = useQuery({
     queryKey: ["collab-staff-options"],
     staleTime: 30_000,
     queryFn: async () => {
-      const [t, c] = await Promise.all([
-        (supabase as any).from("teachers").select("id, full_name, email, phone, user_id, teacher_type, matricule").order("full_name"),
-        (supabase as any).from("employee_contracts").select("id, teacher_id, full_name, position").order("full_name"),
-      ]);
-      return { teachers: (t.data ?? []) as any[], contracts: (c.data ?? []) as any[] };
+      const { data, error } = await (supabase as any).rpc("staff_directory");
+      if (error) throw error;
+      return (data ?? []) as StaffRow[];
     },
   });
-  const options = buildStaffOptions(staff.data?.teachers ?? [], staff.data?.contracts ?? [], existingNames);
+  const options = buildStaffOptions(staff.data ?? [], existingNames);
+  useEffect(() => {
+    if (initialStaff && !picked) { const o = options.find((x) => x.key === initialStaff); if (o) pick(o); }
+  }, [initialStaff, options.length]);
 
   function pick(o: StaffOption | null) {
     setPicked(o);
     setPickerOpen(false);
-    if (!o) { setTeacherId(null); return; }
+    if (!o) { setTeacherId(null); setContractId(null); return; }
     setTeacherId(o.teacherId);
+    setContractId(o.contractId);
     setFullName(o.fullName);
     setEmail(o.email);
     setPhone(o.phone);
@@ -261,7 +268,7 @@ function AddCollaboratorDialog({
     setLoading(true);
     try {
       const res = await addFn({
-        data: { fullName: fullName.trim(), email: email.trim(), phone: phone.trim() || null, role: role as any, mode, teacherId },
+        data: { fullName: fullName.trim(), email: email.trim(), phone: phone.trim() || null, role: role as any, mode, teacherId, contractId },
       });
       if (!res.ok) {
         toast.error(res.error);

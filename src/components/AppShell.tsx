@@ -33,6 +33,7 @@ const STAFF_NAV = [
   { to: "/maternelle", label: "Maternelle", icon: Baby },
   { to: "/classes", label: "Classes", icon: BookOpen },
   { to: "/enseignants", label: "Enseignants", icon: GraduationCap },
+  { to: "/personnel", label: "Personnel", icon: IdCard },
   { to: "/matieres", label: "Matières", icon: BookMarked },
   { to: "/cartes", label: "Cartes scolaires", icon: IdCard },
   { to: "/affectations", label: "Affectations", icon: Link2 },
