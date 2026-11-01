@@ -36,6 +36,7 @@ import { Route as AuthenticatedEleveRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedElevesRouteImport } from './routes/_authenticated/eleves'
 import { Route as AuthenticatedEmploiDuTempsRouteImport } from './routes/_authenticated/emploi-du-temps'
 import { Route as AuthenticatedEnseignantsRouteImport } from './routes/_authenticated/enseignants'
+import { Route as AuthenticatedPersonnelRouteImport } from './routes/_authenticated/personnel'
 import { Route as AuthenticatedEvenementsRouteImport } from './routes/_authenticated/evenements'
 import { Route as AuthenticatedExamensRouteImport } from './routes/_authenticated/examens'
 import { Route as AuthenticatedImportExportRouteImport } from './routes/_authenticated/import-export'
@@ -204,6 +205,12 @@ const AuthenticatedEnseignantsRoute =
     path: '/enseignants',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPersonnelRoute =
+  AuthenticatedPersonnelRouteImport.update({
+    id: '/personnel',
+    path: '/personnel',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedEvenementsRoute = AuthenticatedEvenementsRouteImport.update({
   id: '/evenements',
   path: '/evenements',
@@ -351,6 +358,7 @@ export interface FileRoutesByFullPath {
   '/eleves': typeof AuthenticatedElevesRoute
   '/emploi-du-temps': typeof AuthenticatedEmploiDuTempsRoute
   '/enseignants': typeof AuthenticatedEnseignantsRoute
+  '/personnel': typeof AuthenticatedPersonnelRoute
   '/evenements': typeof AuthenticatedEvenementsRoute
   '/examens': typeof AuthenticatedExamensRoute
   '/import-export': typeof AuthenticatedImportExportRoute
@@ -402,6 +410,7 @@ export interface FileRoutesByTo {
   '/eleves': typeof AuthenticatedElevesRoute
   '/emploi-du-temps': typeof AuthenticatedEmploiDuTempsRoute
   '/enseignants': typeof AuthenticatedEnseignantsRoute
+  '/personnel': typeof AuthenticatedPersonnelRoute
   '/evenements': typeof AuthenticatedEvenementsRoute
   '/examens': typeof AuthenticatedExamensRoute
   '/import-export': typeof AuthenticatedImportExportRoute
@@ -455,6 +464,7 @@ export interface FileRoutesById {
   '/_authenticated/eleves': typeof AuthenticatedElevesRoute
   '/_authenticated/emploi-du-temps': typeof AuthenticatedEmploiDuTempsRoute
   '/_authenticated/enseignants': typeof AuthenticatedEnseignantsRoute
+  '/_authenticated/personnel': typeof AuthenticatedPersonnelRoute
   '/_authenticated/evenements': typeof AuthenticatedEvenementsRoute
   '/_authenticated/examens': typeof AuthenticatedExamensRoute
   '/_authenticated/import-export': typeof AuthenticatedImportExportRoute
@@ -508,6 +518,7 @@ export interface FileRouteTypes {
     | '/eleves'
     | '/emploi-du-temps'
     | '/enseignants'
+    | '/personnel'
     | '/evenements'
     | '/examens'
     | '/import-export'
@@ -559,6 +570,7 @@ export interface FileRouteTypes {
     | '/eleves'
     | '/emploi-du-temps'
     | '/enseignants'
+    | '/personnel'
     | '/evenements'
     | '/examens'
     | '/import-export'
@@ -611,6 +623,7 @@ export interface FileRouteTypes {
     | '/_authenticated/eleves'
     | '/_authenticated/emploi-du-temps'
     | '/_authenticated/enseignants'
+    | '/_authenticated/personnel'
     | '/_authenticated/evenements'
     | '/_authenticated/examens'
     | '/_authenticated/import-export'
@@ -838,6 +851,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEnseignantsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/personnel': {
+      id: '/_authenticated/personnel'
+      path: '/personnel'
+      fullPath: '/personnel'
+      preLoaderRoute: typeof AuthenticatedPersonnelRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/evenements': {
       id: '/_authenticated/evenements'
       path: '/evenements'
@@ -1024,6 +1044,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedElevesRoute: typeof AuthenticatedElevesRoute
   AuthenticatedEmploiDuTempsRoute: typeof AuthenticatedEmploiDuTempsRoute
   AuthenticatedEnseignantsRoute: typeof AuthenticatedEnseignantsRoute
+  AuthenticatedPersonnelRoute: typeof AuthenticatedPersonnelRoute
   AuthenticatedEvenementsRoute: typeof AuthenticatedEvenementsRoute
   AuthenticatedExamensRoute: typeof AuthenticatedExamensRoute
   AuthenticatedImportExportRoute: typeof AuthenticatedImportExportRoute
@@ -1069,6 +1090,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedElevesRoute: AuthenticatedElevesRoute,
   AuthenticatedEmploiDuTempsRoute: AuthenticatedEmploiDuTempsRoute,
   AuthenticatedEnseignantsRoute: AuthenticatedEnseignantsRoute,
+  AuthenticatedPersonnelRoute: AuthenticatedPersonnelRoute,
   AuthenticatedEvenementsRoute: AuthenticatedEvenementsRoute,
   AuthenticatedExamensRoute: AuthenticatedExamensRoute,
   AuthenticatedImportExportRoute: AuthenticatedImportExportRoute,

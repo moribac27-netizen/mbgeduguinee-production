@@ -15,20 +15,16 @@ describe("suggestRoleFromPosition", () => {
 });
 
 describe("buildStaffOptions", () => {
-  const teachers = [
-    { id: "t1", full_name: "Mariama Diallo", email: "m@x.com", phone: "620", user_id: null, teacher_type: "educatrice" },
-    { id: "t2", full_name: "Ousmane Bah", user_id: "u1", teacher_type: "instituteur" },
-    { id: "t3", full_name: "Aly Camara", user_id: null, teacher_type: "instituteur" },
+  const rows: any[] = [
+    { kind: "enseignant", teacher_id: "t1", contract_id: null, full_name: "Mariama Diallo", email: "m@x.com", phone: "620", job_title: "Éducatrice", teacher_type: "educatrice", user_id: null },
+    { kind: "enseignant", teacher_id: "t2", contract_id: null, full_name: "Ousmane Bah", email: null, phone: null, job_title: "Instituteur", teacher_type: "instituteur", user_id: "u1" },
+    { kind: "non_enseignant", teacher_id: null, contract_id: "c2", full_name: "Fatou Sylla", email: null, phone: "621", job_title: "Comptable", teacher_type: null, user_id: null },
+    { kind: "non_enseignant", teacher_id: null, contract_id: "c3", full_name: "Déjà Compte", email: null, phone: null, job_title: "Gardien", teacher_type: null, user_id: null },
   ];
-  const contracts = [
-    { id: "c1", teacher_id: "t1", full_name: "Mariama Diallo", position: "Éducatrice" },
-    { id: "c2", teacher_id: null, full_name: "Fatou Sylla", position: "Comptable" },
-    { id: "c3", teacher_id: null, full_name: "Aly Camara", position: "Enseignant" },
-  ];
-  it("exclut ceux qui ont déjà un compte et les doublons", () => {
-    const o = buildStaffOptions(teachers, contracts, ["Ousmane Bah"]);
-    expect(o.map((x) => x.fullName)).toEqual(["Aly Camara", "Fatou Sylla", "Mariama Diallo"]);
-    expect(o.find((x) => x.fullName === "Mariama Diallo")).toMatchObject({ role: "educatrice_maternelle", teacherId: "t1", email: "m@x.com" });
-    expect(o.find((x) => x.fullName === "Fatou Sylla")).toMatchObject({ role: "comptable", teacherId: null, source: "contract" });
+  it("exclut les comptes existants (lien ou même nom) et déduit les rôles", () => {
+    const o = buildStaffOptions(rows, ["déjà compte"]);
+    expect(o.map((x) => x.fullName)).toEqual(["Fatou Sylla", "Mariama Diallo"]);
+    expect(o.find((x) => x.fullName === "Mariama Diallo")).toMatchObject({ role: "educatrice_maternelle", teacherId: "t1", contractId: null, email: "m@x.com" });
+    expect(o.find((x) => x.fullName === "Fatou Sylla")).toMatchObject({ role: "comptable", teacherId: null, contractId: "c2", source: "contract", phone: "621" });
   });
 });

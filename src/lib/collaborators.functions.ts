@@ -110,6 +110,7 @@ export const addCollaborator = createServerFn({ method: "POST" })
       role: roleSchema,
       mode: z.enum(["invite", "direct"]),
       teacherId: z.string().uuid().optional().nullable(),
+      contractId: z.string().uuid().optional().nullable(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -117,8 +118,8 @@ export const addCollaborator = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Lie le compte à la fiche enseignant choisie (même école, pas encore reliée) pour que ses affectations lui donnent accès à ses classes.
     const linkTeacher = async (userId: string) => {
-      if (!data.teacherId) return;
-      await supabaseAdmin.from("teachers").update({ user_id: userId }).eq("id", data.teacherId).eq("school_id", schoolId).is("user_id", null);
+      if (data.teacherId) await supabaseAdmin.from("teachers").update({ user_id: userId }).eq("id", data.teacherId).eq("school_id", schoolId).is("user_id", null);
+      if (data.contractId) await (supabaseAdmin as any).from("employee_contracts").update({ user_id: userId }).eq("id", data.contractId).eq("school_id", schoolId).is("user_id", null);
     };
 
     if (data.mode === "invite") {

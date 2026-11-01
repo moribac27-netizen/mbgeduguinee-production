@@ -6,6 +6,7 @@ export interface StaffOption {
   key: string;
   source: "teacher" | "contract";
   teacherId: string | null;
+  contractId: string | null;
   fullName: string;
   email: string;
   phone: string;
@@ -36,29 +37,30 @@ export function teacherRole(type: unknown): AppRole {
   return normalizeTeacherType(type) === "educatrice" ? "educatrice_maternelle" : "enseignant";
 }
 
-/**
- * Construit la liste : enseignants sans compte, puis personnel RH non enseignant (sans fiche enseignant) dont le nom
- * n'est pas déjà celui d'un compte ou d'un enseignant proposé.
- */
-export function buildStaffOptions(
-  teachers: Array<{ id: string; full_name: string; email?: string | null; phone?: string | null; user_id?: string | null; teacher_type?: string | null; matricule?: string | null }>,
-  contracts: Array<{ id: string; teacher_id?: string | null; full_name: string; position?: string | null }>,
-  existingNames: string[] = [],
-): StaffOption[] {
+/** Ligne de l'annuaire du personnel (RPC staff_directory). */
+export interface StaffRow {
+  kind: "enseignant" | "non_enseignant"; teacher_id: string | null; contract_id: string | null;
+  full_name: string; email: string | null; phone: string | null; job_title: string | null; teacher_type: string | null; user_id: string | null;
+}
+
+/** Personnel sans compte de connexion, proposé à la création d'un collaborateur ; on écarte les noms déjà utilisés par un compte existant. */
+export function buildStaffOptions(rows: StaffRow[], existingNames: string[] = []): StaffOption[] {
   const taken = new Set(existingNames.map(norm));
   const out: StaffOption[] = [];
-  for (const t of teachers) {
-    if (t.user_id) continue;
+  for (const r of rows) {
+    if (r.user_id || !r.full_name || taken.has(norm(r.full_name))) continue;
+    taken.add(norm(r.full_name));
     out.push({
-      key: "t:" + t.id, source: "teacher", teacherId: t.id, fullName: t.full_name, email: t.email ?? "", phone: t.phone ?? "",
-      role: teacherRole(t.teacher_type), detail: normalizeTeacherType(t.teacher_type) === "educatrice" ? "Éducatrice" : normalizeTeacherType(t.teacher_type) === "instituteur" ? "Instituteur" : "Enseignant",
+      key: (r.teacher_id ? "t:" + r.teacher_id : "c:" + r.contract_id), source: r.kind === "enseignant" ? "teacher" : "contract",
+      teacherId: r.teacher_id, contractId: r.contract_id, fullName: r.full_name, email: r.email ?? "", phone: r.phone ?? "",
+      role: r.kind === "enseignant" ? teacherRole(r.teacher_type) : suggestRoleFromPosition(r.job_title), detail: r.job_title || (r.kind === "enseignant" ? "Enseignant" : "Personnel"),
     });
-    taken.add(norm(t.full_name));
-  }
-  for (const c of contracts) {
-    if (c.teacher_id || !c.full_name || taken.has(norm(c.full_name))) continue;
-    taken.add(norm(c.full_name));
-    out.push({ key: "c:" + c.id, source: "contract", teacherId: null, fullName: c.full_name, email: "", phone: "", role: suggestRoleFromPosition(c.position), detail: c.position || "Personnel" });
   }
   return out.sort((a, b) => a.fullName.localeCompare(b.fullName, "fr"));
 }
+
+/** Postes usuels du personnel non enseignant (liste de choix à l'enregistrement). */
+export const NON_TEACHING_POSITIONS = [
+  "Secrétaire", "Comptable", "Caissier", "Surveillant général", "Bibliothécaire", "Infirmier(ère)", "Chauffeur", "Responsable cantine",
+  "Responsable transport", "Directeur des études", "Proviseur", "Ressources humaines", "Gardien", "Agent d'entretien",
+] as const;
