@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CrudSection } from "@/components/CrudSection";
-import { useStudentOptions, useClassOptions, useTableOptions } from "@/hooks/useOptions";
+import { useStudentOptions, useClassOptions, useScopedClassOptions, useTableOptions } from "@/hooks/useOptions";
 import { useRoles } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
@@ -127,6 +127,22 @@ function Maternelle() {
     isSuperAdmin ||
     roles.some((r) => ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "educatrice_maternelle"].includes(r));
 
+  const isDirection = isSuperAdmin || roles.some((r) => ["admin", "directeur", "directeur_etudes", "proviseur"].includes(r));
+  // Hors direction : accès limité aux sections affectées (vérifié côté base par nursery_has_any_section).
+  const { data: hasAnySection, isLoading: accessLoading } = useQuery({
+    queryKey: ["nursery-has-any-section", isDirection],
+    enabled: !isDirection,
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data, error } = await supabase.rpc("nursery_has_any_section" as any, { _uid: u.user.id });
+      if (error) throw error;
+      return !!data;
+    },
+    staleTime: 30_000,
+  });
+  const noSectionAssigned = !isDirection && !accessLoading && hasAnySection === false;
+
   const pdfMeta = usePdfMeta();
   const { options: studentOptions } = useStudentOptions();
   const { options: classOptions } = useClassOptions();
@@ -162,7 +178,7 @@ function Maternelle() {
     },
     staleTime: 15_000,
   });
-  const { classes: allClasses } = useClassOptions();
+  const { classes: allClasses } = useScopedClassOptions();
   // Uniquement les classes de niveau « Maternelle » (jamais le primaire, le collège ou le lycée).
   const nurseryClasses = useMemo(() => allClasses.filter((c: any) => /maternelle/i.test(c.level ?? "")), [allClasses]);
   const { data: studentsFull = [] } = useQuery({
@@ -240,6 +256,11 @@ function Maternelle() {
         </CardContent></Card>
       </div>
 
+      {noSectionAssigned ? (
+        <Card><CardContent className="p-6 text-sm text-muted-foreground">
+          Aucune section ne vous est affectée. Demandez à la direction de vous affecter à une classe de Maternelle (page Affectations) pour accéder aux fiches enfants, au suivi quotidien et aux évaluations.
+        </CardContent></Card>
+      ) : (
       <Tabs defaultValue="sections">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="sections">Sections</TabsTrigger>
@@ -261,7 +282,7 @@ function Maternelle() {
             queryKey={["nursery-sections"]}
             select="*, classes(name), teachers(full_name), nursery_children(count)"
             orderBy={{ column: "name" }}
-            canWrite={canWrite}
+            canWrite={isDirection}
             beforeSave={async (payload, editing) => {
               const class_id = await ensureNurseryClass(supabase, { name: String(payload.name ?? ""), sectionId: editing?.id ?? null, currentClassId: editing?.class_id ?? null });
               await Promise.all(["opt-classes", "classes-full", "classes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
@@ -487,6 +508,7 @@ function Maternelle() {
           />
         </TabsContent>
       </Tabs>
+      )}
     </div>
   );
 }
