@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { detectPlatform, isIPad } from "@/lib/install-gate";
 
 /** Bouton discret « Installer l'application » (Android / desktop) + astuce iOS. */
 export function InstallPWA({ className }: { className?: string }) {
   const [prompt, setPrompt] = useState<any>(null);
   const [iosHint, setIosHint] = useState(false);
+  const [ipad, setIpad] = useState(false);
 
   useEffect(() => {
     const onPrompt = (e: any) => {
@@ -15,7 +17,8 @@ export function InstallPWA({ className }: { className?: string }) {
     window.addEventListener("beforeinstallprompt", onPrompt);
 
     const ua = window.navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isIOS = detectPlatform(ua, window.navigator.maxTouchPoints) === "ios"; // inclut l'iPad (iPadOS se présente comme un Mac)
+    setIpad(isIPad(ua, window.navigator.maxTouchPoints));
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true;
     if (isIOS && !standalone) setIosHint(true);
@@ -35,7 +38,7 @@ export function InstallPWA({ className }: { className?: string }) {
   if (iosHint && !prompt) {
     return (
       <div className={`text-[11px] leading-tight text-sidebar-foreground/60 ${className ?? ""}`}>
-        Installer : bouton Partager → « Sur l'écran d'accueil »
+        Installer : bouton Partager{ipad ? " (en haut à droite)" : ""} → « Sur l'écran d'accueil »
       </div>
     );
   }

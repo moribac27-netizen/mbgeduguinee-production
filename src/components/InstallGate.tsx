@@ -4,7 +4,7 @@ import { Download, Loader2, Share, SquarePlus, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { decideInstallGate, detectPlatform, isInAppBrowser } from "@/lib/install-gate";
+import { browserCanPrompt, decideInstallGate, detectPlatform, isInAppBrowser, isIPad } from "@/lib/install-gate";
 import { clearDeferredPrompt, getDeferredPrompt, isStandalone, markInstalled, subscribePrompt, wasInstalled } from "@/lib/install-prompt";
 
 export const INSTALL_REQUIRED_KEY = ["platform-setting", "public.install_required"];
@@ -39,10 +39,14 @@ export function InstallGate({ children }: { children: ReactNode }) {
   const ua = window.navigator.userAgent;
   const state = decideInstallGate({
     enabled, standalone: isStandalone(), installedBefore: wasInstalled() || done, platform: detectPlatform(ua, window.navigator.maxTouchPoints),
-    inAppBrowser: isInAppBrowser(ua), canPrompt: !!getDeferredPrompt(), waitElapsed,
+    inAppBrowser: isInAppBrowser(ua), canPrompt: !!getDeferredPrompt(),
+    // Un navigateur qui ne sait jamais proposer l'installation (Firefox, Safari Mac…) n'a aucune raison d'attendre 3 secondes.
+    waitElapsed: waitElapsed || !browserCanPrompt(window),
   });
   if (state === "allowed") return <>{children}</>;
   if (state === "checking") return <Centered><div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Vérification de l'appareil…</div></Centered>;
+
+  const ipad = isIPad(ua, window.navigator.maxTouchPoints);
 
   async function install() {
     const p = getDeferredPrompt();
@@ -67,8 +71,8 @@ export function InstallGate({ children }: { children: ReactNode }) {
           )}
           {state === "ios" && (
             <ol className="space-y-3 text-sm">
-              <li className="flex items-start gap-3"><Share className="mt-0.5 size-5 shrink-0 text-primary" /><span>Touchez le bouton <b>Partager</b> de Safari (le carré avec une flèche).</span></li>
-              <li className="flex items-start gap-3"><SquarePlus className="mt-0.5 size-5 shrink-0 text-primary" /><span>Choisissez <b>« Sur l'écran d'accueil »</b>, puis <b>Ajouter</b>.</span></li>
+              <li className="flex items-start gap-3"><Share className="mt-0.5 size-5 shrink-0 text-primary" /><span>{ipad ? <>Touchez le bouton <b>Partager</b> de Safari, <b>en haut à droite</b> de l'écran (le carré avec une flèche).</> : <>Touchez le bouton <b>Partager</b> de Safari (le carré avec une flèche, en bas de l'écran).</>}</span></li>
+              <li className="flex items-start gap-3"><SquarePlus className="mt-0.5 size-5 shrink-0 text-primary" /><span>Choisissez <b>« Sur l'écran d'accueil »</b> (faites défiler la liste si besoin), puis <b>Ajouter</b>. Si l'option manque, ouvrez cette page dans <b>Safari</b>.</span></li>
               <li className="flex items-start gap-3"><Smartphone className="mt-0.5 size-5 shrink-0 text-primary" /><span>Ouvrez ensuite <b>MBGEduGuinée</b> depuis votre écran d'accueil pour vous connecter.</span></li>
             </ol>
           )}

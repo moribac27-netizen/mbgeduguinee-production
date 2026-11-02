@@ -10,6 +10,16 @@ export function detectPlatform(ua: string, maxTouchPoints = 0): Platform {
   return "desktop";
 }
 
+/** Tablette Apple (iPad, y compris iPadOS qui se présente comme un Mac). Sur iPad le bouton Partager est en haut à droite de Safari. */
+export function isIPad(ua: string, maxTouchPoints = 0): boolean {
+  return /iPad/.test(ua) || (/Macintosh/.test(ua) && maxTouchPoints > 1);
+}
+
+/** Le navigateur peut-il un jour proposer l'installation (événement beforeinstallprompt) ? Sinon inutile d'attendre. */
+export function browserCanPrompt(win: { onbeforeinstallprompt?: unknown } | object): boolean {
+  return "onbeforeinstallprompt" in win;
+}
+
 /** Navigateurs intégrés (Facebook, WhatsApp, Instagram…) : impossible d'y installer une application. */
 export function isInAppBrowser(ua: string): boolean {
   return /FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|Snapchat|TikTok|; wv\)/i.test(ua);
