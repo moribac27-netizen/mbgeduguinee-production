@@ -44,7 +44,7 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/transport", roles: ["admin", "directeur", "comptable", "responsable_transport"] },
   { prefix: "/cantine", roles: ["admin", "directeur", "comptable", "responsable_cantine"] },
   { prefix: "/annonces", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "surveillant", "secretariat"] },
-  { prefix: "/dashboard", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "comptable", "surveillant"] },
+  { prefix: "/dashboard", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "comptable", "surveillant", "educatrice_maternelle"] },
   { prefix: "/parent", roles: ["parent"] },
   { prefix: "/eleve", roles: ["eleve"] },
   { prefix: "/evenements", roles: "*" },
@@ -87,7 +87,7 @@ export function homeForRoles(roles: AppRole[], isSuperAdmin: boolean): string {
   if (roles.includes("comptable")) return "/paiements";
   if (roles.includes("rh")) return "/salaires";
   if (roles.includes("enseignant") || roles.includes("surveillant")) return "/dashboard";
-  if (roles.includes("educatrice_maternelle")) return "/maternelle";
+  if (roles.includes("educatrice_maternelle")) return "/dashboard";
   if (roles.includes("secretariat")) return "/eleves";
   if (roles.includes("bibliothecaire")) return "/bibliotheque";
   if (roles.includes("infirmerie")) return "/infirmerie";
