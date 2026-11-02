@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideInstallGate, detectPlatform, isInAppBrowser, type GateInput } from "./install-gate";
+import { browserCanPrompt, decideInstallGate, detectPlatform, isInAppBrowser, isIPad, type GateInput } from "./install-gate";
 
 const base: GateInput = { enabled: true, standalone: false, installedBefore: false, platform: "android", inAppBrowser: false, canPrompt: false, waitElapsed: false };
 const d = (o: Partial<GateInput>) => decideInstallGate({ ...base, ...o });
@@ -38,5 +38,21 @@ describe("decideInstallGate", () => {
     expect(d({})).toBe("checking");
     expect(d({ waitElapsed: true })).toBe("allowed");
     expect(d({ platform: "desktop", waitElapsed: true })).toBe("allowed");
+  });
+});
+
+describe("iPad et navigateurs sans invite", () => {
+  it("reconnaît l'iPad, y compris en mode « site de bureau »", () => {
+    expect(isIPad("Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)")).toBe(true);
+    expect(isIPad("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", 5)).toBe(true);
+    expect(isIPad("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", 0)).toBe(false);
+    expect(isIPad("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")).toBe(false);
+  });
+  it("un iPad affiche les instructions Safari sans attendre", () => {
+    expect(d({ platform: detectPlatform("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", 5) })).toBe("ios");
+  });
+  it("sait si le navigateur peut proposer l'installation", () => {
+    expect(browserCanPrompt({ onbeforeinstallprompt: null })).toBe(true);
+    expect(browserCanPrompt({})).toBe(false);
   });
 });
