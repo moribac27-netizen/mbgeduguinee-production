@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, PlayCircle, RotateCcw, Save, ListChecks } from "lucide-react";
 import { maxScoreForLevel } from "@/lib/grading";
-import { useScopedClassOptions } from "@/hooks/useOptions";
+import { useScopedClassOptions, useScopedSubjects } from "@/hooks/useOptions";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 import {
   DEFAULT_EVALUATION, ENTRY_PERIODS, EVALUATION_TYPES, fetchGradesFor,
@@ -52,14 +52,10 @@ export function SmartEntry() {
   const { isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
   const academicYear = planInfo.academicYear;
 
-  const { data: subjectsData } = useQuery({
-    queryKey: ["subjects"],
-    queryFn: async () => (await supabase.from("subjects").select("*").order("name")).data ?? [],
-  });
-  const subjects: any[] = subjectsData ?? EMPTY;
 
   // ---- contexte de travail ----
   const [classId, setClassId] = useState("");
+  const subjects: any[] = useScopedSubjects(classId);
   const [subjectId, setSubjectId] = useState("");
   const [period, setPeriod] = useState("T1");
   const [evalType, setEvalType] = useState<string>(DEFAULT_EVALUATION);

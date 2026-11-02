@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, BookOpen } from "lucide-react";
 import { toast } from "sonner";
+import { PRIMARY_SUBJECTS, SECONDARY_SUBJECTS, missingSubjects, type SubjectTemplate } from "@/lib/subject-catalog";
 
 export const Route = createFileRoute("/_authenticated/matieres")({
   head: () => ({ meta: [{ title: "Matières — MBGEduGuinée" }] }),
@@ -25,6 +26,17 @@ function MatieresPage() {
     queryKey: ["subjects"],
     queryFn: async () => (await supabase.from("subjects").select("*").order("name")).data ?? [],
   });
+
+  async function addDefaults(template: SubjectTemplate[]) {
+    const todo = missingSubjects(template, subjects as any[]);
+    if (todo.length === 0) return toast.info("Ces matières existent déjà.");
+    const { data: sid } = await supabase.rpc("current_school_id");
+    if (!sid) return toast.error("École non identifiée");
+    const { error } = await supabase.from("subjects").insert(todo.map((t) => ({ name: t.name, coefficient: t.coefficient, school_id: sid as any })));
+    if (error) return toast.error(error.message);
+    toast.success(`${todo.length} matière(s) ajoutée(s). Vous pouvez modifier les coefficients.`);
+    qc.invalidateQueries({ queryKey: ["subjects"] });
+  }
 
   async function handleDelete(id: string) {
     if (!confirm("Supprimer cette matière ? Les notes existantes liées à cette matière seront affectées.")) return;
@@ -65,7 +77,11 @@ function MatieresPage() {
                 {!isLoading && subjects.length === 0 && (
                   <TableRow><TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
                     <BookOpen className="size-8 mx-auto mb-2 opacity-40" />
-                    Aucune matière. Cliquez sur « Nouvelle matière » pour commencer.
+                    Aucune matière : sans matière, aucune note ne peut être saisie.
+                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                      <Button size="sm" onClick={() => void addDefaults(PRIMARY_SUBJECTS)}>Ajouter les matières du primaire</Button>
+                      <Button size="sm" variant="outline" onClick={() => void addDefaults(SECONDARY_SUBJECTS)}>Ajouter les matières du collège / lycée</Button>
+                    </div>
                   </TableCell></TableRow>
                 )}
                 {subjects.map((s: any) => (

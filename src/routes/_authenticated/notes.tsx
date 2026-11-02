@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SmartEntry } from "@/components/notes/SmartEntry";
 import { toast } from "sonner";
 import { maxScoreForLevel } from "@/lib/grading";
-import { useScopedClassOptions } from "@/hooks/useOptions";
+import { useScopedClassOptions, useScopedSubjects } from "@/hooks/useOptions";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
 
@@ -65,10 +65,8 @@ function ClassicNotesView() {
   const { info: planInfo } = usePerStudentPlan();
   const { isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
-  const { data: subjects = [] } = useQuery({
-    queryKey: ["subjects"],
-    queryFn: async () => (await supabase.from("subjects").select("*").order("name")).data ?? [],
-  });
+  const subjects = useScopedSubjects(classId);
+
   const { data: students = [] } = useQuery({
     queryKey: ["students-class", classId],
     enabled: !!classId,
