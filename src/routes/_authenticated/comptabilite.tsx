@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Printer, Wallet, ArrowDownCircle, ArrowUpCircle, Scale, Download, ArrowLeftRight, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { AttachmentsButton, useAttachmentCounts } from "@/components/AccountingAttachments";
 import { useSchool } from "@/hooks/useSchool";
 import { getAcademicYearOptions, getCurrentAcademicYear } from "@/lib/academic-year";
 import {
@@ -57,6 +58,7 @@ function AccountingPage() {
   const [showVoided, setShowVoided] = useState(false);
   const range = useMemo(() => periodRange(preset, today(), custom), [preset, custom]);
   const refreshAll = () => void qc.invalidateQueries({ queryKey: ["acc"] });
+  const attCounts = useAttachmentCounts();
 
   const balances = useQuery({ queryKey: ["acc", "balances"], queryFn: async () => {
     const { data, error } = await db.rpc("accounting_balances"); if (error) throw error; return (data ?? []) as any[];
@@ -239,7 +241,7 @@ function AccountingPage() {
                     <TableCell>{dateFr(t.occurred_at)}</TableCell><TableCell>{t.from?.name}</TableCell><TableCell>{t.to?.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{[t.reference, t.note].filter(Boolean).join(" — ")}</TableCell>
                     <TableCell className="text-right font-medium">{fmt(Number(t.amount))} GNF</TableCell>
-                    <TableCell className="text-right print:hidden">{t.voided_at ? <Badge variant="outline">Annulé</Badge> : <VoidButton table="account_transfers" id={t.id} onDone={refreshAll} />}</TableCell>
+                    <TableCell className="text-right whitespace-nowrap print:hidden"><AttachmentsButton kind="transfer" entryId={t.id} count={attCounts.get(`transfer:${t.id}`) ?? 0} />{t.voided_at ? <Badge variant="outline">Annulé</Badge> : <VoidButton table="account_transfers" id={t.id} onDone={refreshAll} />}</TableCell>
                   </TableRow>
                 ))}
                 {transfers.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Aucun virement.</TableCell></TableRow>}
@@ -337,6 +339,7 @@ function EntryTable({ rows, kind, onChanged, loading }: { rows: any[]; kind: "re
   const table = kind === "revenue" ? "revenues" : "expenses";
   const labels = kind === "revenue" ? REVENUE_LABELS : EXPENSE_LABELS;
   const { school } = useSchool();
+  const attCounts = useAttachmentCounts();
   const typeOf = (r: any) => categoryLabel(r.accounting_categories) || labels[r.type] || r.type;
   const receipt = (r: any) => printEntryReceipt({
     kind, id: r.id, date: r.occurred_at, amount: Number(r.amount), typeLabel: typeOf(r), accountName: r.financial_accounts?.name,
@@ -362,6 +365,7 @@ function EntryTable({ rows, kind, onChanged, loading }: { rows: any[]; kind: "re
               <TableCell className={"text-right font-medium " + (r.voided_at ? "line-through" : kind === "revenue" ? "text-success" : "text-destructive")}>{kind === "revenue" ? "+" : "-"}{fmt(Number(r.amount))} GNF</TableCell>
               <TableCell className="text-right whitespace-nowrap print:hidden">
                 <Button size="sm" variant="ghost" className="gap-1" onClick={() => receipt(r)}><Printer className="size-3.5" />{kind === "revenue" ? "Reçu" : "Bon"}</Button>
+                <AttachmentsButton kind={kind} entryId={r.id} count={attCounts.get(`${kind}:${r.id}`) ?? 0} />
                 {r.voided_at ? <Badge variant="outline">Annulée</Badge> : (<>
                   <EditNoteButton table={table} row={r} onDone={onChanged} />
                   <VoidButton table={table} id={r.id} onDone={onChanged} />
