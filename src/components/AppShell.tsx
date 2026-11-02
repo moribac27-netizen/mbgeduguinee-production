@@ -90,11 +90,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { roles } = useRoles();
   const { isSuperAdmin } = useSuperAdmin();
   const { school } = useSchool();
-  const { info: planInfo } = usePerStudentPlan();
+  const { info: planInfo, loading: planLoading } = usePerStudentPlan();
   const { flat: myFlat } = useMyFlatOffer();
   const role = primaryRole(roles);
   const BASE_NAV = role === "parent" ? PARENT_NAV : role === "eleve" ? STUDENT_NAV : STAFF_NAV;
-  const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin) && (item.to !== "/mon-forfait" || !!myFlat) && (item.to !== "/cotisations" || !myFlat || !!myFlat.expired || isSuperAdmin) && !pathBlockedByOffer(item.to, planInfo.offer, isSuperAdmin));
+  const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin) && (item.to !== "/mon-forfait" || !!myFlat || (!planLoading && !planInfo.isPerStudent)) && (item.to !== "/cotisations" || !myFlat || !!myFlat.expired || isSuperAdmin) && !pathBlockedByOffer(item.to, planInfo.offer, isSuperAdmin));
   const homePath = homeForRoles(roles, isSuperAdmin);
 
   async function handleSignOut() {
