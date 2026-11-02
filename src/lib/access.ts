@@ -40,7 +40,7 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/bulletins", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant"] },
   { prefix: "/bibliotheque", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "bibliothecaire"] },
   { prefix: "/discipline", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "surveillant"] }, // module Discipline (Prompt 1)
-  { prefix: "/infirmerie", roles: ["admin", "directeur", "enseignant", "infirmerie"] },
+  { prefix: "/infirmerie", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "infirmerie"] },
   { prefix: "/transport", roles: ["admin", "directeur", "comptable", "responsable_transport"] },
   { prefix: "/cantine", roles: ["admin", "directeur", "comptable", "responsable_cantine"] },
   { prefix: "/annonces", roles: ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "surveillant", "secretariat"] },

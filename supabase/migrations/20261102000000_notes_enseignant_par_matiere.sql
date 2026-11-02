@@ -35,3 +35,15 @@ create policy grades_teacher_manage on public.grades for all to authenticated
   with check (public.has_role(auth.uid(), 'enseignant'::public.app_role)
               and school_id = public.current_school_id()
               and public.teacher_teaches_student_subject(auth.uid(), student_id, subject_id));
+
+-- Infirmerie : le rôle enseignant n'a plus accès au dossier médical (la page n'est plus dans son menu).
+do $$
+declare t text; r text := $r$array['admin','directeur','directeur_etudes','proviseur','infirmerie']$r$;
+begin
+  foreach t in array array['medical_records','medical_visits','medicines','treatments','accidents'] loop
+    execute format('drop policy if exists %I on public.%I', t || '_role_scope', t);
+    execute format(
+      'create policy %I on public.%I as restrictive for all to authenticated using (not public.is_staff(auth.uid()) or public.is_super_admin(auth.uid()) or public.has_any_role(auth.uid(), %s)) with check (not public.is_staff(auth.uid()) or public.is_super_admin(auth.uid()) or public.has_any_role(auth.uid(), %s))',
+      t || '_role_scope', t, r, r);
+  end loop;
+end $$;
