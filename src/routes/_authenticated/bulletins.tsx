@@ -10,6 +10,7 @@ import { Printer, FileDown, Eye, Lock } from "lucide-react";
 import { BulletinDocument, BULLETIN_PERIODS, periodLabel } from "@/components/BulletinDocument";
 import { BulletinPreviewDialog } from "@/components/BulletinPreviewDialog";
 import { logActivity } from "@/lib/audit";
+import { useScopedClassOptions, useSeesAllSubjects } from "@/hooks/useOptions";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 
 export const Route = createFileRoute("/_authenticated/bulletins")({
@@ -26,10 +27,8 @@ function BulletinsPage() {
   const { info: planInfo } = usePerStudentPlan();
   const { paidIds, isUnlocked } = usePaidStudentIds(planInfo.schoolId, planInfo.academicYear, planInfo.isPerStudent);
 
-  const { data: classes = [] } = useQuery({
-    queryKey: ["classes-list"],
-    queryFn: async () => (await supabase.from("classes").select("*").order("name")).data ?? [],
-  });
+  const { classes } = useScopedClassOptions();
+  const seesAll = useSeesAllSubjects(classId);
   const { data: students = [] } = useQuery({
     queryKey: ["students-class", classId],
     enabled: !!classId,
@@ -58,6 +57,11 @@ function BulletinsPage() {
         <p className="text-muted-foreground mt-1">Génération automatique conforme au système éducatif guinéen.</p>
       </div>
 
+      {classId && !seesAll && (
+        <div className="no-print rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          Vous n'enseignez qu'une partie des matières de cette classe : le bulletin complet (moyenne générale, rang) est établi par la direction.
+        </div>
+      )}
       <Card className="no-print">
         <CardContent className="p-4 grid gap-3 md:grid-cols-3">
           <div>
