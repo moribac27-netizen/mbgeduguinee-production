@@ -39,6 +39,7 @@ import {
   Legend,
 } from "recharts";
 
+import { NurseryDashboard } from "@/components/NurseryDashboard";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
@@ -46,7 +47,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       { name: "description", content: "Indicateurs, finances et activités récentes de votre établissement." },
     ],
   }),
-  component: Dashboard,
+  component: DashboardEntry,
 });
 
 function fmt(n: number) {
@@ -68,6 +69,15 @@ const ACTION_LABELS: Record<string, string> = {
   delete: "Suppression", export: "Export", print: "Impression", view: "Consultation",
   upload: "Téléversement", download: "Téléchargement", send: "Envoi", publish: "Publication",
 };
+
+/** L'éducatrice (rôle seul) a son propre tableau de bord ; les autres rôles gardent le tableau de bord de l'école. */
+function DashboardEntry() {
+  const { roles, loading } = useRoles();
+  if (!loading && roles.includes("educatrice_maternelle") && !roles.some((r) => ["admin", "directeur", "directeur_etudes", "proviseur", "enseignant", "comptable", "surveillant"].includes(r))) {
+    return <NurseryDashboard />;
+  }
+  return <Dashboard />;
+}
 
 function Dashboard() {
   const { roles } = useRoles();
