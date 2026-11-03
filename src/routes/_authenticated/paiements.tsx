@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText, Landmark } from "lucide-react";
+import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText, Landmark, Send, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
@@ -46,8 +46,26 @@ function PaymentsPage() {
   const { data: students = [] } = useQuery({
     queryKey: ["students-payments"],
     queryFn: async () =>
-      (await supabase.from("students").select("id, full_name, matricule, classes(name, annual_fee), payments(amount, validation_status)")).data ?? [],
+      (await supabase.from("students").select("id, full_name, matricule, parent_phone, classes(name, annual_fee), payments(amount, validation_status)")).data ?? [],
   });
+  const { data: reminders = [] } = useQuery({
+    queryKey: ["payment-reminders"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("payment_reminders").select("student_id, sent_at").order("sent_at", { ascending: false }).limit(5000);
+      if (error) return [] as any[]; // avant l'installation du SQL : pas de relances connues
+      return (data ?? []) as any[];
+    },
+  });
+  const lastReminder = useMemo(() => {
+    const m = new Map<string, { last: string; count: number }>();
+    for (const r of reminders as any[]) {
+      const cur = m.get(r.student_id);
+      if (!cur) m.set(r.student_id, { last: r.sent_at, count: 1 }); else cur.count += 1;
+    }
+    return m;
+  }, [reminders]);
+  const [remindOpen, setRemindOpen] = useState(false);
+
   const { data: school } = useQuery({
     queryKey: ["current-school-full"],
     queryFn: async () => {
@@ -171,6 +189,11 @@ function PaymentsPage() {
               )}
             </>
           )}
+          {tab === "late" && (
+            <Button className="gap-2" onClick={() => setRemindOpen(true)} disabled={lateStudents.length === 0}>
+              <Send className="size-4" /> Relancer les parents{selected.size > 0 ? ` (${selected.size})` : ""}
+            </Button>
+          )}
           <Button variant="outline" className="gap-2" onClick={() => {
             const src = tab === "late" ? lateStudents : rows;
             const subset = selected.size > 0 ? src.filter((r: any) => selected.has(r.id)) : src;
@@ -212,16 +235,24 @@ function PaymentsPage() {
         </div>
       )}
 
+      {remindOpen && (
+        <ReminderDialog
+          students={selected.size > 0 ? lateStudents.filter((s: any) => selected.has(s.id)) : lateStudents}
+          onClose={() => setRemindOpen(false)}
+          onDone={() => { setRemindOpen(false); setSelected(new Set()); void qc.invalidateQueries({ queryKey: ["payment-reminders"] }); }}
+        />
+      )}
+
       <Card>
         <CardContent className="p-4 overflow-x-auto">
           {tab === "late" ? (
             <Table>
               <TableHeader><TableRow>
                 <TableHead className="w-10"><input type="checkbox" checked={lateStudents.length > 0 && lateStudents.every((s: any) => selected.has(s.id))} onChange={(e) => setSelected(e.target.checked ? new Set(lateStudents.map((s: any) => s.id)) : new Set())} /></TableHead>
-                <TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>Payé</TableHead><TableHead>Reste</TableHead><TableHead>Progression</TableHead><TableHead className="text-right">Actions</TableHead>
+                <TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>Payé</TableHead><TableHead>Reste</TableHead><TableHead>Progression</TableHead><TableHead>Dernière relance</TableHead><TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {lateStudents.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Aucun retard</TableCell></TableRow>}
+                {lateStudents.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Aucun retard</TableCell></TableRow>}
                 {lateStudents.map((s: any) => (
                   <TableRow key={s.id} data-state={selected.has(s.id) ? "selected" : undefined}>
                     <TableCell><input type="checkbox" checked={selected.has(s.id)} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(s.id) : n.delete(s.id); setSelected(n); }} /></TableCell>
@@ -235,7 +266,15 @@ function PaymentsPage() {
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">{s.pct.toFixed(0)}%</div>
                     </TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {lastReminder.get(s.id) ? <>{new Date(lastReminder.get(s.id)!.last).toLocaleDateString("fr-FR")}<div>{lastReminder.get(s.id)!.count} relance(s)</div></> : "—"}
+                    </TableCell>
                     <TableCell className="text-right space-x-1 whitespace-nowrap">
+                      {s.parent_phone && (
+                        <Button asChild variant="ghost" size="icon" title="Relancer par WhatsApp">
+                          <a href={whatsappLink(s.parent_phone, defaultReminderText(s.full_name, s.remaining))} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4 text-green-600" /></a>
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" title="Imprimer" onClick={() => exportPdf([], "late", school, [s])}><Printer className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Télécharger Excel" onClick={() => exportExcel([s], "late")}><FileSpreadsheet className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Télécharger PDF" onClick={() => exportPdf([], "late", school, [s])}><FileText className="size-4" /></Button>
@@ -752,4 +791,54 @@ async function printSelectedReceipts(payments: any[], school: any) {
     await printReceipt(p, school);
     await new Promise((r) => setTimeout(r, 400));
   }
+}
+
+
+const defaultReminderText = (name: string, remaining: number) =>
+  `Bonjour, sauf erreur de notre part, il reste ${new Intl.NumberFormat("fr-FR").format(Math.round(remaining)).replace(/[\u202f\u00a0]/g, " ")} GNF à régler pour la scolarité de ${name}. Merci de passer à l'administration ou de régulariser dès que possible. Si vous avez déjà payé, veuillez ignorer ce message.`;
+
+/** Lien WhatsApp : numéros guinéens à 9 chiffres complétés par l'indicatif 224. */
+function whatsappLink(phone: string, text: string) {
+  let d = String(phone).replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 9) d = "224" + d;
+  return `https://wa.me/${d}?text=${encodeURIComponent(text)}`;
+}
+
+/** Relance des parents : message dans leur messagerie + notification. {eleve} et {reste} sont remplacés pour chaque élève. */
+function ReminderDialog({ students, onClose, onDone }: { students: any[]; onClose: () => void; onDone: () => void }) {
+  const [message, setMessage] = useState("Bonjour, sauf erreur de notre part, il reste {reste} GNF à régler pour la scolarité de {eleve}. Merci de passer à l'administration ou de régulariser dès que possible. Si vous avez déjà payé, veuillez ignorer ce message.");
+  const [busy, setBusy] = useState(false);
+  const total = students.reduce((sum, s) => sum + Math.max(0, Number(s.remaining) || 0), 0);
+  async function send() {
+    setBusy(true);
+    const { data, error } = await (supabase as any).rpc("send_payment_reminders", { _student_ids: students.map((s) => s.id), _message: message.trim() || null });
+    setBusy(false);
+    if (error) return void toast.error("Envoi impossible", { description: error.message });
+    const r = data ?? {};
+    const parts = [`${r.sent ?? 0} relance(s) envoyée(s)`];
+    if (r.skipped_recent) parts.push(`${r.skipped_recent} déjà relancé(s) il y a moins de 7 jours`);
+    if (r.skipped_no_parent) parts.push(`${r.skipped_no_parent} sans compte parent (utilisez WhatsApp)`);
+    if (r.skipped_paid) parts.push(`${r.skipped_paid} déjà soldé(s)`);
+    toast.success(parts.join(" · "));
+    onDone();
+  }
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Relancer les parents</DialogTitle>
+          <DialogDescription>{students.length} élève(s) en retard · {fmt(total)} GNF restants. Le message arrive dans la messagerie du parent, avec une notification. Un même élève n'est pas relancé deux fois en 7 jours.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label>Message ({"{eleve}"} et {"{reste}"} sont remplacés pour chaque élève)</Label>
+          <Textarea rows={6} maxLength={1000} value={message} onChange={(e) => setMessage(e.target.value)} />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Annuler</Button>
+          <Button onClick={() => void send()} disabled={busy || students.length === 0} className="gap-2"><Send className="size-4" />{busy ? "Envoi…" : `Envoyer à ${students.length} élève(s)`}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
