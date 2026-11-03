@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText, Landmark, Send, MessageCircle } from "lucide-react";
+import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText, Landmark, Send, MessageCircle, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
@@ -96,6 +96,23 @@ function PaymentsPage() {
       return (data ?? []) as Array<{ account_id: string; name: string; type: string; is_active?: boolean }>;
     },
   });
+  // Remboursements (table créée par le SQL « remboursement » ; avant son installation : aucun remboursement connu).
+  const { data: refunds = [] } = useQuery({
+    queryKey: ["payment-refunds"],
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("payment_refunds").select("payment_id, refund_payment_id, amount, reason").limit(5000);
+      if (error) return [] as any[];
+      return (data ?? []) as any[];
+    },
+  });
+  const refundedOf = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of refunds as any[]) m.set(r.payment_id, (m.get(r.payment_id) ?? 0) + Number(r.amount));
+    return m;
+  }, [refunds]);
+  const refundRowIds = useMemo(() => new Set((refunds as any[]).map((r) => r.refund_payment_id).filter(Boolean)), [refunds]);
+  const [refundTarget, setRefundTarget] = useState<PaymentRow | null>(null);
   const [postTarget, setPostTarget] = useState<PaymentRow | null>(null);
   const showAccounting = !noAccounting && !!postedIds;
   const isPosted = (id: string) => !!postedIds?.has(id);
@@ -310,10 +327,14 @@ function PaymentsPage() {
                     <TableCell><Badge variant="outline" className="capitalize">{p.payment_type}</Badge></TableCell>
                     <TableCell className="text-sm">{p.payment_method}</TableCell>
                     <TableCell className="font-mono text-xs">{p.transaction_reference ?? "—"}</TableCell>
-                    <TableCell className="font-semibold">{fmt(p.amount)} GNF</TableCell>
+                    <TableCell className={"font-semibold " + (Number(p.amount) < 0 ? "text-destructive" : "")}>
+                      {fmt(p.amount)} GNF
+                      {refundedOf.get(p.id) ? <div className="text-xs font-normal text-muted-foreground">dont {fmt(refundedOf.get(p.id)!)} remboursés</div> : null}
+                    </TableCell>
                     {showAccounting && (
                       <TableCell className="whitespace-nowrap">
-                        {p.validation_status !== "validé" ? <span className="text-xs text-muted-foreground">Après validation</span>
+                        {Number(p.amount) < 0 ? <Badge variant="outline" className="gap-1 text-destructive"><Undo2 className="size-3" />Remboursement</Badge>
+                          : p.validation_status !== "validé" ? <span className="text-xs text-muted-foreground">Après validation</span>
                           : isPosted(p.id) ? <Badge variant="outline" className="gap-1 text-emerald-700"><Landmark className="size-3" />Comptabilisé</Badge>
                           : <Button size="sm" variant="outline" className="gap-1" onClick={() => setPostTarget(p)}><Landmark className="size-3.5" />Comptabiliser</Button>}
                       </TableCell>
@@ -325,6 +346,9 @@ function PaymentsPage() {
                           <Button size="sm" variant="outline" className="gap-1 text-destructive" onClick={() => rejectPayment(p)}><XCircle className="size-3.5" />Rejeter</Button>
                         </>
                       ) : null}
+                      {showAccounting && p.validation_status === "validé" && Number(p.amount) > 0 && !refundRowIds.has(p.id) && Number(p.amount) - (refundedOf.get(p.id) ?? 0) > 0 && (
+                        <Button size="sm" variant="outline" className="gap-1" title="Rembourser tout ou partie de ce paiement" onClick={() => setRefundTarget(p)}><Undo2 className="size-3.5" />Rembourser</Button>
+                      )}
                       <Button variant="ghost" size="icon" title="Imprimer le reçu" onClick={() => p.receipt_number ? printReceipt(p, school) : exportPdf([p], tab, school, [])}><Printer className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Télécharger Excel" onClick={() => exportExcel([p], tab)}><FileSpreadsheet className="size-4" /></Button>
                       <Button variant="ghost" size="icon" title="Télécharger PDF" onClick={() => exportPdf([p], tab, school, [])}><FileText className="size-4" /></Button>
@@ -337,6 +361,17 @@ function PaymentsPage() {
 
         </CardContent>
       </Card>
+      <RefundDialog
+        payment={refundTarget}
+        posted={refundTarget ? isPosted(refundTarget.id) : false}
+        left={refundTarget ? Number(refundTarget.amount) - (refundedOf.get(refundTarget.id) ?? 0) : 0}
+        accounts={accounts}
+        onClose={() => setRefundTarget(null)}
+        onDone={() => {
+          setRefundTarget(null);
+          for (const k of ["payments", "payment-refunds", "students-payments", "payments-posted", "acc"]) void qc.invalidateQueries({ queryKey: [k] });
+        }}
+      />
       <PostPaymentDialog payment={postTarget} accounts={accounts} onClose={() => setPostTarget(null)} onDone={() => { setPostTarget(null); qc.invalidateQueries({ queryKey: ["payments-posted"] }); qc.invalidateQueries({ queryKey: ["acc"] }); }} />
     </div>
   );
@@ -383,6 +418,66 @@ function PostPaymentDialog({ payment, accounts, onClose, onDone }: { payment: Pa
           </div>
         )}
         <DialogFooter><Button onClick={post} disabled={busy || !chosen}>Comptabiliser</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Remboursement total ou partiel d'un paiement validé : paiement négatif + (si comptabilisé) dépense sur le compte. */
+function RefundDialog({ payment, posted, left, accounts, onClose, onDone }: { payment: PaymentRow | null; posted: boolean; left: number; accounts: Array<{ account_id: string; name: string; type: string; is_active?: boolean }>; onClose: () => void; onDone: () => void }) {
+  const [amount, setAmount] = useState<string>("");
+  const [reason, setReason] = useState("");
+  const [accountId, setAccountId] = useState("origin");
+  const [busy, setBusy] = useState(false);
+  const value = amount === "" ? left : Number(amount);
+  const invalid = !payment || !(value > 0) || value > left || reason.trim().length < 3;
+  function reset() { setAmount(""); setReason(""); setAccountId("origin"); }
+  async function submit() {
+    if (!payment || invalid || busy) return;
+    setBusy(true);
+    const { error } = await (supabase as any).rpc("refund_payment", {
+      _payment_id: payment.id, _amount: value, _reason: reason.trim(), _account_id: accountId === "origin" ? null : accountId,
+    });
+    setBusy(false);
+    if (error) return void toast.error(error.message);
+    toast.success(`${fmt(value)} GNF remboursés${posted ? " — dépense enregistrée en Comptabilité" : ""}`);
+    reset(); onDone();
+  }
+  return (
+    <Dialog open={!!payment} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rembourser ce paiement</DialogTitle>
+          <DialogDescription>
+            {payment ? `${payment.students?.full_name ?? "Élève"} — ${fmt(Number(payment.amount))} GNF${payment.receipt_number ? ` (reçu ${payment.receipt_number})` : ""}. Reste remboursable : ${fmt(left)} GNF.` : ""}
+            {" "}Le paiement d'origine reste visible ; le reste à payer de l'élève augmente du montant remboursé.
+            {posted ? " Une dépense du même montant sera créée en Comptabilité (le solde du compte baisse)." : " Ce paiement n'est pas en Comptabilité : aucune dépense ne sera créée."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Montant à rembourser (GNF)</Label>
+            <Input type="number" min={1} max={left} value={amount === "" ? String(left) : amount} onChange={(e) => setAmount(e.target.value)} />
+            {value > left && <p className="text-xs text-destructive mt-1">Maximum : {fmt(left)} GNF.</p>}
+          </div>
+          <div>
+            <Label>Motif (obligatoire)</Label>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. : paiement en double, départ de l'élève…" />
+          </div>
+          {posted && accounts.length > 0 && (
+            <div>
+              <Label>Compte qui rend l'argent</Label>
+              <Select value={accountId} onValueChange={setAccountId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="origin">Le compte qui avait reçu le paiement</SelectItem>
+                  {accounts.filter((a) => a.is_active !== false).map((a) => <SelectItem key={a.account_id} value={a.account_id}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <DialogFooter><Button onClick={submit} disabled={invalid || busy}>{busy ? "Remboursement…" : "Confirmer le remboursement"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
