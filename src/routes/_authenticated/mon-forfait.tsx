@@ -102,25 +102,45 @@ function MonForfaitPage() {
     },
   });
 
+  // Calendrier de paiement mensuel progressif (uniquement pour les écoles souscrites après sa mise en service).
+  const schedule = useQuery({
+    queryKey: ["my-flat-schedule"],
+    enabled: !!flat,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("my_flat_schedule");
+      if (error) return null; // avant l'installation du SQL : fonctionnement habituel
+      return (data ?? null) as any;
+    },
+  });
+  const [monthsCount, setMonthsCount] = useState<number | null>(null);
+
   if (loading) return <Loader2 className="size-5 animate-spin" />;
   if (!flat) return <p className="text-sm text-muted-foreground">Votre établissement n'est pas sous une offre établissement.</p>;
   if (flat.expired) return <ChoosePerStudentPlan flat={flat} />;
 
   const months = monthsOfAcademicYear(flat.academic_year);
-  const amount = type === "annual" ? flat.annual_price : flat.monthly_price;
+  const prog = schedule.data?.progressive ? schedule.data : null;
+  const minMonths: number = prog ? Number(prog.min_months) : 1;
+  const maxMonths: number = prog ? Number(prog.remaining_months) : 1;
+  const chosenMonths = prog ? Math.min(Math.max(monthsCount ?? minMonths, minMonths), Math.max(maxMonths, minMonths)) : 1;
+  const amount = type === "annual" ? flat.annual_price : prog ? flat.monthly_price * chosenMonths : flat.monthly_price;
 
   async function declare() {
     if (busy) return;
-    if (type === "monthly" && !month) { toast.error("Choisissez le mois payé."); return; }
+    if (type === "monthly" && !prog && !month) { toast.error("Choisissez le mois payé."); return; }
+    if (type === "monthly" && prog && maxMonths < 1) { toast.error("Les 12 mois de l'année sont déjà payés ou déclarés."); return; }
     if (ref.trim().length < 4) { toast.error("Saisissez la référence du paiement (au moins 4 caractères)."); return; }
     setBusy(true);
     const { error } = await (supabase as any).rpc("declare_flat_payment", {
-      _period_type: type, _period_month: type === "monthly" ? month : null, _payer_reference: ref.trim(),
+      _period_type: type, _period_month: type === "monthly" && !prog ? month : null, _payer_reference: ref.trim(),
+      ...(type === "monthly" && prog ? { _months: chosenMonths } : {}), // inchangé pour les écoles sous l'ancienne règle
     });
     setBusy(false);
     if (error) { toast.error(flatPaymentErrorMessage(error.message)); return; }
     toast.success("Paiement déclaré. Il sera activé après validation par l'administration.");
-    setRef("");
+    setRef(""); setMonthsCount(null);
+    void qc.invalidateQueries({ queryKey: ["my-flat-schedule"] });
     void qc.invalidateQueries({ queryKey: ["my-flat-payments"] });
     void qc.invalidateQueries({ queryKey: MY_FLAT_OFFER_KEY });
   }
@@ -159,12 +179,41 @@ function MonForfaitPage() {
           {flat.phase === "trial" && flat.trial_end_date && (
             <div className="sm:col-span-2 lg:col-span-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Période d'essai jusqu'au {formatDateFr(flat.trial_end_date)} ({Math.max(flat.trial_days_left ?? 0, 0)} jour(s) restant(s)), limitée à {flat.trial_max_students ?? 10} élèves. Les notes, bulletins et examens sont activés après validation de votre premier paiement.</div>
           )}
-          {flat.next_due_date && !flat.annual_paid && (
+          {flat.next_due_date && !flat.annual_paid && !prog && (
             <div className="sm:col-span-2"><div className="text-xs text-muted-foreground">Prochaine échéance</div>
               <div className="font-semibold">{formatDateFr(flat.next_due_date)}{flat.grace_end_date ? ` — tolérance jusqu'au ${formatDateFr(flat.grace_end_date)}` : ""}{typeof flat.grace_days_left === "number" ? (flat.grace_days_left >= 0 ? ` (${flat.grace_days_left} jour(s) restant(s))` : " (délai dépassé)") : ""}</div></div>
           )}
         </CardContent>
       </Card>
+
+      {prog && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Calendrier de paiement mensuel</CardTitle>
+            <CardDescription>
+              Les {prog.total_months} mois de l'année se règlent par acomptes croissants. {prog.paid_months} mois payés (validés) sur {prog.total_months}
+              {prog.declared_months > prog.paid_months ? ` — ${prog.declared_months - prog.paid_months} en attente de validation` : ""}.
+              {prog.min_months > 0 ? ` Prochain paiement : au moins ${prog.min_months} mois, soit ${formatPublicGNF(Number(prog.min_amount))}.` : " Tous les mois sont réglés ou déclarés."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Échéance</TableHead><TableHead>Mois payés exigés (cumul)</TableHead><TableHead>Montant cumulé</TableHead><TableHead>Situation</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {(prog.rows ?? []).map((r: any) => (
+                  <TableRow key={r.k}>
+                    <TableCell>{formatDateFr(r.due_date)}{` (tolérance jusqu'au ${formatDateFr(r.grace_end_date)})`}</TableCell>
+                    <TableCell>{r.required_months}</TableCell>
+                    <TableCell>{formatPublicGNF(Number(r.required_amount))}</TableCell>
+                    <TableCell>{r.met ? <Badge className="bg-emerald-100 text-emerald-900">Réglé</Badge> : <Badge className="bg-amber-100 text-amber-900">À régler</Badge>}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <p className="mt-3 text-xs text-muted-foreground">Une échéance non réglée après la tolérance limite l'accès de l'établissement, comme pour un retard de paiement habituel.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Moyens de paiement disponibles</CardTitle></CardHeader>
@@ -188,7 +237,18 @@ function MonForfaitPage() {
                 </SelectContent>
               </Select>
             </div>
-            {type === "monthly" && (
+            {type === "monthly" && prog && (
+              <div className="space-y-1.5">
+                <Label>Nombre de mois à payer</Label>
+                <Select value={String(chosenMonths)} onValueChange={(v) => setMonthsCount(Number(v))} disabled={maxMonths < 1}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: Math.max(maxMonths - minMonths + 1, 0) }, (_, i) => minMonths + i).map((n) => <SelectItem key={n} value={String(n)}>{n} mois{n === minMonths ? " (minimum)" : ""}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {type === "monthly" && !prog && (
               <div className="space-y-1.5">
                 <Label>Mois payé</Label>
                 <Select value={month} onValueChange={setMonth}>
@@ -218,7 +278,7 @@ function MonForfaitPage() {
               {(payments.data ?? []).map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-xs">{p.reference}</TableCell>
-                  <TableCell>{p.period_type === "annual" ? "Année complète" : new Date(p.period_month + "T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</TableCell>
+                  <TableCell>{p.period_type === "annual" ? "Année complète" : (Number(p.months_covered) > 1 ? `${p.months_covered} mois à partir de ` : "") + new Date(p.period_month + "T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</TableCell>
                   <TableCell>{formatPublicGNF(Number(p.amount))}</TableCell>
                   <TableCell>{p.payer_reference}</TableCell>
                   <TableCell><Badge className={STATUS[p.status]?.cls}>{STATUS[p.status]?.label ?? p.status}</Badge>{p.review_note ? <div className="mt-1 text-xs text-muted-foreground">{p.review_note}</div> : null}</TableCell>

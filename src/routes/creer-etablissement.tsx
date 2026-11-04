@@ -68,6 +68,7 @@ function CreateSchoolOffer() {
   // Le choix est conservé dans la session : retour arrière, rechargement ou changement de page ne le font pas perdre.
   const [code, setCode] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [accepted, setAccepted] = useState(false);
 
   useEffect(() => {
     const fromUrl = offre ? resolveSignupOffer(offre, signupOffers) : null;
@@ -104,9 +105,11 @@ function CreateSchoolOffer() {
   function change() {
     clearSignupOfferCode();
     setCode(null);
+    setAccepted(false);
   }
   function next() {
     if (!selected) return;
+    if (selected.flat && !accepted) return;
     saveSignupOfferCode(selected.code, selected);
     // /auth lit son contexte (espace + mode) dans l'URL : navigation complète, le choix reste dans la session.
     window.location.assign("/auth?role=etablissement&mode=signup");
@@ -186,9 +189,15 @@ function CreateSchoolOffer() {
                   <div className="mt-6 space-y-2 rounded-xl bg-[#EEF4FA] p-4 text-sm leading-6">
                     {offerConditions(selected).map((c) => <p key={c}>{c}</p>)}
                   </div>
+                  {selected.flat && (
+                    <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm">
+                      <input type="checkbox" className="mt-1 size-4" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+                      <span>J'ai lu et j'accepte ces conditions, y compris le calendrier de paiement mensuel.</span>
+                    </label>
+                  )}
                   <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
                     <Button variant="outline" onClick={change}><ArrowLeft className="mr-2 size-4" /> Changer d'offre</Button>
-                    <Button className="bg-[#0B1F3A] text-white hover:bg-[#123B68]" onClick={next}>Continuer <ArrowRight className="ml-2 size-4" /></Button>
+                    <Button className="bg-[#0B1F3A] text-white hover:bg-[#123B68]" onClick={next} disabled={!!selected.flat && !accepted}>Continuer <ArrowRight className="ml-2 size-4" /></Button>
                   </div>
                 </CardContent>
               </Card>

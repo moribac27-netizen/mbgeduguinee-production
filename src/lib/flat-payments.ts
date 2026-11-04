@@ -22,6 +22,10 @@ const MESSAGES: Record<string, string> = {
   MONTHLY_ALREADY_DECLARED: "Des paiements mensuels existent déjà pour cette année : le paiement annuel n'est plus possible.",
   ANNUAL_ALREADY_DECLARED: "Le paiement annuel est déjà déclaré pour cette année.",
   DUPLICATE_PAYMENT: "Ce paiement existe déjà (même période ou même référence).",
+  MONTHS_INVALID: "Choisissez un nombre de mois valide.",
+  MONTHS_BELOW_MINIMUM: "Le nombre de mois est inférieur au minimum demandé par le calendrier de paiement.",
+  MONTHS_TOO_MANY: "Ce nombre de mois dépasse les mois restant à payer pour l'année.",
+  ALL_MONTHS_PAID: "Les 12 mois de l'année sont déjà payés ou déclarés.",
   PERIOD_INVALID: "Type de paiement invalide.",
   PAYMENT_NOT_FOUND: "Paiement introuvable.",
   ALREADY_REVIEWED: "Ce paiement a déjà été traité.",
@@ -38,9 +42,9 @@ export function flatPaymentErrorMessage(raw: string | undefined | null): string 
 const esc = (t: unknown) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
 /** Ouvre un reçu imprimable pour un paiement de forfait VALIDÉ (aucun reçu pour un paiement en attente ou rejeté). */
-export function printFlatReceipt(p: { reference: string; period_type: string; period_month: string | null; amount: number | string; payer_reference: string; status: string; reviewed_at?: string | null; academic_year: string }, schoolName: string, offerName: string): void {
+export function printFlatReceipt(p: { reference: string; period_type: string; period_month: string | null; amount: number | string; payer_reference: string; status: string; reviewed_at?: string | null; academic_year: string; months_covered?: number | null }, schoolName: string, offerName: string): void {
   if (p.status !== "VALIDATED" || typeof window === "undefined") return;
-  const period = p.period_type === "annual" ? `Année scolaire ${p.academic_year} (paiement annuel)` : new Date(String(p.period_month) + "T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const period = p.period_type === "annual" ? `Année scolaire ${p.academic_year} (paiement annuel)` : (Number(p.months_covered) > 1 ? `${Number(p.months_covered)} mois à partir de ` : "") + new Date(String(p.period_month) + "T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
   const amount = `${Math.round(Number(p.amount)).toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ")} GNF`;
   const w = window.open("", "_blank", "width=720,height=800");
   if (!w) return;
