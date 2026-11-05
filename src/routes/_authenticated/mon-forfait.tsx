@@ -180,7 +180,7 @@ function MonForfaitPage() {
           <CardHeader>
             <CardTitle className="text-base">Calendrier de paiement mensuel</CardTitle>
             <CardDescription>
-              Les 12 mois de l'année se règlent par acomptes croissants. {prog.paid_months_count ?? 0} mois payés sur 12
+              Vous payez mois par mois (ou plusieurs mois à la fois) ; les 12 mois doivent être réglés avant la date limite. {prog.paid_months_count ?? 0} mois payés sur 12
               {prog.full_by ? ` — règlement complet attendu avant le ${formatDateFr(prog.full_by)}` : ""}.
               {Number(prog.min_months) > 0 ? ` Prochain paiement : au moins ${prog.min_months} mois, soit ${formatPublicGNF(Number(prog.min_amount))}.` : " Tous les mois sont réglés ou déclarés."}
               {prog.next_due_date ? ` Prochaine échéance : ${formatDateFr(prog.next_due_date)}${typeof prog.grace_days_left === "number" ? (prog.grace_days_left >= 0 ? ` (${prog.grace_days_left} jour(s) de tolérance restant(s))` : " (délai dépassé)") : ""}.` : ""}
