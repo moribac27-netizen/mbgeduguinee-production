@@ -32,6 +32,14 @@ export interface MyFlatOffer {
   grace_end_date?: string | null;
   grace_days_left?: number | null;
   payment_methods?: PaymentMethod[];
+  /** Plan mensuel progressif : tout est calculé par la base, le front affiche seulement. */
+  progressive?: boolean;
+  schedule?: Array<{ k: number; due_date: string; grace_end_date: string; required_months: number; required_amount: number | string; met: boolean }>;
+  paid_months_count?: number;
+  remaining_months?: number;
+  min_months?: number;
+  min_amount?: number | string;
+  full_by?: string | null;
 }
 
 export interface PaymentMethod {

@@ -102,17 +102,6 @@ function MonForfaitPage() {
     },
   });
 
-  // Calendrier de paiement mensuel progressif (uniquement pour les écoles souscrites après sa mise en service).
-  const schedule = useQuery({
-    queryKey: ["my-flat-schedule"],
-    enabled: !!flat,
-    retry: false,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("my_flat_schedule");
-      if (error) return null; // avant l'installation du SQL : fonctionnement habituel
-      return (data ?? null) as any;
-    },
-  });
   const [monthsCount, setMonthsCount] = useState<number | null>(null);
 
   if (loading) return <Loader2 className="size-5 animate-spin" />;
@@ -120,7 +109,8 @@ function MonForfaitPage() {
   if (flat.expired) return <ChoosePerStudentPlan flat={flat} />;
 
   const months = monthsOfAcademicYear(flat.academic_year);
-  const prog = schedule.data?.progressive ? schedule.data : null;
+  // Tout le calendrier est calculé et renvoyé par la base (my_flat_offer_status) : le front affiche seulement.
+  const prog = flat.progressive ? flat : null;
   const minMonths: number = prog ? Number(prog.min_months) : 1;
   const maxMonths: number = prog ? Number(prog.remaining_months) : 1;
   const chosenMonths = prog ? Math.min(Math.max(monthsCount ?? minMonths, minMonths), Math.max(maxMonths, minMonths)) : 1;
@@ -140,8 +130,7 @@ function MonForfaitPage() {
     if (error) { toast.error(flatPaymentErrorMessage(error.message)); return; }
     toast.success("Paiement déclaré. Il sera activé après validation par l'administration.");
     setRef(""); setMonthsCount(null);
-    void qc.invalidateQueries({ queryKey: ["my-flat-schedule"] });
-    void qc.invalidateQueries({ queryKey: ["my-flat-payments"] });
+        void qc.invalidateQueries({ queryKey: ["my-flat-payments"] });
     void qc.invalidateQueries({ queryKey: MY_FLAT_OFFER_KEY });
   }
 
@@ -191,16 +180,17 @@ function MonForfaitPage() {
           <CardHeader>
             <CardTitle className="text-base">Calendrier de paiement mensuel</CardTitle>
             <CardDescription>
-              Les {prog.total_months} mois de l'année se règlent par acomptes croissants. {prog.paid_months} mois payés (validés) sur {prog.total_months}
-              {prog.declared_months > prog.paid_months ? ` — ${prog.declared_months - prog.paid_months} en attente de validation` : ""}.
-              {prog.min_months > 0 ? ` Prochain paiement : au moins ${prog.min_months} mois, soit ${formatPublicGNF(Number(prog.min_amount))}.` : " Tous les mois sont réglés ou déclarés."}
+              Les 12 mois de l'année se règlent par acomptes croissants. {prog.paid_months_count ?? 0} mois payés sur 12
+              {prog.full_by ? ` — règlement complet attendu avant le ${formatDateFr(prog.full_by)}` : ""}.
+              {Number(prog.min_months) > 0 ? ` Prochain paiement : au moins ${prog.min_months} mois, soit ${formatPublicGNF(Number(prog.min_amount))}.` : " Tous les mois sont réglés ou déclarés."}
+              {prog.next_due_date ? ` Prochaine échéance : ${formatDateFr(prog.next_due_date)}${typeof prog.grace_days_left === "number" ? (prog.grace_days_left >= 0 ? ` (${prog.grace_days_left} jour(s) de tolérance restant(s))` : " (délai dépassé)") : ""}.` : ""}
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow><TableHead>Échéance</TableHead><TableHead>Mois payés exigés (cumul)</TableHead><TableHead>Montant cumulé</TableHead><TableHead>Situation</TableHead></TableRow></TableHeader>
               <TableBody>
-                {(prog.rows ?? []).map((r: any) => (
+                {(prog.schedule ?? []).map((r: any) => (
                   <TableRow key={r.k}>
                     <TableCell>{formatDateFr(r.due_date)}{` (tolérance jusqu'au ${formatDateFr(r.grace_end_date)})`}</TableCell>
                     <TableCell>{r.required_months}</TableCell>
