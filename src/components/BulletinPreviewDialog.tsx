@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Printer, FileDown, ZoomIn, ZoomOut } from "lucide-react";
 import { BulletinDocument, BULLETIN_PERIODS, periodLabel } from "@/components/BulletinDocument";
 import { logActivity } from "@/lib/audit";
+import { printWhenReady } from "@/lib/print-ready";
 
 const A4_WIDTH_PX = 794; // 210mm @ 96dpi
 
@@ -49,7 +50,7 @@ export function BulletinPreviewDialog({
       entity_label: studentName ?? null,
       metadata: { periode: periodLabel(period), source: "apercu" },
     });
-    window.print();
+    void printWhenReady();
   }
 
   const scale = fit * zoom;

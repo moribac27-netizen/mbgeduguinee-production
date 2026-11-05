@@ -5,6 +5,7 @@ import { maxScoreForLevel } from "@/lib/grading";
 import { StudentPhoto } from "@/components/StudentPhoto";
 import { BulletinAnalytics } from "@/components/BulletinAnalytics";
 import { SchoolLetterhead, SchoolPrintFooter } from "@/components/print/SchoolLetterhead";
+import { SchoolSignatureBlock } from "@/components/print/SchoolSignatureBlock";
 import { useSchool } from "@/hooks/useSchool";
 import { newDocumentReference } from "@/lib/reports";
 import {
@@ -173,23 +174,8 @@ export function BulletinDocument({ studentId, classId, period, paged = false }: 
 
       <BulletinAnalytics studentId={selected.student.id} classId={classId} maxScore={maxScore} />
 
-      {/* Signatures */}
-      <div className="grid grid-cols-3 gap-4 text-xs text-center mt-8">
-        <div>
-          <div className="font-semibold mb-12">Le Titulaire</div>
-          <div className="border-t border-black pt-1">Signature</div>
-        </div>
-        <div>
-          <div className="font-semibold mb-2">Cachet de l'établissement</div>
-          <div className="mx-auto size-24 rounded-full border-2 border-dashed border-gray-500 flex items-center justify-center text-[10px] text-gray-500">
-            CACHET
-          </div>
-        </div>
-        <div>
-          <div className="font-semibold mb-12">Le Directeur</div>
-          <div className="border-t border-black pt-1">Signature</div>
-        </div>
-      </div>
+      {/* Signatures : cachet et signature réels de l'établissement */}
+      <SchoolSignatureBlock />
 
       <SchoolPrintFooter school={school} />
 

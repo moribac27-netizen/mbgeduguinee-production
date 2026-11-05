@@ -12,6 +12,7 @@ import { BulletinPreviewDialog } from "@/components/BulletinPreviewDialog";
 import { logActivity } from "@/lib/audit";
 import { useScopedClassOptions, useSeesAllSubjects } from "@/hooks/useOptions";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
+import { printWhenReady } from "@/lib/print-ready";
 
 export const Route = createFileRoute("/_authenticated/bulletins")({
   head: () => ({ meta: [{ title: "Bulletins scolaires — MBGEduGuinée" }] }),
@@ -47,7 +48,7 @@ function BulletinsPage() {
       entity_label: student?.full_name ?? null,
       metadata: { periode: periodLabel(period) },
     });
-    window.print();
+    void printWhenReady();
   }
 
   return (

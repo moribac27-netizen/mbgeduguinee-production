@@ -20,7 +20,9 @@ export function useSignedUrl(path: string | null | undefined, bucket = "school-a
         cache.set(key, { url: data.signedUrl, expires: now + 55 * 60 * 1000 });
         setUrl(data.signedUrl);
       } else {
-        setUrl(null);
+        // Repli : le bucket des logos est public, l'URL publique fonctionne si la signature échoue.
+        const pub = supabase.storage.from(bucket).getPublicUrl(path).data?.publicUrl;
+        setUrl(pub ?? null);
       }
     });
     return () => { cancelled = true; };

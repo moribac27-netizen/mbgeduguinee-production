@@ -18,6 +18,7 @@ import {
   periodsFor,
   computeRanking,
 } from "@/lib/rankings";
+import { SchoolSignatureBlock } from "@/components/print/SchoolSignatureBlock";
 import { exportPDF, exportExcel, type ExportColumn } from "@/lib/reports";
 import { logActivity } from "@/lib/audit";
 
@@ -278,22 +279,7 @@ function ResultatsGenerauxPage() {
             </tbody>
           </table>
 
-          <div className="grid grid-cols-3 gap-4 text-xs text-center mt-10">
-            <div>
-              <div className="font-semibold mb-12">Le Titulaire</div>
-              <div className="border-t border-black pt-1">Signature</div>
-            </div>
-            <div>
-              <div className="font-semibold mb-2">Cachet de l'établissement</div>
-              <div className="mx-auto size-24 rounded-full border-2 border-dashed border-gray-500 flex items-center justify-center text-[10px] text-gray-500">
-                CACHET
-              </div>
-            </div>
-            <div>
-              <div className="font-semibold mb-12">Le Directeur</div>
-              <div className="border-t border-black pt-1">Signature</div>
-            </div>
-          </div>
+          <SchoolSignatureBlock className="mt-10" />
 
           <div className="text-[9px] text-center mt-6 text-slate-500">
             Édité le {new Date().toLocaleDateString("fr-FR")} · Document généré par MBGEduGuinée

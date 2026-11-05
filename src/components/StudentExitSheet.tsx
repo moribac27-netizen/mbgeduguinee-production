@@ -6,6 +6,7 @@ import { useSchool } from "@/hooks/useSchool";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { maxScoreForLevel } from "@/lib/grading";
 import { fmtMoney } from "@/lib/reports";
+import { SchoolSignatureBlock } from "@/components/print/SchoolSignatureBlock";
 import { DocumentFooter, DocumentHeader, DocumentStat, StudentIdentity } from "@/components/documents/DocumentPrimitives";
 import { Button } from "@/components/ui/button";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
@@ -129,7 +130,7 @@ export function StudentExitSheet({ studentId }: { studentId: string }) {
           <div className="min-h-20 rounded-xl border p-4 text-sm">Observations : ........................................................................................................................................<br /><br />Décision / motif de sortie : ............................................................................................................................</div>
         </section>
 
-        <div className="mbg-signature-grid"><div><div className="mbg-signature-box">Le responsable administratif</div></div><div><div className="mbg-signature-box">Cachet de l'établissement</div></div><div><div className="mbg-signature-box">Le Directeur</div></div></div>
+        <SchoolSignatureBlock leftLabel="Le responsable administratif" />
         <DocumentFooter reference={ref} />
       </article>
     </div>

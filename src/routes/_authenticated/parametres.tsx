@@ -231,20 +231,23 @@ function AssetUploader({ kind, schoolId, url, label, onDone }: {
     if (f.size > MAX_SIZE) return toast.error("Fichier trop volumineux (max 5 Mo)");
     setPending(f);
     setPreview(URL.createObjectURL(f));
+    // Envoi immédiat : plus besoin d'un second clic (les fichiers choisis mais jamais « téléversés » n'apparaissaient pas sur les documents).
+    void upload(f);
   }
 
-  async function upload() {
-    if (!pending || !schoolId) return;
+  async function upload(file?: File) {
+    const pending_ = file ?? pending;
+    if (!pending_ || !schoolId) return;
     setUploading(true);
     try {
       // Remove previous file if it exists in bucket
       if (currentPath) {
         await supabase.storage.from("school-assets").remove([currentPath]);
       }
-      const ext = pending.name.split(".").pop()?.toLowerCase() || "png";
+      const ext = pending_.name.split(".").pop()?.toLowerCase() || "png";
       const path = `${schoolId}/${kind}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("school-assets").upload(path, pending, {
-        contentType: pending.type,
+      const { error } = await supabase.storage.from("school-assets").upload(path, pending_, {
+        contentType: pending_.type,
         upsert: true,
       });
       if (error) throw error;
@@ -288,12 +291,12 @@ function AssetUploader({ kind, schoolId, url, label, onDone }: {
         />
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => fileRef.current?.click()}>
-            <Upload className="size-4" /> Choisir
+            <Upload className="size-4" /> {uploading ? "Envoi…" : "Choisir un fichier"}
           </Button>
           {pending && (
-            <Button size="sm" className="flex-1 gap-2" onClick={upload} disabled={uploading}>
+            <Button size="sm" className="flex-1 gap-2" onClick={() => upload()} disabled={uploading}>
               {uploading ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-              Téléverser
+              Réessayer l'envoi
             </Button>
           )}
         </div>

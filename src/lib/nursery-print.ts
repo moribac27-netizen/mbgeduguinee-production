@@ -1,4 +1,4 @@
-import type { PdfMeta } from "@/lib/reports";
+import { signatureBlockHtml, type PdfMeta } from "@/lib/reports";
 
 const esc = (v: any) =>
   String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m] as string);
@@ -256,7 +256,7 @@ ${photo}<div class="fields">
   ${field("Fait la sieste", yesNo(c.napNeeded))}${field("Propreté acquise", yesNo(c.toiletTrained))}
   ${field("Remarques particulières", c.specialNotes, true)}
 </div>
-<div class="sign"><div>Signature du responsable légal</div><div>Cachet et signature de la direction</div></div>
+${signatureBlockHtml(meta, "Le responsable légal")}
 <footer><span>Document généré par MBGEduGuinée</span><span>${esc(meta.schoolName || "")}</span></footer>
 ${opts.autoPrint === false ? "" : `<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>`}
 </body></html>`;
