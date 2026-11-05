@@ -18,6 +18,7 @@ import { MY_FLAT_OFFER_KEY } from "@/hooks/useMyFlatOffer";
 import { flatAnnualPrice, todayConakry } from "@/lib/flat-offers";
 import { flatPaymentErrorMessage } from "@/lib/flat-payments";
 import { formatPublicGNF } from "@/lib/public-offers";
+import { ProgressiveScheduleAdmin, ReconciliationHistoryAdmin, StatementImportAdmin } from "@/components/FlatReconciliationAdmin";
 
 const db = supabase as any;
 
@@ -71,6 +72,9 @@ export function FlatOffersAdmin() {
       </Card>
 
       <FlatSettingsAdmin />
+      <ProgressiveScheduleAdmin />
+      <StatementImportAdmin />
+      <ReconciliationHistoryAdmin />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Paiements de forfait à valider {pending.length ? `(${pending.length})` : ""}</CardTitle></CardHeader>
