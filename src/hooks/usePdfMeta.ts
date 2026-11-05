@@ -7,7 +7,7 @@ import type { PdfMeta } from "@/lib/reports";
  * alignées sur le modèle utilisé par BulletinDocument / SchoolLetterhead.
  */
 export function usePdfMeta(subtitle?: string | null): PdfMeta {
-  const { school, logoUrl } = useSchool();
+  const { school, logoUrl, stampUrl, signatureUrl } = useSchool();
   return useMemo(
     () => ({
       schoolName: school?.name ?? null,
@@ -15,9 +15,11 @@ export function usePdfMeta(subtitle?: string | null): PdfMeta {
       schoolContact: [school?.phone, school?.email].filter(Boolean).join(" · ") || null,
       academicYear: school?.academic_year ?? null,
       logoUrl: logoUrl ?? null,
+      stampUrl: school?.bulletin_settings?.show_stamp === false ? null : (stampUrl ?? null),
+      signatureUrl: school?.bulletin_settings?.show_signature === false ? null : (signatureUrl ?? null),
       accent: school?.theme_primary ?? null,
       subtitle: subtitle ?? null,
     }),
-    [school, logoUrl, subtitle],
+    [school, logoUrl, stampUrl, signatureUrl, subtitle],
   );
 }

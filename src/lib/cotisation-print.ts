@@ -1,4 +1,4 @@
-import type { PdfMeta } from "@/lib/reports";
+import { signatureBlockHtml, type PdfMeta } from "@/lib/reports";
 import QRCode from "qrcode";
 
 const esc = (v: any) =>
@@ -68,7 +68,8 @@ footer { margin-top:8px; font-size:8px; color:#68716b; display:flex; justify-con
 <div class="total">Montant réglé : ${esc(fmt(d.amount))}</div>
 <div class="status">${esc(d.status === "VALIDATED" ? "Paiement validé" : "Reçu enregistré")}</div>
 <div class="verify"><img src="${qrDataUrl}" alt="QR de vérification" /><div><strong>Vérification du document</strong><br/>Scannez ce QR Code pour vérifier le reçu.<br/>Référence : ${esc(d.receiptNumber)}</div></div>
-<footer><span>${esc(meta.schoolName || "MBGEduGuinée")}${meta.schoolContact ? ` · ${esc(meta.schoolContact)}` : ""}</span><span>Signature / cachet</span></footer>
+${signatureBlockHtml(meta, "Le comptable")}
+<footer><span>${esc(meta.schoolName || "MBGEduGuinée")}${meta.schoolContact ? ` · ${esc(meta.schoolContact)}` : ""}</span><span>Document généré par MBGEduGuinée</span></footer>
 <script>window.onload = () => { window.print(); }<\/script>
 </body></html>`;
   qr.then((qrDataUrl) => { w.document.write(html(qrDataUrl)); w.document.close(); }).catch(() => { w.document.write(html("")); w.document.close(); });

@@ -81,5 +81,7 @@ export function useSchool() {
     },
   });
   const logoUrl = useSignedUrl(data?.logo_url ?? null);
-  return { school: data ?? null, logoUrl, loading: authLoading || isLoading, error: error as Error | null };
+  const stampUrl = useSignedUrl((data as any)?.school_stamp_url ?? null);
+  const signatureUrl = useSignedUrl((data as any)?.director_signature_url ?? null);
+  return { school: data ?? null, logoUrl, stampUrl, signatureUrl, loading: authLoading || isLoading, error: error as Error | null };
 }

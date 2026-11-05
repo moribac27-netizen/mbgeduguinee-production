@@ -51,6 +51,8 @@ export interface PdfMeta {
   schoolContact?: string | null;
   academicYear?: string | null;
   logoUrl?: string | null;
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
   subtitle?: string | null;
   accent?: string | null;
 }
@@ -60,6 +62,19 @@ export function newDocumentReference(prefix = "DOC") {
   const token = (globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000000")
     .replace(/-/g, "").slice(0, 8).toUpperCase();
   return `${prefix}-${year}-${token}`;
+}
+
+/** Bloc « cachet + signature du directeur » en HTML autonome (styles en ligne) pour les documents imprimés. */
+export function signatureBlockHtml(meta: PdfMeta, leftLabel = "Établi par"): string {
+  const e = (v: string) => v.replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" } as any)[m]);
+  const stamp = meta.stampUrl ? `<img src="${e(meta.stampUrl)}" alt="Cachet" style="height:78px;width:78px;object-fit:contain" />` : `<div style="height:78px"></div>`;
+  const sig = meta.signatureUrl ? `<img src="${e(meta.signatureUrl)}" alt="Signature" style="max-height:44px;max-width:100%;object-fit:contain" />` : "";
+  const cell = "text-align:center;font-size:10px;break-inside:avoid";
+  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:22px;break-inside:avoid">
+  <div style="${cell}"><div style="font-weight:700;margin-bottom:40px">${e(leftLabel)}</div><div style="border-top:1px solid #333;padding-top:3px">Signature</div></div>
+  <div style="${cell}"><div style="font-weight:700;margin-bottom:4px">Cachet de l'établissement</div>${stamp}</div>
+  <div style="${cell}"><div style="font-weight:700;margin-bottom:2px">Le Directeur</div><div style="height:44px;display:flex;align-items:flex-end;justify-content:center">${sig}</div><div style="border-top:1px solid #333;padding-top:3px">Signature</div></div>
+</div>`;
 }
 
 function printStyles(accent: string) {
@@ -109,6 +124,7 @@ export function exportPDF(title: string, rows: any[], columns: ExportColumn[], m
     <div class="summary"><div class="stat"><div class="stat-label">Document</div><div class="stat-value">${esc(reference)}</div></div><div class="stat"><div class="stat-label">Enregistrements</div><div class="stat-value">${rows.length}</div></div><div class="stat"><div class="stat-label">Établissement</div><div class="stat-value">${esc(meta.schoolName || "MBGEduGuinée")}</div></div><div class="stat"><div class="stat-label">Émis le</div><div class="stat-value">${esc(generated)}</div></div></div>
     <div class="section-title">Données du rapport</div>
     <table><thead><tr>${columns.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${columns.map((c) => `<td>${esc(cell(r,c))}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    ${signatureBlockHtml(meta)}
     <footer class="footer"><span>${esc(meta.schoolName || "MBGEduGuinée")}${meta.schoolContact ? ` · ${esc(meta.schoolContact)}` : ""}</span><span>Réf. ${esc(reference)} · Document généré par MBGEduGuinée</span></footer>
   </main><script>window.onload=function(){setTimeout(function(){window.print();},350)};<\/script></body></html>`;
   const w = window.open("", "_blank", "width=1200,height=800");
