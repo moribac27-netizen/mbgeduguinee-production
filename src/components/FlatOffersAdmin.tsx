@@ -82,7 +82,7 @@ export function FlatOffersAdmin() {
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-xs">{p.reference}</TableCell>
                   <TableCell>{schoolName.get(p.school_id) ?? p.school_id}</TableCell>
-                  <TableCell>{p.period_type === "annual" ? `Année ${p.academic_year}` : new Date(p.period_month + "T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</TableCell>
+                  <TableCell>{p.period_type === "annual" ? `Année ${p.academic_year}` : (Number(p.months_covered) > 1 ? `${p.months_covered} mois à partir de ` : "") + new Date(p.period_month + "T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</TableCell>
                   <TableCell>{formatPublicGNF(Number(p.amount))}</TableCell>
                   <TableCell>{p.payer_reference}</TableCell>
                   <TableCell>{new Date(p.declared_at).toLocaleString("fr-FR")}</TableCell>

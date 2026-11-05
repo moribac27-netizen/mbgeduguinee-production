@@ -66,7 +66,7 @@ export function offerConditions(o: PublicOffer): string[] {
       ? "Nombre d'élèves illimité (sous réserve des limites techniques générales de la plateforme)."
       : `Capacité maximale : ${o.flat.maxStudents} élèves. Au-delà, les nouvelles inscriptions sont refusées : passez à une formule supérieure.`);
     out.push("Choisir une offre n'est pas un paiement : les paiements (mensuels ou annuel) sont déclarés puis validés par l'administration de la plateforme.");
-    return out;
+    out.push("Paiement mensuel : les 12 mois de l'année se règlent par acomptes croissants (1 mois au départ, puis davantage de mois à chaque paiement) jusqu'au règlement complet des 12 mois avant la fin de l'année. Le calendrier exact est affiché dans « Mon forfait ». Le paiement annuel, avec ses mois offerts, reste possible.");    return out;
   }
   out.push(
     o.commission > 0
