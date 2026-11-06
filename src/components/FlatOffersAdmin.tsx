@@ -18,6 +18,7 @@ import { MY_FLAT_OFFER_KEY } from "@/hooks/useMyFlatOffer";
 import { flatAnnualPrice, todayConakry } from "@/lib/flat-offers";
 import { flatPaymentErrorMessage } from "@/lib/flat-payments";
 import { formatPublicGNF } from "@/lib/public-offers";
+import { FlatFinanceDashboard } from "@/components/FlatFinanceDashboard";
 import { BillingConfigJournal, FlatBillingConfigAdmin } from "@/components/FlatBillingConfigAdmin";
 import { ProgressiveScheduleAdmin, ReconciliationHistoryAdmin, StatementImportAdmin } from "@/components/FlatReconciliationAdmin";
 
@@ -61,6 +62,7 @@ export function FlatOffersAdmin() {
 
   return (
     <div className="space-y-6">
+      <FlatFinanceDashboard />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Plans par établissement (offre exceptionnelle)</CardTitle>
