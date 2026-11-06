@@ -62,6 +62,31 @@ export function printFlatReceipt(p: { reference: string; period_type: string; pe
   w.document.close();
 }
 
+/** Numéro de facture stable et unique, dérivé de la référence du paiement (pas de numérotation modifiable). */
+export function flatInvoiceNumber(reference: string): string {
+  return `FAC-${String(reference ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase()}`;
+}
+
+/** Ouvre une facture imprimable (PDF via « Imprimer ») pour un paiement VALIDÉ. `balance` = reste à payer sur l'année, s'il est connu. */
+export function printFlatInvoice(p: { reference: string; period_type: string; period_month: string | null; amount: number | string; payer_reference: string; status: string; reviewed_at?: string | null; academic_year: string; months_covered?: number | null }, schoolName: string, offerName: string, balance?: number | null): void {
+  if (p.status !== "VALIDATED" || typeof window === "undefined") return;
+  const gnf = (n: number) => `${Math.round(n).toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ")} GNF`;
+  const period = p.period_type === "annual" ? `Année scolaire ${p.academic_year} (paiement annuel)` : (Number(p.months_covered) > 1 ? `${Number(p.months_covered)} mois à partir de ` : "Mois de ") + new Date(String(p.period_month) + "T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const issued = new Date(p.reviewed_at ?? Date.now()).toLocaleDateString("fr-FR");
+  const w = window.open("", "_blank", "width=800,height=900");
+  if (!w) return;
+  w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Facture ${esc(flatInvoiceNumber(p.reference))}</title>
+  <style>body{font-family:Arial,sans-serif;margin:40px;color:#0B1F3A}h1{font-size:22px;margin:0}.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0B1F3A;padding-bottom:12px}.badge{border:2px solid #15803d;color:#15803d;padding:4px 12px;font-weight:bold;transform:rotate(-4deg)}table{border-collapse:collapse;width:100%;margin-top:22px}th,td{border:1px solid #cbd5e1;padding:10px;text-align:left}th{background:#f1f5f9}.r{text-align:right}.tot td{font-weight:bold;background:#f8fafc}.s{margin-top:28px;font-size:12px;color:#475569}</style></head>
+  <body><div class="top"><div><h1>FACTURE</h1><div>MBGEduGuinée — plateforme de gestion scolaire</div></div><div class="badge">PAYÉE</div></div>
+  <p><b>Facture n° :</b> ${esc(flatInvoiceNumber(p.reference))}<br><b>Date :</b> ${esc(issued)}<br><b>Établissement :</b> ${esc(schoolName)}<br><b>Année scolaire :</b> ${esc(p.academic_year)}</p>
+  <table><thead><tr><th>Désignation</th><th>Période</th><th class="r">Montant</th></tr></thead>
+  <tbody><tr><td>Forfait établissement — ${esc(offerName)}</td><td>${esc(period)}</td><td class="r">${esc(gnf(Number(p.amount)))}</td></tr></tbody>
+  <tfoot><tr class="tot"><td colspan="2">Total payé</td><td class="r">${esc(gnf(Number(p.amount)))}</td></tr>${balance !== undefined && balance !== null ? `<tr><td colspan="2">Reste à payer sur l'année scolaire</td><td class="r">${esc(gnf(Number(balance)))}</td></tr>` : ""}</tfoot></table>
+  <p class="s">Référence du paiement : ${esc(p.payer_reference)} · Reçu n° ${esc(p.reference)}.<br>Paiement validé par l'administration de la plateforme MBGEduGuinée. Montants en francs guinéens (GNF).</p>
+  <script>window.onload=function(){window.print()}</script></body></html>`);
+  w.document.close();
+}
+
 export const PAYMENT_STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pending_payment: { label: "Paiement en attente", cls: "bg-amber-100 text-amber-900" },
   under_review: { label: "Paiement en cours de vérification", cls: "bg-blue-100 text-blue-900" },
