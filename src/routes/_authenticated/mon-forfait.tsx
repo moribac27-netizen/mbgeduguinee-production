@@ -24,6 +24,14 @@ export const Route = createFileRoute("/_authenticated/mon-forfait")({
   component: MonForfaitPage,
 });
 
+const INSTALLMENT_STATUS: Record<string, { label: string; cls: string }> = {
+  paid: { label: "Réglée", cls: "bg-emerald-100 text-emerald-900" },
+  partial: { label: "Partiellement réglée", cls: "bg-blue-100 text-blue-900" },
+  pending: { label: "À venir", cls: "bg-slate-200 text-slate-800" },
+  overdue: { label: "En retard", cls: "bg-red-100 text-red-900" },
+  due: { label: "À régler", cls: "bg-amber-100 text-amber-900" },
+};
+
 const STATUS: Record<string, { label: string; cls: string }> = {
   PENDING: { label: "En attente de validation", cls: "bg-amber-100 text-amber-900" },
   VALIDATED: { label: "Validé", cls: "bg-emerald-100 text-emerald-900" },
@@ -103,6 +111,17 @@ function MonForfaitPage() {
   });
 
   const [monthsCount, setMonthsCount] = useState<number | null>(null);
+  const [amountInput, setAmountInput] = useState<string>("");
+  // Échéancier calculé par la base (mode « installments ») : le front affiche, il ne calcule rien.
+  const sched = useQuery({
+    queryKey: ["my-flat-schedule"],
+    enabled: !!flat,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("my_flat_schedule");
+      if (error) throw error;
+      return data as any;
+    },
+  });
 
   if (loading) return <Loader2 className="size-5 animate-spin" />;
   if (!flat) return <p className="text-sm text-muted-foreground">Votre établissement n'est pas sous une offre établissement.</p>;
@@ -110,26 +129,32 @@ function MonForfaitPage() {
 
   const months = monthsOfAcademicYear(flat.academic_year);
   // Tout le calendrier est calculé et renvoyé par la base (my_flat_offer_status) : le front affiche seulement.
-  const prog = flat.progressive ? flat : null;
+  const inst = sched.data?.mode === "installments" ? sched.data : null;
+  const prog = flat.progressive && !inst ? flat : null;
   const minMonths: number = prog ? Number(prog.min_months) : 1;
   const maxMonths: number = prog ? Number(prog.remaining_months) : 1;
   const chosenMonths = prog ? Math.min(Math.max(monthsCount ?? minMonths, minMonths), Math.max(maxMonths, minMonths)) : 1;
-  const amount = type === "annual" ? flat.annual_price : prog ? flat.monthly_price * chosenMonths : flat.monthly_price;
+  const instDefault = inst ? Number(inst.pay_now ?? inst.min_amount ?? 0) : 0;
+  const instAmount = inst ? (amountInput.trim() === "" ? instDefault : Number(amountInput.replace(/[\s\u00a0]/g, ""))) : 0;
+  const amount = type === "annual" ? flat.annual_price : inst ? instAmount : prog ? flat.monthly_price * chosenMonths : flat.monthly_price;
 
   async function declare() {
     if (busy) return;
-    if (type === "monthly" && !prog && !month) { toast.error("Choisissez le mois payé."); return; }
+    if (type === "monthly" && inst && (!Number.isFinite(instAmount) || instAmount <= 0)) { toast.error("Saisissez un montant valide."); return; }
+    if (type === "monthly" && !prog && !inst && !month) { toast.error("Choisissez le mois payé."); return; }
     if (type === "monthly" && prog && maxMonths < 1) { toast.error("Les 12 mois de l'année sont déjà payés ou déclarés."); return; }
     if (ref.trim().length < 4) { toast.error("Saisissez la référence du paiement (au moins 4 caractères)."); return; }
     setBusy(true);
     const { error } = await (supabase as any).rpc("declare_flat_payment", {
-      _period_type: type, _period_month: type === "monthly" && !prog ? month : null, _payer_reference: ref.trim(),
+      _period_type: type, _period_month: type === "monthly" && !prog && !inst ? month : null, _payer_reference: ref.trim(),
+      ...(type === "monthly" && inst ? { _amount: instAmount } : {}),
       ...(type === "monthly" && prog ? { _months: chosenMonths } : {}), // inchangé pour les écoles sous l'ancienne règle
     });
     setBusy(false);
     if (error) { toast.error(flatPaymentErrorMessage(error.message)); return; }
     toast.success("Paiement déclaré. Il sera activé après validation par l'administration.");
-    setRef(""); setMonthsCount(null);
+    setRef(""); setMonthsCount(null); setAmountInput("");
+    void qc.invalidateQueries({ queryKey: ["my-flat-schedule"] });
         void qc.invalidateQueries({ queryKey: ["my-flat-payments"] });
     void qc.invalidateQueries({ queryKey: MY_FLAT_OFFER_KEY });
   }
@@ -142,6 +167,7 @@ function MonForfaitPage() {
     const { error } = await (supabase as any).rpc("cancel_flat_payment", { _payment_id: id });
     if (error) { toast.error(flatPaymentErrorMessage(error.message)); return; }
     toast.success("Déclaration annulée.");
+    void qc.invalidateQueries({ queryKey: ["my-flat-schedule"] });
     void qc.invalidateQueries({ queryKey: ["my-flat-payments"] });
     void qc.invalidateQueries({ queryKey: MY_FLAT_OFFER_KEY });
   }
@@ -174,6 +200,49 @@ function MonForfaitPage() {
           )}
         </CardContent>
       </Card>
+
+      {inst && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Échéancier de l'année scolaire {flat.academic_year}</CardTitle>
+            <CardDescription>
+              L'engagement annuel est de {formatPublicGNF(Number(inst.annual_commitment))} (12 mensualités). Après la première mensualité, le solde est réparti sur les échéances restantes jusqu'au {formatDateFr(inst.last_due_date)}.
+              Les paiements en attente de validation ne sont pas comptés comme réglés.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Engagement annuel</div><div className="font-semibold">{formatPublicGNF(Number(inst.annual_commitment))}</div></div>
+              <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Déjà payé (validé)</div><div className="font-semibold">{formatPublicGNF(Number(inst.paid_amount ?? 0))}</div></div>
+              <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Solde restant</div><div className="font-semibold">{formatPublicGNF(Number(inst.balance ?? 0))}</div></div>
+              <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Prochaine échéance</div><div className="font-semibold">{inst.next_due_date ? `${formatPublicGNF(Number(inst.next_installment_amount ?? 0))} le ${formatDateFr(inst.next_due_date)}` : "—"}</div><div className="text-xs text-muted-foreground">{inst.installments_remaining ?? 0} échéance(s) restante(s)</div></div>
+            </div>
+            {Number(inst.overdue_amount) > 0 && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-900">Montant en retard : <strong>{formatPublicGNF(Number(inst.overdue_amount))}</strong>. Passé le délai de tolérance, l'accès de tout l'établissement est suspendu jusqu'à régularisation.</div>}
+            {Number(inst.pending_amount) > 0 && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">{formatPublicGNF(Number(inst.pending_amount))} déclaré(s) et en attente de validation par l'administration.</div>}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>N°</TableHead><TableHead>Échéance</TableHead><TableHead>Montant</TableHead><TableHead>Déjà réglé</TableHead><TableHead>Reste</TableHead><TableHead>Situation</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(inst.rows ?? []).map((r: any) => {
+                    const st = INSTALLMENT_STATUS[r.status] ?? { label: r.status, cls: "bg-slate-200 text-slate-800" };
+                    return (
+                      <TableRow key={r.id ?? r.k}>
+                        <TableCell>{r.kind === "initial" ? "Départ" : r.seq}</TableCell>
+                        <TableCell>{formatDateFr(r.due_date)}{r.status === "paid" ? "" : ` (tolérance jusqu'au ${formatDateFr(r.grace_end_date)})`}</TableCell>
+                        <TableCell>{formatPublicGNF(Number(r.amount_due))}</TableCell>
+                        <TableCell>{formatPublicGNF(Number(r.amount_paid))}</TableCell>
+                        <TableCell>{formatPublicGNF(Number(r.remaining))}</TableCell>
+                        <TableCell><Badge className={st.cls}>{st.label}</Badge></TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="text-xs text-muted-foreground">Vous pouvez payer plus que l'échéance (paiement anticipé) ou moins (paiement partiel) : l'échéancier est recalculé après validation, sans jamais dépasser l'engagement annuel.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {prog && (
         <Card>
@@ -213,7 +282,7 @@ function MonForfaitPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Déclarer un paiement</CardTitle>
-          <CardDescription>Après avoir effectué le transfert, saisissez ci-dessous la référence reçue. Le montant est calculé par la plateforme ; l'abonnement n'est confirmé qu'après vérification et validation par l'administration (cliquer sur « Déclarer » ne confirme jamais un paiement).</CardDescription>
+          <CardDescription>Après avoir effectué le transfert, saisissez ci-dessous la référence reçue. Le montant exigible est calculé par la plateforme ; l'abonnement n'est confirmé qu'après vérification et validation par l'administration (cliquer sur « Déclarer » ne confirme jamais un paiement).</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -238,7 +307,14 @@ function MonForfaitPage() {
                 </Select>
               </div>
             )}
-            {type === "monthly" && !prog && (
+            {type === "monthly" && inst && (
+              <div className="space-y-1.5">
+                <Label>Montant à payer (GNF)</Label>
+                <Input inputMode="numeric" value={amountInput} onChange={(e) => setAmountInput(e.target.value)} placeholder={String(instDefault)} />
+                <p className="text-xs text-muted-foreground">Par défaut : {formatPublicGNF(instDefault)} (ce qui est exigible maintenant).</p>
+              </div>
+            )}
+            {type === "monthly" && !prog && !inst && (
               <div className="space-y-1.5">
                 <Label>Mois payé</Label>
                 <Select value={month} onValueChange={setMonth}>
