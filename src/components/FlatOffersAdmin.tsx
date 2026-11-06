@@ -18,6 +18,7 @@ import { MY_FLAT_OFFER_KEY } from "@/hooks/useMyFlatOffer";
 import { flatAnnualPrice, todayConakry } from "@/lib/flat-offers";
 import { flatPaymentErrorMessage } from "@/lib/flat-payments";
 import { formatPublicGNF } from "@/lib/public-offers";
+import { BillingConfigJournal, FlatBillingConfigAdmin } from "@/components/FlatBillingConfigAdmin";
 import { ProgressiveScheduleAdmin, ReconciliationHistoryAdmin, StatementImportAdmin } from "@/components/FlatReconciliationAdmin";
 
 const db = supabase as any;
@@ -72,9 +73,11 @@ export function FlatOffersAdmin() {
       </Card>
 
       <FlatSettingsAdmin />
+      <FlatBillingConfigAdmin />
       <ProgressiveScheduleAdmin />
       <StatementImportAdmin />
       <ReconciliationHistoryAdmin />
+      <BillingConfigJournal />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Paiements de forfait à valider {pending.length ? `(${pending.length})` : ""}</CardTitle></CardHeader>
@@ -269,7 +272,7 @@ function BillingForm({ value, onDone }: { value: any; onDone: () => void }) {
     if (!(Number.isInteger(grace) && grace >= 0 && grace <= 90) || !(Number.isInteger(exp) && exp >= 0 && exp <= 180)) return void toast.error("Délais invalides.");
     const td = Number(b.trialDays), tm = Number(b.trialMax);
     if (!(Number.isInteger(td) && td >= 0 && td <= 60) || !(Number.isInteger(tm) && tm >= 0 && tm <= 1000)) return void toast.error("Essai invalide (0 à 60 jours, 0 à 1000 élèves).");
-    void saveSetting("billing.flat", { due_day: due, grace_days: grace, expiry_grace_days: exp, trial_days: td, trial_max_students: tm }, onDone);
+    void saveSetting("billing.flat", { ...value, due_day: due, grace_days: grace, expiry_grace_days: exp, trial_days: td, trial_max_students: tm }, onDone);
   }
   return (
     <div className="space-y-2 rounded-xl border p-4">
