@@ -15,7 +15,7 @@ import { useMyFlatOffer, MY_FLAT_OFFER_KEY, type MyFlatOffer, type PaymentMethod
 import { usePublicOffers } from "@/hooks/usePublicOffers";
 import { formatDateFr } from "@/lib/flat-offers";
 import { formatPublicGNF } from "@/lib/public-offers";
-import { flatPaymentErrorMessage, monthsOfAcademicYear, PAYMENT_STATUS_LABEL, printFlatReceipt } from "@/lib/flat-payments";
+import { flatPaymentErrorMessage, monthsOfAcademicYear, PAYMENT_STATUS_LABEL, printFlatInvoice, printFlatReceipt } from "@/lib/flat-payments";
 import { useSchool } from "@/hooks/useSchool";
 
 export const Route = createFileRoute("/_authenticated/mon-forfait")({
@@ -350,7 +350,7 @@ function MonForfaitPage() {
                   <TableCell>{formatPublicGNF(Number(p.amount))}</TableCell>
                   <TableCell>{p.payer_reference}</TableCell>
                   <TableCell><Badge className={STATUS[p.status]?.cls}>{STATUS[p.status]?.label ?? p.status}</Badge>{p.review_note ? <div className="mt-1 text-xs text-muted-foreground">{p.review_note}</div> : null}</TableCell>
-                  <TableCell>{p.status === "VALIDATED" ? <Button size="sm" variant="outline" onClick={() => printFlatReceipt(p, (school as any)?.name ?? "", flat.offer_name)}>Reçu</Button> : null}{p.status === "PENDING" ? <Button size="sm" variant="ghost" onClick={() => cancelPayment(p.id)}>Annuler</Button> : null}</TableCell>
+                  <TableCell>{p.status === "VALIDATED" ? <Button size="sm" variant="outline" onClick={() => printFlatReceipt(p, (school as any)?.name ?? "", flat.offer_name)}>Reçu</Button> : null}{p.status === "VALIDATED" ? <Button size="sm" variant="outline" className="ml-1" onClick={() => printFlatInvoice(p, (school as any)?.name ?? "", flat.offer_name, inst ? Number(sched.data?.balance ?? 0) : null)}>Facture</Button> : null}{p.status === "PENDING" ? <Button size="sm" variant="ghost" onClick={() => cancelPayment(p.id)}>Annuler</Button> : null}</TableCell>
                 </TableRow>
               ))}
               {!(payments.data ?? []).length && <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground">Aucun paiement déclaré.</TableCell></TableRow>}
