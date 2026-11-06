@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useAuth, useRoles, primaryRole } from "@/hooks/useAuth";
 import { useMyFlatOffer } from "@/hooks/useMyFlatOffer";
 import { FlatOfferBanner } from "@/components/FlatOfferBanner";
+import { SuspensionGate } from "@/components/SuspensionGate";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { canAccess, homeForRoles } from "@/lib/access";
 import { NotificationsBell } from "@/components/NotificationsBell";
@@ -185,7 +186,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
           <SchoolIdentityHeader />
           <FlatOfferBanner />
-          {children}
+          <SuspensionGate>{children}</SuspensionGate>
         </main>
       </div>
     </div>
