@@ -155,6 +155,7 @@ function MonForfaitPage() {
     toast.success("Paiement déclaré. Il sera activé après validation par l'administration.");
     setRef(""); setMonthsCount(null); setAmountInput("");
     void qc.invalidateQueries({ queryKey: ["my-flat-schedule"] });
+    void qc.invalidateQueries({ queryKey: ["school-suspension"] });
         void qc.invalidateQueries({ queryKey: ["my-flat-payments"] });
     void qc.invalidateQueries({ queryKey: MY_FLAT_OFFER_KEY });
   }
@@ -168,6 +169,7 @@ function MonForfaitPage() {
     if (error) { toast.error(flatPaymentErrorMessage(error.message)); return; }
     toast.success("Déclaration annulée.");
     void qc.invalidateQueries({ queryKey: ["my-flat-schedule"] });
+    void qc.invalidateQueries({ queryKey: ["school-suspension"] });
     void qc.invalidateQueries({ queryKey: ["my-flat-payments"] });
     void qc.invalidateQueries({ queryKey: MY_FLAT_OFFER_KEY });
   }
