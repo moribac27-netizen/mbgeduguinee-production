@@ -156,3 +156,39 @@ export const getLoginStats = createServerFn({ method: "GET" })
     });
     return bySchool;
   });
+
+// --- Fondateur : lien de (ré)initialisation du mot de passe, avec correction éventuelle de l'e-mail de connexion ---
+export const founderAccessLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ userId: z.string().uuid(), newEmail: z.string().trim().toLowerCase().email().max(254).optional() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertSuperAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Réservé aux comptes rattachés comme fondateur : cette fonction ne sert pas à toucher un autre compte.
+    const { data: link } = await (supabaseAdmin as any)
+      .from("founder_schools").select("school_id").eq("user_id", data.userId).is("revoked_at", null).limit(1).maybeSingle();
+    if (!link) throw new Error("Ce compte n'est rattaché à aucun établissement comme fondateur.");
+
+    const { data: userRes, error: getErr } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    if (getErr || !userRes?.user) throw new Error("Utilisateur introuvable");
+    let email = userRes.user.email ?? "";
+    let emailChanged = false;
+
+    if (data.newEmail && data.newEmail !== email) {
+      const { error: upErr } = await supabaseAdmin.auth.admin.updateUserById(data.userId, { email: data.newEmail, email_confirm: true });
+      if (upErr) throw new Error(upErr.message);
+      email = data.newEmail;
+      emailChanged = true;
+    }
+    if (!email) throw new Error("Aucun e-mail pour ce compte : saisissez-en un.");
+
+    const { data: linkRes, error } = await supabaseAdmin.auth.admin.generateLink({ type: "recovery", email });
+    if (error) throw new Error(error.message);
+
+    await (supabaseAdmin as any).from("founder_audit").insert({
+      user_id: data.userId, school_id: link.school_id, event: "FOUNDER_ACCESS_LINK", actor: context.userId,
+      details: { email_changed: emailChanged },
+    });
+    return { email, emailChanged, actionLink: linkRes.properties?.action_link ?? null };
+  });
