@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useServerFn } from "@tanstack/react-start";
+import { founderAccessLink } from "@/lib/super-admin.functions";
 import { founderErrorMessage } from "@/lib/founder";
 
 const db = supabase as any;
@@ -18,6 +20,10 @@ export function FounderAccountsAdmin({ schools }: { schools: Array<{ id: string;
   const [userId, setUserId] = useState("");
   const [schoolId, setSchoolId] = useState("");
   const [busy, setBusy] = useState(false);
+  const accessLink = useServerFn(founderAccessLink);
+  const [linkFor, setLinkFor] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+  const [result, setResult] = useState<{ email: string; actionLink: string | null; emailChanged: boolean } | null>(null);
 
   const list = useQuery({ queryKey: ["founder", "admin-list"], retry: false, queryFn: async () => {
     const { data, error } = await db.rpc("founder_list");
@@ -37,6 +43,17 @@ export function FounderAccountsAdmin({ schools }: { schools: Array<{ id: string;
     toast.success(ok + (data?.ban_required ? " — plus aucun établissement lié." : ""));
     setUserId(""); setSearch("");
     void qc.invalidateQueries({ queryKey: ["founder"] });
+  }
+
+  async function makeLink(u: string) {
+    setBusy(true);
+    try {
+      const r = await accessLink({ data: { userId: u, newEmail: newEmail.trim() || undefined } });
+      if (r.actionLink) await navigator.clipboard.writeText(r.actionLink).catch(() => {});
+      setResult({ email: r.email, actionLink: r.actionLink, emailChanged: r.emailChanged });
+      toast.success(r.emailChanged ? "E-mail corrigé et lien généré (copié)." : "Lien généré (copié).");
+    } catch (e: any) { toast.error(e?.message ?? "Impossible de générer le lien."); }
+    setBusy(false);
   }
 
   return (
@@ -65,6 +82,25 @@ export function FounderAccountsAdmin({ schools }: { schools: Array<{ id: string;
                   ? <Badge key={s.school_id} variant="outline" className="line-through">{s.school_name}</Badge>
                   : <span key={s.school_id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">{s.school_name}
                       <button type="button" disabled={busy} className="text-red-700 font-bold" aria-label={`Retirer ${s.school_name}`} onClick={() => { if (window.confirm(`Retirer l'accès de ${f.full_name ?? "ce fondateur"} à ${s.school_name} ?`)) void act("founder_revoke", f.user_id, s.school_id, "Accès retiré"); }}>×</button></span>)}
+              </div>
+              <div className="mt-2">
+                <button type="button" className="text-xs text-primary underline" onClick={() => { setLinkFor(linkFor === f.user_id ? null : f.user_id); setResult(null); setNewEmail(""); }}>Mot de passe / e-mail de connexion</button>
+                {linkFor === f.user_id && (
+                  <div className="mt-2 space-y-2 rounded-lg bg-muted p-3">
+                    <p className="text-xs text-muted-foreground">Génère un lien pour définir un nouveau mot de passe, à transmettre à la personne (WhatsApp, etc.). Si son e-mail est faux, saisissez le bon : il remplacera l'ancien.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Input className="max-w-xs" type="email" placeholder="Nouvel e-mail (facultatif)" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+                      <Button size="sm" disabled={busy} onClick={() => void makeLink(f.user_id)}>Générer le lien</Button>
+                    </div>
+                    {result && (
+                      <div className="text-xs break-all">
+                        <div>Compte : <strong>{result.email}</strong></div>
+                        {result.actionLink ? <div className="mt-1 rounded border bg-background p-2 select-all">{result.actionLink}</div> : <div className="text-red-700">Lien indisponible.</div>}
+                        <div className="mt-1 text-muted-foreground">Le lien est personnel et temporaire : ne le publiez pas.</div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
