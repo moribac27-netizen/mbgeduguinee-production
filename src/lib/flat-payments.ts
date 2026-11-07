@@ -35,6 +35,12 @@ const MESSAGES: Record<string, string> = {
   ALREADY_REVIEWED: "Ce paiement a déjà été traité.",
   OFFER_ALREADY_SET: "Une formule est déjà en place pour l'année scolaire en cours.",
   OFFER_INVALID: "Cette formule n'est pas disponible.",
+  NOT_AN_UPGRADE: "Seul le passage à une formule supérieure est possible en cours d'année.",
+  PAY_OVERDUE_FIRST: "Réglez d'abord les montants en retard avant de changer de formule.",
+  NO_REMAINING_INSTALLMENTS: "Il ne reste plus d'échéance à venir : le changement prendra effet à la prochaine année scolaire.",
+  YEAR_ENDED: "L'année scolaire est terminée : le changement se fera à la réinscription.",
+  ANNUAL_CHANGE_UNSUPPORTED: "Le changement de formule en cours d'année n'est pas disponible pour un paiement annuel. Contactez l'administration.",
+  NOT_INSTALLMENTS: "Le changement de formule n'est pas disponible pour votre mode de paiement. Contactez l'administration.",
 };
 
 export function flatPaymentErrorMessage(raw: string | undefined | null): string {

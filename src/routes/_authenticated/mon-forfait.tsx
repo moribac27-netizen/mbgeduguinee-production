@@ -17,6 +17,7 @@ import { formatDateFr } from "@/lib/flat-offers";
 import { formatPublicGNF } from "@/lib/public-offers";
 import { flatPaymentErrorMessage, monthsOfAcademicYear, PAYMENT_STATUS_LABEL, printFlatInvoice, printFlatReceipt } from "@/lib/flat-payments";
 import { useSchool } from "@/hooks/useSchool";
+import { FlatPlanChange } from "@/components/FlatPlanChange";
 
 export const Route = createFileRoute("/_authenticated/mon-forfait")({
   head: () => ({ meta: [{ title: "Mon forfait — MBGEduGuinée" }] }),
@@ -245,6 +246,8 @@ function MonForfaitPage() {
           </CardContent>
         </Card>
       )}
+
+      {inst && !inst.annual_mode && <FlatPlanChange currentMonthly={Number(flat.monthly_price)} canChange />}
 
       {prog && (
         <Card>
