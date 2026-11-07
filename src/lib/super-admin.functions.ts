@@ -162,6 +162,7 @@ export const founderAccessLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ userId: z.string().uuid(), newEmail: z.string().trim().toLowerCase().email().max(254).optional() }).parse(d))
   .handler(async ({ data, context }) => {
+   try {
     await assertSuperAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -190,5 +191,9 @@ export const founderAccessLink = createServerFn({ method: "POST" })
       user_id: data.userId, school_id: link.school_id, event: "FOUNDER_ACCESS_LINK", actor: context.userId,
       details: { email_changed: emailChanged },
     });
-    return { email, emailChanged, actionLink: linkRes.properties?.action_link ?? null };
+    return { ok: true as const, email, emailChanged, actionLink: linkRes.properties?.action_link ?? null };
+   } catch (e: any) {
+    // Toujours renvoyer un message lisible (une erreur levée peut arriver vide côté navigateur)
+    return { ok: false as const, error: String(e?.message || e || "Erreur serveur inconnue") };
+   }
   });

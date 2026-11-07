@@ -21,6 +21,7 @@ export function FounderAccountsAdmin({ schools }: { schools: Array<{ id: string;
   const [schoolId, setSchoolId] = useState("");
   const [busy, setBusy] = useState(false);
   const accessLink = useServerFn(founderAccessLink);
+  const [err, setErr] = useState<string | null>(null);
   const [linkFor, setLinkFor] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [result, setResult] = useState<{ email: string; actionLink: string | null; emailChanged: boolean } | null>(null);
@@ -49,10 +50,12 @@ export function FounderAccountsAdmin({ schools }: { schools: Array<{ id: string;
     setBusy(true);
     try {
       const r = await accessLink({ data: { userId: u, newEmail: newEmail.trim() || undefined } });
+      if (!r.ok) { setResult(null); setErr(r.error); toast.error(r.error); setBusy(false); return; }
+      setErr(null);
       if (r.actionLink) await navigator.clipboard.writeText(r.actionLink).catch(() => {});
       setResult({ email: r.email, actionLink: r.actionLink, emailChanged: r.emailChanged });
       toast.success(r.emailChanged ? "E-mail corrigé et lien généré (copié)." : "Lien généré (copié).");
-    } catch (e: any) { toast.error(e?.message ?? "Impossible de générer le lien."); }
+    } catch (e: any) { const m = String(e?.message || e || "").trim() || "Le serveur n'a pas répondu (configuration serveur à vérifier)."; setErr(m); toast.error(m); }
     setBusy(false);
   }
 
@@ -92,6 +95,7 @@ export function FounderAccountsAdmin({ schools }: { schools: Array<{ id: string;
                       <Input className="max-w-xs" type="email" placeholder="Nouvel e-mail (facultatif)" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
                       <Button size="sm" disabled={busy} onClick={() => void makeLink(f.user_id)}>Générer le lien</Button>
                     </div>
+                    {err && <div className="text-xs text-red-700 break-words">Échec : {err}</div>}
                     {result && (
                       <div className="text-xs break-all">
                         <div>Compte : <strong>{result.email}</strong></div>
