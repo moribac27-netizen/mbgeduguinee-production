@@ -18,7 +18,8 @@ export type AppRole =
   | "responsable_cantine"
   | "rh"
   | "parent"
-  | "eleve";
+  | "eleve"
+  | "fondateur";
 
 export const ROLE_LABELS: Record<AppRole, string> = {
   admin: "Administrateur",
@@ -37,6 +38,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   rh: "Ressources Humaines",
   parent: "Parent",
   eleve: "Élève",
+  fondateur: "Fondateur",
 };
 
 export function useAuth() {

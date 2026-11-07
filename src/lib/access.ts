@@ -9,6 +9,7 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] | "*" }> = [
   { prefix: "/super-admin", roles: [] }, // super admin only
   { prefix: "/offres", roles: [] }, // offres, paiements à valider, commissions : super admin only
   { prefix: "/mon-forfait", roles: ["admin", "directeur", "comptable"] }, // forfait établissement : déclaration des paiements
+  { prefix: "/fondateur", roles: ["fondateur"] }, // vue fondateur : consultation seule (agrégats via fonctions SQL)
   { prefix: "/directeur", roles: ["admin"] },
   { prefix: "/sauvegarde", roles: ["admin", "directeur"] },
   { prefix: "/journal", roles: ["admin", "directeur"] },
@@ -95,6 +96,7 @@ export function homeForRoles(roles: AppRole[], isSuperAdmin: boolean): string {
   if (roles.includes("responsable_cantine")) return "/cantine";
   if (roles.includes("parent")) return "/parent";
   if (roles.includes("eleve")) return "/eleve";
+  if (roles.includes("fondateur")) return "/fondateur"; // en dernier : ne change la priorité d'aucun autre rôle
   return "/dashboard";
 }
 

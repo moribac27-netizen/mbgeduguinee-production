@@ -27,6 +27,7 @@ import { ConakryClock } from "@/components/ConakryClock";
 
 const STAFF_NAV = [
   { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+  { to: "/fondateur", label: "Vue Fondateur", icon: Briefcase },
   { to: "/directeur", label: "Directeur", icon: Briefcase },
   { to: "/direction-etudes", label: "Direction des études", icon: GraduationCap },
   { to: "/evenements", label: "Événements", icon: CalendarDays },
@@ -77,6 +78,11 @@ const PARENT_NAV = [
   { to: "/messagerie", label: "Messagerie", icon: MessageSquare },
 ] as const;
 
+const FOUNDER_NAV = [
+  { to: "/fondateur", label: "Vue Fondateur", icon: Briefcase },
+  { to: "/mon-compte", label: "Mon compte", icon: Settings },
+];
+
 const STUDENT_NAV = [
   { to: "/eleve", label: "Mon espace", icon: Home },
   { to: "/calendrier", label: "Calendrier", icon: CalendarDays },
@@ -94,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { info: planInfo, loading: planLoading } = usePerStudentPlan();
   const { flat: myFlat } = useMyFlatOffer();
   const role = primaryRole(roles);
-  const BASE_NAV = role === "parent" ? PARENT_NAV : role === "eleve" ? STUDENT_NAV : STAFF_NAV;
+  const BASE_NAV = role === "parent" ? PARENT_NAV : role === "eleve" ? STUDENT_NAV : role === "fondateur" ? FOUNDER_NAV : STAFF_NAV;
   const NAV = BASE_NAV.filter((item) => canAccess(item.to, roles, isSuperAdmin) && (item.to !== "/mon-forfait" || !!myFlat || (!planLoading && !planInfo.isPerStudent)) && (item.to !== "/cotisations" || !myFlat || !!myFlat.expired || isSuperAdmin) && !pathBlockedByOffer(item.to, planInfo.offer, isSuperAdmin));
   const homePath = homeForRoles(roles, isSuperAdmin);
 
