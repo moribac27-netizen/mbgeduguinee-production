@@ -18,6 +18,7 @@ import { formatPublicGNF } from "@/lib/public-offers";
 import { flatPaymentErrorMessage, monthsOfAcademicYear, PAYMENT_STATUS_LABEL, printFlatInvoice, printFlatReceipt } from "@/lib/flat-payments";
 import { useSchool } from "@/hooks/useSchool";
 import { FlatPlanChange } from "@/components/FlatPlanChange";
+import { FlatRenewal } from "@/components/FlatRenewal";
 
 export const Route = createFileRoute("/_authenticated/mon-forfait")({
   head: () => ({ meta: [{ title: "Mon forfait — MBGEduGuinée" }] }),
@@ -125,7 +126,7 @@ function MonForfaitPage() {
   });
 
   if (loading) return <Loader2 className="size-5 animate-spin" />;
-  if (!flat) return <p className="text-sm text-muted-foreground">Votre établissement n'est pas sous une offre établissement.</p>;
+  if (!flat) return <FlatRenewal fallback={<p className="text-sm text-muted-foreground">Votre établissement n'est pas sous une offre établissement.</p>} />;
   if (flat.expired) return <ChoosePerStudentPlan flat={flat} />;
 
   const months = monthsOfAcademicYear(flat.academic_year);
@@ -177,6 +178,7 @@ function MonForfaitPage() {
 
   return (
     <div className="space-y-6">
+      <FlatRenewal />
       <div>
         <h1 className="font-display text-2xl font-bold">{finalising ? "FINALISEZ VOTRE ABONNEMENT MBGEDUGUINÉE" : "Mon forfait établissement"}</h1>
         <p className="text-sm text-muted-foreground">{finalising ? "Votre établissement est créé. Il ne reste qu'à régler votre abonnement : voici le récapitulatif." : `${flat.offer_name} — année académique ${flat.academic_year}`}</p>
