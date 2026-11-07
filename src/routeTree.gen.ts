@@ -29,6 +29,7 @@ import { Route as AuthenticatedComptabiliteRouteImport } from './routes/_authent
 import { Route as AuthenticatedCotisationsRouteImport } from './routes/_authenticated/cotisations'
 import { Route as AuthenticatedMonForfaitRouteImport } from './routes/_authenticated/mon-forfait'
 import { Route as AuthenticatedMonCompteRouteImport } from './routes/_authenticated/mon-compte'
+import { Route as AuthenticatedFondateurRouteImport } from './routes/_authenticated/fondateur'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDirecteurRouteImport } from './routes/_authenticated/directeur'
 import { Route as AuthenticatedDirectionEtudesRouteImport } from './routes/_authenticated/direction-etudes'
@@ -167,6 +168,12 @@ const AuthenticatedMonCompteRoute =
   AuthenticatedMonCompteRouteImport.update({
     id: '/mon-compte',
     path: '/mon-compte',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFondateurRoute =
+  AuthenticatedFondateurRouteImport.update({
+    id: '/fondateur',
+    path: '/fondateur',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -358,6 +365,7 @@ export interface FileRoutesByFullPath {
   '/cotisations': typeof AuthenticatedCotisationsRoute
   '/mon-forfait': typeof AuthenticatedMonForfaitRoute
   '/mon-compte': typeof AuthenticatedMonCompteRoute
+  '/fondateur': typeof AuthenticatedFondateurRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -411,6 +419,7 @@ export interface FileRoutesByTo {
   '/cotisations': typeof AuthenticatedCotisationsRoute
   '/mon-forfait': typeof AuthenticatedMonForfaitRoute
   '/mon-compte': typeof AuthenticatedMonCompteRoute
+  '/fondateur': typeof AuthenticatedFondateurRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directeur': typeof AuthenticatedDirecteurRoute
   '/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -466,6 +475,7 @@ export interface FileRoutesById {
   '/_authenticated/cotisations': typeof AuthenticatedCotisationsRoute
   '/_authenticated/mon-forfait': typeof AuthenticatedMonForfaitRoute
   '/_authenticated/mon-compte': typeof AuthenticatedMonCompteRoute
+  '/_authenticated/fondateur': typeof AuthenticatedFondateurRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directeur': typeof AuthenticatedDirecteurRoute
   '/_authenticated/direction-etudes': typeof AuthenticatedDirectionEtudesRoute
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
     | '/cotisations'
     | '/mon-forfait'
     | '/mon-compte'
+    | '/fondateur'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
@@ -574,6 +585,7 @@ export interface FileRouteTypes {
     | '/cotisations'
     | '/mon-forfait'
     | '/mon-compte'
+    | '/fondateur'
     | '/dashboard'
     | '/directeur'
     | '/direction-etudes'
@@ -628,6 +640,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cotisations'
     | '/_authenticated/mon-forfait'
     | '/_authenticated/mon-compte'
+    | '/_authenticated/fondateur'
     | '/_authenticated/dashboard'
     | '/_authenticated/directeur'
     | '/_authenticated/direction-etudes'
@@ -813,6 +826,13 @@ declare module '@tanstack/react-router' {
       path: '/mon-compte'
       fullPath: '/mon-compte'
       preLoaderRoute: typeof AuthenticatedMonCompteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/fondateur': {
+      id: '/_authenticated/fondateur'
+      path: '/fondateur'
+      fullPath: '/fondateur'
+      preLoaderRoute: typeof AuthenticatedFondateurRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -1057,6 +1077,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCotisationsRoute: typeof AuthenticatedCotisationsRoute
   AuthenticatedMonForfaitRoute: typeof AuthenticatedMonForfaitRoute
   AuthenticatedMonCompteRoute: typeof AuthenticatedMonCompteRoute
+  AuthenticatedFondateurRoute: typeof AuthenticatedFondateurRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirecteurRoute: typeof AuthenticatedDirecteurRoute
   AuthenticatedDirectionEtudesRoute: typeof AuthenticatedDirectionEtudesRoute
@@ -1104,6 +1125,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCotisationsRoute: AuthenticatedCotisationsRoute,
   AuthenticatedMonForfaitRoute: AuthenticatedMonForfaitRoute,
   AuthenticatedMonCompteRoute: AuthenticatedMonCompteRoute,
+  AuthenticatedFondateurRoute: AuthenticatedFondateurRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirecteurRoute: AuthenticatedDirecteurRoute,
   AuthenticatedDirectionEtudesRoute: AuthenticatedDirectionEtudesRoute,

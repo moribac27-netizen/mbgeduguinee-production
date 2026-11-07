@@ -45,6 +45,8 @@ export function SuspensionGate({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { suspension } = useSchoolSuspension();
   if (!suspension.suspended) return <>{children}</>;
+  // La Vue Fondateur gère elle-même la suspension (la base ne renvoie alors que la partie abonnement).
+  if (pathname === "/fondateur" || pathname.startsWith("/fondateur/")) return <>{children}</>;
   const allowed = suspension.can_manage && ALLOWED_WHEN_SUSPENDED.some((p) => pathname === p || pathname.startsWith(p + "/"));
   if (allowed) return <>{children}</>;
   return <SuspendedScreen s={suspension} />;

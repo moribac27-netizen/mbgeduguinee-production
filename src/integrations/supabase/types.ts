@@ -3838,6 +3838,7 @@ export type Database = {
         | "surveillant"
         | "directeur_etudes"
         | "proviseur"
+        | "fondateur"
       contract_status: "actif" | "suspendu" | "termine"
       exam_type: "composition" | "devoir" | "controle" | "examen"
       expense_type:
@@ -4021,6 +4022,7 @@ export const Constants = {
         "surveillant",
         "directeur_etudes",
         "proviseur",
+        "fondateur",
       ],
       contract_status: ["actif", "suspendu", "termine"],
       exam_type: ["composition", "devoir", "controle", "examen"],
