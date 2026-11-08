@@ -93,11 +93,27 @@ export const deleteSchoolAsSuperAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ schoolId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    await assertSuperAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("schools").delete().eq("id", data.schoolId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    // Les erreurs levées ici arrivent vides côté navigateur : on renvoie toujours un résultat lisible.
+    try {
+      await assertSuperAdmin(context);
+      const { error } = await (context.supabase as any).rpc("super_delete_school", { _school_id: data.schoolId });
+      if (error) {
+        const m = String(error.message ?? "");
+        const known: Record<string, string> = {
+          SCHOOL_HAS_STUDENTS: "Cette école a des élèves : suppression refusée.",
+          SCHOOL_HAS_PAYMENTS: "Cette école a des paiements d'abonnement validés : suppression refusée.",
+          SCHOOL_HAS_SUPER_ADMIN: "Un Super Admin est rattaché à cette école : suppression refusée.",
+          SCHOOL_HAS_FOUNDER: "Un fondateur est rattaché à cette école : retirez-le d'abord.",
+          SCHOOL_HAS_DATA: "Cette école contient encore des données (classes, notes, comptabilité…) : suppression refusée.",
+          SCHOOL_NOT_FOUND: "École introuvable.", FORBIDDEN: "Action réservée au Super Admin.",
+        };
+        const k = Object.keys(known).find((c) => m.includes(c));
+        return { ok: false as const, error: k ? known[k] : `Suppression impossible : ${m || "erreur inconnue"}` };
+      }
+      return { ok: true as const };
+    } catch (e: any) {
+      return { ok: false as const, error: String(e?.message || e || "Erreur serveur inconnue") };
+    }
   });
 
 // --- Notify one or many schools (broadcast) ---
