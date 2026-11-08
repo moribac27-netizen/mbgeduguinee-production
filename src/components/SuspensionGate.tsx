@@ -14,6 +14,8 @@ export interface SchoolSuspension {
   since?: string | null;
   phase?: string;
   can_manage?: boolean;
+  manual?: boolean;
+  status?: string;
   balance?: number | null;
   overdue_amount?: number | null;
   next_due_date?: string | null;
@@ -53,6 +55,16 @@ export function SuspensionGate({ children }: { children: ReactNode }) {
 }
 
 function SuspendedScreen({ s }: { s: SchoolSuspension }) {
+  if (s.manual) {
+    return (
+      <div className="mx-auto max-w-2xl py-10" data-testid="suspended-screen-manual">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 sm:p-8">
+          <div className="flex items-center gap-3 text-red-900"><Lock className="size-6" /><h1 className="font-display text-xl font-bold">{s.status === "pending" ? "Établissement en attente de validation" : "Accès de l'établissement suspendu"}</h1></div>
+          <p className="mt-4 text-sm leading-6 text-red-950">{s.school_name ? <><strong>{s.school_name}</strong> : </> : null}l'accès à la plateforme est {s.status === "pending" ? "en attente de validation" : "suspendu"} par l'administrateur de MBGEduGuinée. <strong>Aucune donnée n'est perdue.</strong> Contactez l'administrateur de la plateforme pour rétablir l'accès.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-2xl py-10" data-testid="suspended-screen">
       <div className="rounded-2xl border border-red-200 bg-red-50 p-6 sm:p-8">
