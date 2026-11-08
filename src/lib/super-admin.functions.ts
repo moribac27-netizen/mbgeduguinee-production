@@ -81,11 +81,17 @@ export const updateSchoolAsSuperAdmin = createServerFn({ method: "POST" })
     }),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    await assertSuperAdmin(context);
-    const { error } = await context.supabase
-      .from("schools").update(data.patch).eq("id", data.schoolId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    // Les erreurs levées ici arrivent vides côté navigateur : on renvoie toujours un résultat lisible.
+    try {
+      await assertSuperAdmin(context);
+      const { data: rows, error } = await context.supabase
+        .from("schools").update(data.patch).eq("id", data.schoolId).select("id");
+      if (error) return { ok: false as const, error: `Modification impossible : ${error.message}` };
+      if (!rows || rows.length !== 1) return { ok: false as const, error: "Modification refusée ou école introuvable." };
+      return { ok: true as const };
+    } catch (e: any) {
+      return { ok: false as const, error: String(e?.message || e || "Erreur serveur inconnue") };
+    }
   });
 
 // --- Delete school ---
