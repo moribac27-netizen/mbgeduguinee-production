@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { IdCard, Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { NON_TEACHING_POSITIONS, type StaffRow } from "@/lib/staff-picker";
+import { EditTeacherDialog } from "@/components/EditTeacherDialog";
 import { TEACHER_TYPE_LABELS, isTitularType, type TeacherType } from "@/lib/teacher-types";
 
 export const Route = createFileRoute("/_authenticated/personnel")({
@@ -27,6 +28,8 @@ const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n);
 
 function PersonnelPage() {
   const qc = useQueryClient();
+  const teachersQ = useQuery({ queryKey: ["teachers"], queryFn: async () => (await supabase.from("teachers").select("id,full_name,phone,email,monthly_salary,subjects,teacher_type")).data ?? [] });
+  const teacherById = new Map<string, any>((teachersQ.data ?? []).map((t: any) => [t.id, t]));
   const search0 = Route.useSearch();
   const [filter, setFilter] = useState<"all" | "enseignant" | "non_enseignant" | "sans_compte">("all");
   const [search, setSearch] = useState("");
@@ -99,6 +102,7 @@ function PersonnelPage() {
                     <TableCell className="text-sm">{r.email ?? "—"}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       {r.kind === "non_enseignant" && r.contract_id && <EditStaffDialog row={r} onDone={refresh} />}
+                      {r.kind === "enseignant" && r.teacher_id && teacherById.get(r.teacher_id) && <EditTeacherDialog teacher={teacherById.get(r.teacher_id)!} onDone={() => { refresh(); qc.invalidateQueries({ queryKey: ["teachers"] }); }} />}
                       {r.user_id ? <Badge>Compte créé</Badge> : (
                         <Button asChild size="sm" variant="outline" className="gap-1"><Link to="/collaborateurs" search={{ staff: key }}><UserPlus className="size-3.5" />Créer le compte</Link></Button>
                       )}
