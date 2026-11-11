@@ -23,7 +23,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Users2, Copy, KeyRound, ChevronsUpDown, UserCheck } from "lucide-react";
+import { Plus, Users2, Copy, KeyRound, ChevronsUpDown, UserCheck, Pencil } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
@@ -183,6 +183,7 @@ function Collaborateurs() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
+                        <EditProfileDialog person={c} onDone={() => qc.invalidateQueries({ queryKey: ["collaborators"] })} />
                         {!isCoreDirection && (
                           <Button variant="ghost" size="sm" className="mr-1 gap-1" onClick={() => handleResetPassword(c)}>
                             <KeyRound className="size-3.5" />Nouveau mot de passe
@@ -384,5 +385,40 @@ function AddCollaboratorDialog({
         </DialogFooter>
       </form>
     </DialogContent>
+  );
+}
+
+
+/** Modifie le nom et le téléphone du titulaire d'un compte (les fiches enseignant / contrat liées sont synchronisées côté base). */
+function EditProfileDialog({ person, onDone }: { person: { id: string; fullName: string; phone: string | null }; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState(person.fullName);
+  const [phone, setPhone] = useState(person.phone ?? "");
+  async function save() {
+    if (busy) return;
+    if (name.trim().length < 2) return void toast.error("Le nom complet est obligatoire.");
+    setBusy(true);
+    const { data, error } = await supabase.from("profiles").update({ full_name: name.trim(), phone: phone.trim() || null }).eq("id", person.id).select("id");
+    setBusy(false);
+    if (error) return void toast.error("Modification impossible : " + error.message);
+    if (!data?.length) return void toast.error("Aucune modification enregistrée : droits insuffisants.");
+    toast.success("Informations mises à jour");
+    logActivity({ action: "update", entity_type: "collaborator", entity_id: person.id, entity_label: name.trim(), metadata: { profile_edit: true } });
+    setOpen(false); onDone();
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) { setName(person.fullName); setPhone(person.phone ?? ""); } }}>
+      <DialogTrigger asChild><Button variant="ghost" size="sm" className="mr-1 gap-1"><Pencil className="size-3.5" />Modifier</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Modifier les informations</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <div><Label>Nom complet</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div><Label>Téléphone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+          <p className="text-xs text-muted-foreground">L'adresse e-mail de connexion ne se change pas ici.</p>
+        </div>
+        <DialogFooter><Button onClick={save} disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer"}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

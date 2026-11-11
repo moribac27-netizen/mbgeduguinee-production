@@ -338,12 +338,19 @@ function StudentDialog({ editing, classes, onClose }: { editing: Student | null;
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const payload = { ...form, class_id: form.class_id || null, birth_date: form.birth_date || null };
+    // Seuls les champs modifiables sont envoyés : la ligne chargée contient aussi la jointure « classes » et des colonnes système, que la base refuse (erreur 400).
+    const payload = {
+      matricule: String(form.matricule ?? "").trim(), full_name: String(form.full_name ?? "").trim(), gender: form.gender,
+      birth_date: form.birth_date || null, birth_place: form.birth_place || null, address: form.address || null,
+      class_id: form.class_id || null, parent_name: form.parent_name?.trim() || null, parent_phone: form.parent_phone?.trim() || null,
+      status: form.status, photo_url: form.photo_url ?? null,
+    } as any;
+    if (payload.full_name.length < 2) { setLoading(false); return void toast.error("Le nom complet est obligatoire."); }
     const { error } = editing
       ? await supabase.from("students").update(payload).eq("id", editing.id)
       : await supabase.from("students").insert(payload);
     setLoading(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(studentErrorMessage(error));
     toast.success(editing ? "Élève modifié avec succès" : "Élève inscrit avec succès", {
       description: editing ? "Les modifications ont été enregistrées." : "L'élève apparaît dans la liste.",
     });
@@ -391,4 +398,14 @@ function StudentDialog({ editing, classes, onClose }: { editing: Student | null;
       </form>
     </DialogContent>
   );
+}
+
+
+function studentErrorMessage(e: { message?: string; code?: string }): string {
+  const m = e.message ?? "";
+  if (m.includes("CLASS_OTHER_SCHOOL")) return "Cette classe n'appartient pas à l'établissement de l'élève.";
+  if (m.includes("PARENT_OTHER_SCHOOL")) return "Ce compte parent n'appartient pas à l'établissement de l'élève.";
+  if (e.code === "23505" || m.includes("duplicate key")) return "Ce matricule existe déjà. Choisissez-en un autre.";
+  if (e.code === "42501" || m.includes("row-level security")) return "Vous n'avez pas le droit de modifier cette fiche.";
+  return "Enregistrement impossible : " + m;
 }

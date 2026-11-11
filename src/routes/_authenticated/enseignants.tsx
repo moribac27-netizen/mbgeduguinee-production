@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EditTeacherDialog } from "@/components/EditTeacherDialog";
 import { TEACHER_TYPE_LABELS, TEACHER_TYPE_SHORT, isTitularType, normalizeTeacherType, type TeacherType } from "@/lib/teacher-types";
 
 export const Route = createFileRoute("/_authenticated/enseignants")({
@@ -64,7 +65,7 @@ function TeachersPage() {
                   <TableCell className="text-sm">{isTitularType(t.teacher_type) ? <span className="text-muted-foreground">{t.teacher_type === "educatrice" ? "Tous les domaines d'éveil" : "Toutes les matières"}</span> : (t.subjects ?? []).join(", ")}</TableCell>
                   <TableCell className="text-sm"><div>{t.phone}</div><div className="text-xs text-muted-foreground">{t.email}</div></TableCell>
                   <TableCell>{new Intl.NumberFormat("fr-FR").format(t.monthly_salary)} GNF</TableCell>
-                  <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => remove(t.id)}><Trash2 className="size-4 text-destructive" /></Button></TableCell>
+                  <TableCell className="text-right whitespace-nowrap"><EditTeacherDialog teacher={t} onDone={() => qc.invalidateQueries({ queryKey: ["teachers"] })} /><Button variant="ghost" size="icon" onClick={() => remove(t.id)}><Trash2 className="size-4 text-destructive" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>
