@@ -56,6 +56,7 @@ function AccountingPage() {
   const [accountId, setAccountId] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showVoided, setShowVoided] = useState(false);
+  const [tab, setTab] = useState("accounts");
   const range = useMemo(() => periodRange(preset, today(), custom), [preset, custom]);
   const refreshAll = () => void qc.invalidateQueries({ queryKey: ["acc"] });
   const attCounts = useAttachmentCounts();
@@ -68,6 +69,10 @@ function AccountingPage() {
     const { data, error } = await db.from("accounting_categories").select("*").order("kind").order("sort_order"); if (error) throw error; return (data ?? []) as AccountingCategory[];
   } });
   const categories = categoriesQ.data ?? [];
+  // Mêmes requêtes que l'onglet « À comptabiliser » (clés identiques) : alerte visible dès l'ouverture de la page.
+  const unpostedPay = useQuery({ queryKey: ["acc", "unposted-pay"], queryFn: async () => { const { data, error } = await db.rpc("unposted_payments"); if (error) throw error; return (data ?? []) as any[]; } });
+  const unpostedSlips = useQuery({ queryKey: ["acc", "unposted-slips"], queryFn: async () => { const { data, error } = await db.rpc("unposted_payslips"); if (error) throw error; return (data ?? []) as any[]; } });
+  const unpostedCount = (unpostedPay.data?.length ?? 0) + (unpostedSlips.data?.length ?? 0);
   const summary = useQuery({ queryKey: ["acc", "summary", range, accountId], queryFn: async () => {
     const { data, error } = await db.rpc("accounting_summary", { _from: range.from, _to: range.to, _account_id: accountId === "all" ? null : accountId });
     if (error) throw error; return data as any;
@@ -87,7 +92,7 @@ function AccountingPage() {
   const expensesQ = useEntries("expenses");
   const transfersQ = useEntries("account_transfers");
   const q = search.trim().toLowerCase();
-  const match = (r: any) => !q || [r.description, r.reference, r.beneficiary, r.note, r.type].some((x) => String(x ?? "").toLowerCase().includes(q));
+  const match = (r: any) => !q || [r.description, r.reference, r.beneficiary, r.note, r.type, r.accounting_categories?.label, r.accounting_categories?.code, r.financial_accounts?.name].some((x) => String(x ?? "").toLowerCase().includes(q));
   const revenues = (revenuesQ.data ?? []).filter(match);
   const expenses = (expensesQ.data ?? []).filter(match);
   const transfers = (transfersQ.data ?? []).filter(match);
@@ -146,6 +151,13 @@ function AccountingPage() {
       )}
       {truncated && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Les listes affichent au plus {ROW_LIMIT} lignes : réduisez la période pour tout voir. Les totaux ci-dessous restent exacts.</p>}
 
+      {unpostedCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 print:hidden">
+          <span><b>{unpostedCount} opération(s)</b> (paiements d'élèves ou salaires) ne sont pas encore dans la comptabilité : les recettes et soldes ci-dessous sont donc incomplets.</span>
+          <Button size="sm" variant="outline" onClick={() => setTab("post")}>Les comptabiliser</Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Recettes (période)" value={fmt(sum.revenue_total) + " GNF"} icon={ArrowDownCircle} color="text-success bg-success/10" />
         <StatCard label="Dépenses (période)" value={fmt(sum.expense_total) + " GNF"} icon={ArrowUpCircle} color="text-destructive bg-destructive/10" />
@@ -155,7 +167,7 @@ function AccountingPage() {
 
       <ClosureCard onDone={refreshAll} />
 
-      <Tabs defaultValue="accounts">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex-wrap h-auto print:hidden">
           <TabsTrigger value="accounts">Comptes</TabsTrigger>
           <TabsTrigger value="revenues">Recettes</TabsTrigger>

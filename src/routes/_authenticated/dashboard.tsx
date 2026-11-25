@@ -103,6 +103,7 @@ function Dashboard() {
         studentsWithPay,
         attendanceToday,
         expensesAll,
+        refundLinks,
         upcomingExams,
         recentAnnouncements,
         recentPayments,
@@ -118,7 +119,8 @@ function Dashboard() {
         supabase.from("payments").select("amount, paid_at, payment_type").eq("validation_status", "validé"),
         supabase.from("students").select("id, full_name, class_id, classes(name, annual_fee), payments(amount, validation_status)"),
         supabase.from("student_attendance").select("status").eq("date", today),
-        (supabase as any).from("expenses").select("amount, occurred_at").is("voided_at", null),
+        (supabase as any).from("expenses").select("id, amount, occurred_at").is("voided_at", null),
+        (supabase as any).from("payment_refunds").select("expense_id").not("expense_id", "is", null),
         supabase.from("exams").select("id, name, exam_date, subject_id, class_id, classes(name)").gte("exam_date", today).order("exam_date", { ascending: true }).limit(5),
         supabase.from("announcements").select("id, title, created_at, target_role").order("created_at", { ascending: false }).limit(5),
         supabase.from("payments").select("id, amount, paid_at, payment_type, students(full_name)").order("paid_at", { ascending: false }).limit(5),
@@ -129,7 +131,9 @@ function Dashboard() {
       ]);
 
       const allPayments = payments.data ?? [];
-      const allExpenses = expensesAll.data ?? [];
+      // Un remboursement baisse déjà les recettes (paiement négatif) : sa dépense comptable liée ne doit pas être comptée une 2e fois.
+      const refundExpenseIds = new Set(((refundLinks.data ?? []) as any[]).map((r) => r.expense_id));
+      const allExpenses = ((expensesAll.data ?? []) as any[]).filter((e) => !refundExpenseIds.has(e.id));
 
       const totalRevenue = allPayments.reduce((s, p: any) => s + Number(p.amount), 0);
       const totalExpenses = allExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0);
