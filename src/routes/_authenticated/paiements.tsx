@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText, Landmark, Send, MessageCircle, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { feeStatus, isLate } from "@/lib/fees";
 
 export const Route = createFileRoute("/_authenticated/paiements")({
   head: () => ({ meta: [{ title: "Paiements — MBGEduGuinée" }] }),
@@ -46,7 +47,7 @@ function PaymentsPage() {
   const { data: students = [] } = useQuery({
     queryKey: ["students-payments"],
     queryFn: async () =>
-      (await supabase.from("students").select("id, full_name, matricule, parent_phone, classes(name, annual_fee), payments(amount, validation_status)")).data ?? [],
+      (await supabase.from("students").select("id, full_name, matricule, parent_phone, classes(name, annual_fee), payments(amount, validation_status, payment_type, paid_at)")).data ?? [],
   });
   const { data: reminders = [] } = useQuery({
     queryKey: ["payment-reminders"],
@@ -127,12 +128,8 @@ function PaymentsPage() {
   const lateStudents = useMemo(
     () =>
       students
-        .map((s: any) => {
-          const paid = (s.payments ?? []).filter((p: any) => p.validation_status === "validé").reduce((sum: number, p: any) => sum + Number(p.amount), 0);
-          const due = Number(s.classes?.annual_fee ?? 0);
-          return { ...s, paid, due, remaining: due - paid, pct: due > 0 ? (paid / due) * 100 : 0 };
-        })
-        .filter((s: any) => s.due > 0 && s.pct < 50),
+        .map((s: any) => ({ ...s, ...feeStatus(s.classes?.annual_fee, s.payments) }))
+        .filter((s: any) => isLate(s)),
     [students],
   );
 

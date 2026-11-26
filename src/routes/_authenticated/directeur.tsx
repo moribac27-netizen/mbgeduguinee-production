@@ -33,12 +33,13 @@ function DirecteurPage() {
     queryKey: ["directeur-overview"],
     staleTime: 60_000,
     queryFn: async () => {
-      const [students, teachers, classes, payments, expenses, sections, children, logs] = await Promise.all([
+      const [students, teachers, classes, payments, expenses, refundLinks, sections, children, logs] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)"),
         supabase.from("teachers").select("id, full_name, subject_id"),
         supabase.from("classes").select("id, name, level, annual_fee"),
         supabase.from("payments").select("amount, paid_at").eq("validation_status", "validé"),
-        (supabase as any).from("expenses").select("amount").is("voided_at", null),
+        (supabase as any).from("expenses").select("id, amount").is("voided_at", null),
+        (supabase as any).from("payment_refunds").select("expense_id").not("expense_id", "is", null),
         supabase.from("nursery_sections" as any).select("id, name, capacity"),
         supabase.from("nursery_children" as any).select("id, section_id"),
         supabase.from("nursery_daily_logs" as any).select("id", { count: "exact", head: true }).eq("date", today()),
@@ -47,7 +48,9 @@ function DirecteurPage() {
       const studentRows = (students.data ?? []) as any[];
       const classRows = (classes.data ?? []) as any[];
       const paymentRows = (payments.data ?? []) as any[];
-      const expenseRows = (expenses.data ?? []) as any[];
+      // Les dépenses de remboursement sont déjà déduites des recettes (paiement négatif) : on ne les compte pas deux fois.
+      const refundExpenseIds = new Set(((refundLinks.data ?? []) as any[]).map((r) => r.expense_id));
+      const expenseRows = ((expenses.data ?? []) as any[]).filter((e) => !refundExpenseIds.has(e.id));
       const childRows = (children.data ?? []) as any[];
 
       const month = new Date().toISOString().slice(0, 7);
