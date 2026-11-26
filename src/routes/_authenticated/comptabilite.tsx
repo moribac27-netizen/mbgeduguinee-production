@@ -39,6 +39,20 @@ function byCat(cats: any, types: Record<string, number> | undefined, labels: Rec
   return Object.keys(labels).map((t) => ({ key: t, label: labels[t], total: Number(types?.[t] ?? 0) }));
 }
 
+const TAB_HELP: Record<string, string> = {
+  accounts: "Un compte est un endroit où l'argent est gardé (caisse, banque, Orange Money…). Le solde se met à jour tout seul à chaque écriture.",
+  revenues: "Une recette est de l'argent qui entre (scolarité, inscription, don…). Cliquez sur « Nouvelle recette » pour en saisir une.",
+  expenses: "Une dépense est de l'argent qui sort (fournitures, électricité, salaires…). Cliquez sur « Nouvelle dépense » pour en saisir une.",
+  transfers: "Un virement déplace de l'argent d'un compte à un autre (ex. de la caisse vers la banque). Il ne change pas le résultat.",
+  post: "Les paiements d'élèves validés et les salaires payés doivent être enregistrés dans un compte pour apparaître dans la comptabilité.",
+  reconcile: "Comparez votre relevé (banque, Orange Money…) avec vos écritures : cochez ce qui y figure, l'écart doit être nul.",
+  budget: "Fixez ce que vous prévoyez de recevoir et de dépenser, et suivez l'avancement réel.",
+  plan: "Les catégories classent vos recettes et dépenses. Désactivez celles dont vous n'avez pas besoin ; ajoutez les vôtres.",
+  journal: "Toutes les écritures de la période, de la plus récente à la plus ancienne (entrées, sorties, virements).",
+  report: "Résumé de la période : total des recettes, des dépenses et résultat, par catégorie et par mois.",
+  audit: "Qui a fait quoi et quand (création, annulation…). Rien n'est jamais supprimé.",
+};
+
 const ACCOUNT_TYPES = Object.keys(ACCOUNT_LABELS);
 const METHODS = Object.keys(METHOD_LABELS);
 
@@ -98,7 +112,9 @@ function AccountingPage() {
   const transfers = (transfersQ.data ?? []).filter(match);
 
   const sum = summary.data ?? { revenue_total: 0, expense_total: 0, net: 0, revenue_by_type: {}, expense_by_type: {}, by_month: [] };
-  const consolidated = accounts.reduce((s: number, a: any) => s + Number(a.balance), 0);
+  const selectedAccount = accountId === "all" ? null : accounts.find((a: any) => a.account_id === accountId);
+  // Quand un compte est choisi, le solde affiché est celui de CE compte (et non le total de tous les comptes).
+  const consolidated = (selectedAccount ? [selectedAccount] : accounts).reduce((s: number, a: any) => s + Number(a.balance), 0);
   const truncated = [revenuesQ.data, expensesQ.data, transfersQ.data].some((d) => (d?.length ?? 0) >= ROW_LIMIT);
   const activeAccounts = accounts.filter((a: any) => a.is_active);
 
@@ -162,8 +178,20 @@ function AccountingPage() {
         <StatCard label="Recettes (période)" value={fmt(sum.revenue_total) + " GNF"} icon={ArrowDownCircle} color="text-success bg-success/10" />
         <StatCard label="Dépenses (période)" value={fmt(sum.expense_total) + " GNF"} icon={ArrowUpCircle} color="text-destructive bg-destructive/10" />
         <StatCard label="Résultat net (période)" value={fmt(sum.net) + " GNF"} icon={Scale} color={sum.net >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10"} />
-        <StatCard label="Solde consolidé actuel" value={fmt(consolidated) + " GNF"} icon={Wallet} color="text-primary bg-primary/10" />
+        <StatCard label={selectedAccount ? `Solde actuel — ${selectedAccount.name}` : "Solde actuel (tous les comptes)"} value={fmt(consolidated) + " GNF"} icon={Wallet} color="text-primary bg-primary/10" />
       </div>
+
+      {!balances.isLoading && !balances.isError && accounts.length === 0 && (
+        <Card className="border-primary/40 print:hidden"><CardContent className="space-y-2 p-4 text-sm">
+          <div className="font-semibold">Pour bien commencer</div>
+          <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+            <li>Onglet <b>Comptes</b> : cliquez sur « Comptes usuels » pour créer votre caisse, votre banque, Orange Money…</li>
+            <li>Onglet <b>À comptabiliser</b> : enregistrez les paiements d'élèves déjà encaissés dans un compte.</li>
+            <li>Onglets <b>Recettes</b> et <b>Dépenses</b> : saisissez le reste au fil de l'eau (une écriture = un montant, un compte, une catégorie).</li>
+            <li>Chaque fin de mois : vérifiez avec le <b>Rapprochement bancaire</b>, puis <b>clôturez</b> le mois.</li>
+          </ol>
+        </CardContent></Card>
+      )}
 
       <ClosureCard onDone={refreshAll} />
 
@@ -173,14 +201,15 @@ function AccountingPage() {
           <TabsTrigger value="revenues">Recettes</TabsTrigger>
           <TabsTrigger value="expenses">Dépenses</TabsTrigger>
           <TabsTrigger value="transfers">Virements</TabsTrigger>
-          <TabsTrigger value="post">À comptabiliser</TabsTrigger>
-          <TabsTrigger value="reconcile">Rapprochement</TabsTrigger>
+          <TabsTrigger value="post">À comptabiliser{unpostedCount > 0 ? ` (${unpostedCount})` : ""}</TabsTrigger>
+          <TabsTrigger value="reconcile">Rapprochement bancaire</TabsTrigger>
           <TabsTrigger value="budget">Budget</TabsTrigger>
-          <TabsTrigger value="plan">Plan comptable</TabsTrigger>
-          <TabsTrigger value="journal">Journal</TabsTrigger>
+          <TabsTrigger value="plan">Catégories</TabsTrigger>
+          <TabsTrigger value="journal">Journal général</TabsTrigger>
           <TabsTrigger value="report">Compte de résultat</TabsTrigger>
-          <TabsTrigger value="audit">Historique</TabsTrigger>
+          <TabsTrigger value="audit">Historique des actions</TabsTrigger>
         </TabsList>
+        <p className="mt-2 text-sm text-muted-foreground print:hidden">{TAB_HELP[tab]}</p>
 
         <TabsContent value="accounts" className="space-y-4">
           <div className="flex flex-wrap justify-end gap-2">
@@ -277,7 +306,7 @@ function AccountingPage() {
           <div className="mb-3 flex justify-end print:hidden">
             <Button variant="outline" className="gap-2" onClick={() => exportCsv("journal", journal, [
               { label: "Date", value: (r) => r.date }, { label: "Libellé", value: (r) => r.label }, { label: "Compte", value: (r) => r.account },
-              { label: "Référence", value: (r) => r.reference }, { label: "Débit", value: (r) => r.debit || "" }, { label: "Crédit", value: (r) => r.credit || "" },
+              { label: "Référence", value: (r) => r.reference }, { label: "Entrée", value: (r) => r.debit || "" }, { label: "Sortie", value: (r) => r.credit || "" },
             ])}><Download className="size-4" />CSV</Button>
           </div>
           <Card><CardContent className="p-0 overflow-x-auto">

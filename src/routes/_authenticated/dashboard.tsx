@@ -40,6 +40,7 @@ import {
 } from "recharts";
 
 import { NurseryDashboard } from "@/components/NurseryDashboard";
+import { feeStatus, isLate } from "@/lib/fees";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
@@ -117,7 +118,7 @@ function Dashboard() {
         supabase.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "parent"),
         supabase.from("classes").select("id, name, annual_fee"),
         supabase.from("payments").select("amount, paid_at, payment_type").eq("validation_status", "validé"),
-        supabase.from("students").select("id, full_name, class_id, classes(name, annual_fee), payments(amount, validation_status)"),
+        supabase.from("students").select("id, full_name, class_id, classes(name, annual_fee), payments(amount, validation_status, payment_type, paid_at)"),
         supabase.from("student_attendance").select("status").eq("date", today),
         (supabase as any).from("expenses").select("id, amount, occurred_at").is("voided_at", null),
         (supabase as any).from("payment_refunds").select("expense_id").not("expense_id", "is", null),
@@ -148,11 +149,7 @@ function Dashboard() {
         .filter((e: any) => String(e.occurred_at) >= monthStartISO)
         .reduce((s: number, e: any) => s + Number(e.amount), 0);
 
-      const late = (studentsWithPay.data ?? []).filter((s: any) => {
-        const paid = (s.payments ?? []).filter((p: any) => p.validation_status === "validé").reduce((sum: number, p: any) => sum + Number(p.amount), 0);
-        const due = Number(s.classes?.annual_fee ?? 0);
-        return due > 0 && paid < due * 0.5;
-      });
+      const late = (studentsWithPay.data ?? []).filter((s: any) => isLate(feeStatus(s.classes?.annual_fee, s.payments)));
 
       // Revenus vs Dépenses par mois (6 derniers)
       const now = new Date();
