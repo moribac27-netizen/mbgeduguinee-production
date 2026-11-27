@@ -15,7 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Plus, Printer, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileSpreadsheet, FileText, Landmark, Send, MessageCircle, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { feeStatus, isLate } from "@/lib/fees";
+import { adjustmentsByStudent, feeStatus, isLate } from "@/lib/fees";
+import { FeeAdjustmentDialog } from "@/components/FeeAdjustmentDialog";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 export const Route = createFileRoute("/_authenticated/paiements")({
   head: () => ({ meta: [{ title: "Paiements — MBGEduGuinée" }] }),
@@ -49,6 +51,17 @@ function PaymentsPage() {
     queryFn: async () =>
       (await supabase.from("students").select("id, full_name, matricule, parent_phone, classes(name, annual_fee), payments(amount, validation_status, payment_type, paid_at)")).data ?? [],
   });
+  const { data: adjustmentRows = [] } = useQuery({
+    queryKey: ["fee-adjustments", getCurrentAcademicYear()],
+    queryFn: async () => {
+      // Réductions non annulées de l'année scolaire en cours (visibles par la direction et la comptabilité seulement).
+      const { data, error } = await (supabase as any).from("fee_adjustments").select("student_id, amount").eq("academic_year", getCurrentAcademicYear()).is("voided_at", null);
+      if (error) return [] as any[];
+      return (data ?? []) as any[];
+    },
+  });
+  const adjustmentMap = useMemo(() => adjustmentsByStudent(adjustmentRows), [adjustmentRows]);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const { data: reminders = [] } = useQuery({
     queryKey: ["payment-reminders"],
     queryFn: async () => {
@@ -128,9 +141,9 @@ function PaymentsPage() {
   const lateStudents = useMemo(
     () =>
       students
-        .map((s: any) => ({ ...s, ...feeStatus(s.classes?.annual_fee, s.payments) }))
+        .map((s: any) => ({ ...s, ...feeStatus(s.classes?.annual_fee, s.payments, undefined, adjustmentMap.get(s.id)) }))
         .filter((s: any) => isLate(s)),
-    [students],
+    [students, adjustmentMap],
   );
 
   const rows = (tab === "pending" ? pending : validated).filter((p: PaymentRow) => {
@@ -222,6 +235,10 @@ function PaymentsPage() {
           }} disabled={(tab === "late" ? lateStudents.length : rows.length) === 0}>
             <FileText className="size-4" /> PDF{selected.size > 0 ? ` (${selected.size})` : ""}
           </Button>
+          <Button variant="outline" className="gap-2" onClick={() => setAdjustOpen(true)} title="Enregistrer une réduction, une bourse ou une exonération">
+            Réduction / exonération
+          </Button>
+          <FeeAdjustmentDialog open={adjustOpen} onOpenChange={setAdjustOpen} students={students as any[]} />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -263,15 +280,16 @@ function PaymentsPage() {
             <Table>
               <TableHeader><TableRow>
                 <TableHead className="w-10"><input type="checkbox" checked={lateStudents.length > 0 && lateStudents.every((s: any) => selected.has(s.id))} onChange={(e) => setSelected(e.target.checked ? new Set(lateStudents.map((s: any) => s.id)) : new Set())} /></TableHead>
-                <TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>Payé</TableHead><TableHead>Reste</TableHead><TableHead>Progression</TableHead><TableHead>Dernière relance</TableHead><TableHead className="text-right">Actions</TableHead>
+                <TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>Dû net</TableHead><TableHead>Payé</TableHead><TableHead>Reste</TableHead><TableHead>Progression</TableHead><TableHead>Dernière relance</TableHead><TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {lateStudents.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Aucun retard</TableCell></TableRow>}
+                {lateStudents.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Aucun retard</TableCell></TableRow>}
                 {lateStudents.map((s: any) => (
                   <TableRow key={s.id} data-state={selected.has(s.id) ? "selected" : undefined}>
                     <TableCell><input type="checkbox" checked={selected.has(s.id)} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(s.id) : n.delete(s.id); setSelected(n); }} /></TableCell>
                     <TableCell><div className="flex items-center gap-2"><AlertTriangle className="size-4 text-destructive" /><span className="font-medium">{s.full_name}</span></div></TableCell>
                     <TableCell>{s.classes?.name ?? "—"}</TableCell>
+                    <TableCell>{fmt(s.due)} GNF{s.adjustment > 0 && <div className="text-xs text-muted-foreground">dont réduction {fmt(s.adjustment)}</div>}</TableCell>
                     <TableCell>{fmt(s.paid)} GNF</TableCell>
                     <TableCell className="font-semibold text-destructive">{fmt(s.remaining)} GNF</TableCell>
                     <TableCell>

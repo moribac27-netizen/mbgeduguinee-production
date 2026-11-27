@@ -14,6 +14,7 @@ import { exportExcel, exportPDF } from "@/lib/reports";
 import { usePdfMeta } from "@/hooks/usePdfMeta";
 import { usePerStudentPlan, usePaidStudentIds } from "@/hooks/usePerStudentPlan";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
+import { adjustmentsByStudent, feeStatus } from "@/lib/fees";
 
 
 export const Route = createFileRoute("/_authenticated/rapports")({
@@ -722,11 +723,14 @@ function ClassesReport() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [{ data: classes, error }, { data: students }] = await Promise.all([
+      const [{ data: classes, error }, { data: students }, adjRes] = await Promise.all([
         supabase.from("classes").select("id,name,level,annual_fee,teachers(full_name)").order("name"),
-        supabase.from("students").select("class_id,gender,status"),
+        supabase.from("students").select("id,class_id,gender,status"),
+        // Réductions / exonérations de l'année en cours (direction et comptabilité seulement : sinon liste vide).
+        (supabase as any).from("fee_adjustments").select("student_id, amount").eq("academic_year", getCurrentAcademicYear()).is("voided_at", null),
       ]);
       if (error) toast.error(error.message);
+      const adjustments = adjustmentsByStudent(adjRes?.error ? [] : adjRes?.data);
       setRows(
         (classes || []).map((c: any) => {
           const list = (students || []).filter((s: any) => s.class_id === c.id);
@@ -740,7 +744,8 @@ function ClassesReport() {
             filles: list.filter((s: any) => s.gender === "F").length,
             actifs: actifs.length,
             frais: c.annual_fee ?? 0,
-            attendu: (c.annual_fee ?? 0) * actifs.length,
+            // Recette attendue = frais des élèves actifs moins leurs réductions (jamais en dessous de 0 par élève).
+            attendu: actifs.reduce((sum: number, s: any) => sum + feeStatus(c.annual_fee, [], undefined, adjustments.get(s.id)).due, 0),
           };
         }),
       );
@@ -757,7 +762,7 @@ function ClassesReport() {
     { key: "filles", label: "Filles" },
     { key: "actifs", label: "Actifs" },
     { key: "frais", label: "Frais annuels", render: (v: number) => fmtGNF(v) },
-    { key: "attendu", label: "Recette attendue", render: (v: number) => fmtGNF(v) },
+    { key: "attendu", label: "Recette attendue (après réductions)", render: (v: number) => fmtGNF(v) },
   ];
 
   return (
