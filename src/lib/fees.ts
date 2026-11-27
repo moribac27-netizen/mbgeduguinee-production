@@ -26,12 +26,34 @@ export function tuitionPaid(payments: PaymentLike[] | null | undefined, since: s
     .reduce((s, p) => s + Number(p.amount ?? 0), 0);
 }
 
-export interface FeeStatus { due: number; paid: number; remaining: number; pct: number }
+export interface FeeStatus { due: number; paid: number; remaining: number; pct: number; adjustment: number }
 
-export function feeStatus(annualFee: number | string | null | undefined, payments: PaymentLike[] | null | undefined, since?: string): FeeStatus {
-  const due = Number(annualFee ?? 0) || 0;
+/**
+ * `adjustment` = réductions / bourses / exonérations non annulées de l'année : le dû net est « frais de la classe − réductions ».
+ * Un élève totalement exonéré a un dû de 0 : il n'est jamais « en retard ».
+ */
+export function feeStatus(annualFee: number | string | null | undefined, payments: PaymentLike[] | null | undefined, since?: string, adjustment: number | string | null | undefined = 0): FeeStatus {
+  const adj = Math.max(Number(adjustment ?? 0) || 0, 0);
+  const due = Math.max((Number(annualFee ?? 0) || 0) - adj, 0);
   const paid = tuitionPaid(payments, since);
-  return { due, paid, remaining: Math.max(due - paid, 0), pct: due > 0 ? (paid / due) * 100 : 0 };
+  return { due, paid, remaining: Math.max(due - paid, 0), pct: due > 0 ? (paid / due) * 100 : 0, adjustment: adj };
+}
+
+/** Somme des réductions par élève à partir des lignes { student_id, amount } (les lignes annulées sont déjà exclues par la requête). */
+export function adjustmentsByStudent(rows: { student_id: string; amount: number | string }[] | null | undefined): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of rows ?? []) m.set(r.student_id, (m.get(r.student_id) ?? 0) + Number(r.amount ?? 0));
+  return m;
+}
+
+export const ADJUSTMENT_LABELS: Record<string, string> = { reduction: "Réduction", bourse: "Bourse", exoneration: "Exonération" };
+
+/** Message lisible pour une erreur de réduction (les messages de la base sont déjà en français). */
+export function feeAdjustmentErrorMessage(raw: string | undefined | null): string {
+  const text = String(raw ?? "");
+  if (/SCHOOL_SUSPENDED|SCHOOL_BLOCKED/.test(text)) return "Établissement suspendu : aucune écriture possible.";
+  if (/row-level security|permission denied/i.test(text)) return "Droits insuffisants pour cette action.";
+  return text || "Opération impossible pour le moment.";
 }
 
 /** Élève « en retard » : frais définis et moins de la moitié payée. */

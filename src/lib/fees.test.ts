@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { feeStatus, isLate, isTuitionPayment } from "./fees";
+import { adjustmentsByStudent, feeAdjustmentErrorMessage, feeStatus, isLate, isTuitionPayment } from "./fees";
 
 describe("frais de scolarité", () => {
   it("n'impute que la scolarité (comme la Vue Fondateur)", () => {
@@ -34,5 +34,27 @@ describe("frais de scolarité", () => {
     expect(isLate(feeStatus(1000, [{ amount: 499, validation_status: "validé", payment_type: "scolarite" }]))).toBe(true);
     expect(isLate(feeStatus(1000, [{ amount: 500, validation_status: "validé", payment_type: "scolarite" }]))).toBe(false);
     expect(isLate(feeStatus(0, []))).toBe(false);
+  });
+  it("une réduction diminue le dû, une exonération totale ne laisse aucun retard", () => {
+    const paid300 = [{ amount: 300, validation_status: "validé", payment_type: "scolarite" }];
+    expect(feeStatus(1000, paid300, undefined, 400)).toMatchObject({ due: 600, paid: 300, remaining: 300, pct: 50, adjustment: 400 });
+    expect(isLate(feeStatus(1000, paid300, undefined, 400))).toBe(false);
+    const exo = feeStatus(1000, [], undefined, 1000);
+    expect(exo).toMatchObject({ due: 0, remaining: 0 });
+    expect(isLate(exo)).toBe(false);
+  });
+  it("une réduction supérieure aux frais ne rend pas le dû négatif", () => {
+    expect(feeStatus(1000, [], undefined, 5000).due).toBe(0);
+  });
+  it("additionne les réductions par élève", () => {
+    const m = adjustmentsByStudent([{ student_id: "a", amount: 100 }, { student_id: "a", amount: "50" }, { student_id: "b", amount: 10 }]);
+    expect(m.get("a")).toBe(150);
+    expect(m.get("b")).toBe(10);
+    expect(m.get("c")).toBeUndefined();
+  });
+  it("messages d'erreur lisibles", () => {
+    expect(feeAdjustmentErrorMessage("SCHOOL_SUSPENDED")).toContain("suspendu");
+    expect(feeAdjustmentErrorMessage("Montant trop élevé : il reste 5 GNF")).toContain("Montant trop élevé");
+    expect(feeAdjustmentErrorMessage("")).toContain("impossible");
   });
 });
