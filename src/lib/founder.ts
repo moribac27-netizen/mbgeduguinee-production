@@ -32,7 +32,7 @@ export type FounderOverview = {
     attendance_rate: number | null; attendance_rate_definition: string; attendance_records: number;
     by_level: Array<{ level: string; records: number; present: number; late: number; absent: number; justified: number; attendance_rate: number | null; students: number }>;
   };
-  alerts?: { voided_entries: { count: number; amount: number } };
+  alerts?: { voided_entries: { count: number; amount: number }; unposted_payments?: { count: number; amount: number } };
 };
 
 export async function fetchMyFounder(): Promise<MyFounder> {

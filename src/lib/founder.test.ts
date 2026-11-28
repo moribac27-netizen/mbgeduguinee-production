@@ -37,3 +37,47 @@ describe("période", () => {
     expect(founderErrorMessage({ message: "boom" })).toContain("erreur");
   });
 });
+
+import { compactGNF, founderSummary, founderWatchList, monthLabelFr, recoveryRate, schoolYearToDate } from "./founder-utils";
+
+describe("lecture rapide fondateur", () => {
+  test("libellés et montants courts", () => {
+    expect(monthLabelFr("2026-11")).toBe("nov. 26");
+    expect(compactGNF(300000)).toBe("300 k");
+    expect(compactGNF(1500000)).toBe("1,5 M");
+    expect(compactGNF(0)).toBe("0");
+  });
+  test("année scolaire à ce jour", () => {
+    expect(schoolYearToDate("2026-11-28")).toEqual({ from: "2026-09-01", to: "2026-11-28" });
+    expect(schoolYearToDate("2027-03-05")).toEqual({ from: "2026-09-01", to: "2027-03-05" });
+  });
+  test("taux de recouvrement", () => {
+    expect(recoveryRate(0, 0)).toBeNull();
+    expect(recoveryRate(1000, 250)).toBe(25);
+    expect(recoveryRate(1000, 2000)).toBe(100);
+  });
+  test("points d'attention : gravité et règles", () => {
+    const d = {
+      subscription: { phase: "active" }, finance: { expense: 500, result: -500, revenue: 0 }, headline: { students: 10, treasury_total: -5 },
+      recovery: { fees_expected: 1000, fees_collected: 100, students_late: 3 }, alerts: { unposted_payments: { count: 1, amount: 440000 }, voided_entries: { count: 0, amount: 0 } },
+      staff: { payslips_unpaid: 2 },
+    };
+    const w = founderWatchList(d);
+    expect(w[0].level).toBe("alert");
+    expect(w.some((x) => x.level === "warn" && /pas encore enregistrés/.test(x.text))).toBe(true);
+    expect(w.some((x) => /bulletin/.test(x.text))).toBe(true);
+    expect(founderWatchList({ subscription: { phase: "active" }, finance: { expense: 0, result: 0 }, headline: { students: 1, treasury_total: 0 }, recovery: { fees_expected: 1000, fees_collected: 900 } })).toEqual([]);
+    expect(founderWatchList({ subscription: { phase: "overdue" } })[0].level).toBe("alert");
+  });
+  test("synthèse en phrases", () => {
+    const s = founderSummary({
+      headline: { students: 248, treasury_total: 0, treasury_by_type: {} },
+      finance: { revenue: 300000, expense: 500000, result: -200000 },
+      recovery: { academic_year: "2026-2027", fees_expected: 1000000, fees_collected: 250000, amount_due: 750000, students_late: 3, families_late: 2 },
+    });
+    expect(s.length).toBe(4);
+    expect(s[1]).toMatch(/25 % encaissée/);
+    expect(s[2]).toMatch(/déficit/);
+    expect(s[3]).toMatch(/Aucun compte/);
+  });
+});
