@@ -235,8 +235,8 @@ function PaymentsPage() {
           }} disabled={(tab === "late" ? lateStudents.length : rows.length) === 0}>
             <FileText className="size-4" /> PDF{selected.size > 0 ? ` (${selected.size})` : ""}
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => setAdjustOpen(true)} title="Enregistrer une réduction, une bourse ou une exonération">
-            Réduction / exonération
+          <Button variant="outline" className="gap-2" onClick={() => setAdjustOpen(true)} title="Enregistrer une réduction, une bourse ou une gratuité totale">
+            Réduction / gratuité
           </Button>
           <FeeAdjustmentDialog open={adjustOpen} onOpenChange={setAdjustOpen} students={students as any[]} />
           <Dialog open={open} onOpenChange={setOpen}>

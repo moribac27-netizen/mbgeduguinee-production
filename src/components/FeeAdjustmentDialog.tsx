@@ -16,7 +16,7 @@ const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(Math.round(n));
 
 interface StudentOption { id: string; full_name: string; matricule?: string | null; classes?: { name?: string | null; annual_fee?: number | string | null } | null }
 
-/** Enregistrer ou annuler une réduction, une bourse ou une exonération de frais de scolarité (direction et comptabilité). */
+/** Enregistrer ou annuler une réduction, une bourse ou une gratuité totale de frais de scolarité (direction et comptabilité). */
 export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStudentId }: {
   open: boolean; onOpenChange: (o: boolean) => void; students: StudentOption[]; initialStudentId?: string;
 }) {
@@ -67,7 +67,7 @@ export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStude
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success(kind === "exoneration" ? "Exonération enregistrée" : "Réduction enregistrée");
+      toast.success(kind === "exoneration" ? "Gratuité enregistrée" : "Réduction enregistrée");
       setAmount(""); setReason(""); refresh();
     },
     onError: (e: any) => toast.error(feeAdjustmentErrorMessage(e?.message)),
@@ -92,7 +92,7 @@ export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStude
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Réduction, bourse ou exonération</DialogTitle>
+          <DialogTitle>Réduction, bourse ou gratuité totale</DialogTitle>
           <DialogDescription>Diminue les frais de scolarité dus par un élève pour l'année en cours. Les paiements déjà reçus ne sont pas modifiés.</DialogDescription>
         </DialogHeader>
 
@@ -139,7 +139,7 @@ export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStude
                       <SelectContent>
                         <SelectItem value="reduction">Réduction (montant en GNF)</SelectItem>
                         <SelectItem value="bourse">Bourse (montant en GNF)</SelectItem>
-                        <SelectItem value="exoneration">Exonération totale (tout le reste dû)</SelectItem>
+                        <SelectItem value="exoneration">Gratuité totale (plus rien à payer)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -157,7 +157,7 @@ export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStude
                     <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. : 3e enfant de la même famille, orphelin, bourse d'excellence…" />
                   </div>
                   <Button className="w-full" disabled={!canSubmit} onClick={() => add.mutate()}>
-                    {add.isPending ? "Enregistrement…" : kind === "exoneration" ? "Enregistrer l'exonération" : "Enregistrer la réduction"}
+                    {add.isPending ? "Enregistrement…" : kind === "exoneration" ? "Enregistrer la gratuité" : "Enregistrer la réduction"}
                   </Button>
                 </div>
               ) : (

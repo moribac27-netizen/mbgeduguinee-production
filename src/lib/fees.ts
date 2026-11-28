@@ -46,7 +46,7 @@ export function adjustmentsByStudent(rows: { student_id: string; amount: number 
   return m;
 }
 
-export const ADJUSTMENT_LABELS: Record<string, string> = { reduction: "Réduction", bourse: "Bourse", exoneration: "Exonération" };
+export const ADJUSTMENT_LABELS: Record<string, string> = { reduction: "Réduction", bourse: "Bourse", exoneration: "Gratuité totale" };
 
 /** Message lisible pour une erreur de réduction (les messages de la base sont déjà en français). */
 export function feeAdjustmentErrorMessage(raw: string | undefined | null): string {
