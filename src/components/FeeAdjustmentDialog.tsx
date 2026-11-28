@@ -96,6 +96,18 @@ export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStude
           <DialogDescription>Diminue les frais de scolarité dus par un élève pour l'année en cours. Les paiements déjà reçus ne sont pas modifiés.</DialogDescription>
         </DialogHeader>
 
+        <details className="rounded-md border bg-muted/40 p-3 text-xs" open={!studentId}>
+          <summary className="cursor-pointer font-medium">Comment ça marche ?</summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-4 text-muted-foreground">
+            <li>Choisissez l'élève, puis le type : <b>réduction</b> ou <b>bourse</b> (un montant en GNF) ou <b>gratuité totale</b> (plus rien à payer).</li>
+            <li>Écrivez le motif (obligatoire, il reste dans l'historique), puis enregistrez.</li>
+            <li>Les frais de l'élève baissent : <b>À payer après réduction = frais annuels − réductions</b>. Le reste à payer se calcule à partir de ce montant.</li>
+          </ol>
+          <p className="mt-2 text-muted-foreground">Exemple : frais 1 000 000, réduction 200 000 → l'élève doit 800 000. S'il a déjà payé 300 000, il lui reste 500 000.</p>
+          <p className="mt-1 text-muted-foreground">Aucun paiement n'est créé et la caisse ne bouge pas. Valable pour l'année en cours. Une erreur ? Annulez la réduction dans l'historique ci-dessous : elle reste visible, marquée « annulée ».</p>
+          <p className="mt-1 text-muted-foreground">Un élève qui paie en plusieurs fois n'a pas besoin de réduction : enregistrez simplement chaque paiement reçu.</p>
+        </details>
+
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label>Élève</Label>
@@ -129,6 +141,12 @@ export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStude
                 <div className="rounded-md bg-muted p-2"><div className="text-muted-foreground">Réductions</div><div className="font-semibold">{fmt(activeTotal)}</div></div>
                 <div className="rounded-md bg-muted p-2"><div className="text-muted-foreground">À payer après réduction</div><div className="font-semibold">{fmt(remainingToCover)}</div></div>
               </div>
+
+              {remainingToCover > 0 && (kind === "exoneration" || (amountNum > 0 && !amountError)) && (
+                <p className="rounded-md bg-primary/10 p-2 text-xs">
+                  Après enregistrement : l'élève devra <b>{fmt(kind === "exoneration" ? 0 : remainingToCover - amountNum)} GNF</b> au lieu de {fmt(remainingToCover)} GNF.
+                </p>
+              )}
 
               {remainingToCover > 0 ? (
                 <div className="space-y-3 rounded-md border p-3">
