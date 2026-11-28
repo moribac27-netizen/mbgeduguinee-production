@@ -17,6 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { adjustmentsByStudent, feeStatus, isLate } from "@/lib/fees";
 import { FeeAdjustmentDialog } from "@/components/FeeAdjustmentDialog";
+import { StudentPicker } from "@/components/SearchSelect";
+import { matchesSearch } from "@/lib/search";
+import { fetchAll } from "@/lib/fetch-all";
 import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 export const Route = createFileRoute("/_authenticated/paiements")({
@@ -41,15 +44,16 @@ function PaymentsPage() {
   const { data: payments = [] } = useQuery({
     queryKey: ["payments"],
     queryFn: async () =>
-      (await supabase
-        .from("payments")
-        .select("*, students(full_name, matricule, class_id, classes(name, annual_fee))")
-        .order("paid_at", { ascending: false })).data ?? [],
+      fetchAll<any>((from, to) =>
+        supabase.from("payments").select("*, students(full_name, matricule, class_id, classes(name, annual_fee))")
+          .order("paid_at", { ascending: false }).order("id").range(from, to) as any),
   });
   const { data: students = [] } = useQuery({
     queryKey: ["students-payments"],
     queryFn: async () =>
-      (await supabase.from("students").select("id, full_name, matricule, parent_phone, classes(name, annual_fee), payments(amount, validation_status, payment_type, paid_at)")).data ?? [],
+      fetchAll<any>((from, to) =>
+        supabase.from("students").select("id, full_name, matricule, parent_phone, classes(name, annual_fee), payments(amount, validation_status, payment_type, paid_at)")
+          .order("full_name").order("id").range(from, to) as any),
   });
   const { data: adjustmentRows = [] } = useQuery({
     queryKey: ["fee-adjustments", getCurrentAcademicYear()],
@@ -146,14 +150,14 @@ function PaymentsPage() {
     [students, adjustmentMap],
   );
 
+  const lateShown = useMemo(
+    () => lateStudents.filter((s: any) => matchesSearch(search, s.full_name, s.matricule, s.classes?.name)),
+    [lateStudents, search],
+  );
+
   const rows = (tab === "pending" ? pending : validated).filter((p: PaymentRow) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (p.receipt_number ?? "").toLowerCase().includes(q) ||
-      (p.students?.full_name ?? "").toLowerCase().includes(q) ||
-      (p.transaction_reference ?? "").toLowerCase().includes(q)
-    );
+    if (!search.trim()) return true;
+    return matchesSearch(search, p.receipt_number, p.students?.full_name, p.students?.matricule, p.students?.classes?.name, p.transaction_reference);
   });
 
   async function validatePayment(p: PaymentRow) {
@@ -259,12 +263,10 @@ function PaymentsPage() {
       </div>
 
 
-      {tab !== "late" && (
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input placeholder="Rechercher (reçu, élève, référence)…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-      )}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input placeholder={tab === "late" ? "Rechercher un élève (nom, matricule, classe)…" : "Rechercher (élève, matricule, reçu, référence)…"} className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
 
       {remindOpen && (
         <ReminderDialog
@@ -279,15 +281,15 @@ function PaymentsPage() {
           {tab === "late" ? (
             <Table>
               <TableHeader><TableRow>
-                <TableHead className="w-10"><input type="checkbox" checked={lateStudents.length > 0 && lateStudents.every((s: any) => selected.has(s.id))} onChange={(e) => setSelected(e.target.checked ? new Set(lateStudents.map((s: any) => s.id)) : new Set())} /></TableHead>
+                <TableHead className="w-10"><input type="checkbox" checked={lateShown.length > 0 && lateShown.every((s: any) => selected.has(s.id))} onChange={(e) => setSelected(e.target.checked ? new Set(lateShown.map((s: any) => s.id)) : new Set())} /></TableHead>
                 <TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>À payer après réduction</TableHead><TableHead>Payé</TableHead><TableHead>Reste</TableHead><TableHead>Progression</TableHead><TableHead>Dernière relance</TableHead><TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {lateStudents.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Aucun retard</TableCell></TableRow>}
-                {lateStudents.map((s: any) => (
+                {lateShown.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{lateStudents.length === 0 ? "Aucun retard" : "Aucun élève en retard ne correspond à la recherche"}</TableCell></TableRow>}
+                {lateShown.map((s: any) => (
                   <TableRow key={s.id} data-state={selected.has(s.id) ? "selected" : undefined}>
                     <TableCell><input type="checkbox" checked={selected.has(s.id)} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(s.id) : n.delete(s.id); setSelected(n); }} /></TableCell>
-                    <TableCell><div className="flex items-center gap-2"><AlertTriangle className="size-4 text-destructive" /><span className="font-medium">{s.full_name}</span></div></TableCell>
+                    <TableCell><div className="flex items-center gap-2"><AlertTriangle className="size-4 text-destructive" /><div><span className="font-medium">{s.full_name}</span>{s.matricule && <div className="text-xs text-muted-foreground">{s.matricule}</div>}</div></div></TableCell>
                     <TableCell>{s.classes?.name ?? "—"}</TableCell>
                     <TableCell>{fmt(s.due)} GNF{s.adjustment > 0 && <div className="text-xs text-muted-foreground">dont réduction {fmt(s.adjustment)}</div>}</TableCell>
                     <TableCell>{fmt(s.paid)} GNF</TableCell>
@@ -570,10 +572,7 @@ function PaymentDialog({ students, onClose }: any) {
       <form onSubmit={submit} className="space-y-3">
         <div>
           <Label>Élève *</Label>
-          <Select value={form.student_id} onValueChange={(v) => setForm({ ...form, student_id: v })}>
-            <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-            <SelectContent>{students.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.full_name} — {s.matricule}</SelectItem>)}</SelectContent>
-          </Select>
+          <StudentPicker students={students} value={form.student_id} onChange={(v) => setForm({ ...form, student_id: v })} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Montant (GNF) *</Label><Input type="number" required min={1} value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} /></div>

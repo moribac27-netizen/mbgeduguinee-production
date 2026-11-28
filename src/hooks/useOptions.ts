@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles } from "@/hooks/useAuth";
+import { fetchAll } from "@/lib/fetch-all";
 
 export interface Option { value: string; label: string }
 
@@ -16,18 +17,14 @@ export function useIsClassScoped(): boolean {
 export function useStudentOptions() {
   const { data } = useQuery({
     queryKey: ["opt-students"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("students")
-        .select("id, full_name, matricule, classes(name)")
-        .order("full_name");
-      return (data ?? []) as any[];
-    },
+    queryFn: async () =>
+      fetchAll<any>((from, to) =>
+        supabase.from("students").select("id, full_name, matricule, classes(name)").order("full_name").order("id").range(from, to) as any),
     staleTime: 5 * 60_000,
   });
   const options: Option[] = (data ?? []).map((s: any) => ({
     value: s.id,
-    label: `${s.full_name}${s.classes?.name ? ` — ${s.classes.name}` : ""}`,
+    label: `${s.full_name}${s.matricule ? ` — ${s.matricule}` : ""}${s.classes?.name ? ` · ${s.classes.name}` : ""}`,
   }));
   const byId = new Map((data ?? []).map((s: any) => [s.id, s]));
   return { options, byId, students: data ?? [] };

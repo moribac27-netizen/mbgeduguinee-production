@@ -181,7 +181,7 @@ function Transport() {
             orderBy={{ column: "start_date", ascending: false }}
             searchKeys={["students.full_name", "stop_name"]}
             fields={[
-              { name: "student_id", label: "Élève", type: "select", options: studentOptions, required: true },
+              { name: "student_id", label: "Élève", type: "select", searchable: true, options: studentOptions, required: true },
               { name: "route_id", label: "Circuit", type: "select", options: routeOptions, required: true },
               { name: "stop_name", label: "Arrêt" },
               { name: "direction", label: "Sens", type: "select", options: DIRECTION, required: true, default: "aller_retour" },
@@ -216,7 +216,7 @@ function Transport() {
             orderBy={{ column: "date", ascending: false }}
             searchKeys={["students.full_name"]}
             fields={[
-              { name: "student_id", label: "Élève", type: "select", options: studentOptions, required: true },
+              { name: "student_id", label: "Élève", type: "select", searchable: true, options: studentOptions, required: true },
               { name: "route_id", label: "Circuit", type: "select", options: routeOptions },
               { name: "date", label: "Date", type: "date", required: true, default: new Date().toISOString().slice(0, 10) },
               { name: "direction", label: "Sens", type: "select", options: DIRECTION.slice(0, 2), required: true, default: "aller" },

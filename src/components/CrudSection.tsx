@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { SearchSelect } from "@/components/SearchSelect";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Search, Inbox, FileSpreadsheet, Printer } from "lucide-react";
@@ -27,6 +28,8 @@ export interface CrudField {
   label: string;
   type?: FieldType;
   options?: { value: string; label: string }[];
+  /** Liste déroulante avec champ de recherche (utile pour les longues listes : élèves, classes…). */
+  searchable?: boolean;
   required?: boolean;
   placeholder?: string;
   step?: string;
@@ -334,6 +337,8 @@ function CrudDialog({
                 {f.type === "textarea" ? (
                   <Textarea rows={3} value={form[f.name] ?? ""} placeholder={f.placeholder}
                     onChange={(e) => set(f.name, e.target.value)} />
+                ) : f.type === "select" && f.searchable ? (
+                  <SearchSelect options={f.options ?? []} value={form[f.name] ? String(form[f.name]) : ""} onChange={(v) => set(f.name, v)} placeholder="Sélectionner…" />
                 ) : f.type === "select" ? (
                   <Select value={form[f.name] ? String(form[f.name]) : ""} onValueChange={(v) => set(f.name, v)}>
                     <SelectTrigger><SelectValue placeholder="Sélectionner…" /></SelectTrigger>
