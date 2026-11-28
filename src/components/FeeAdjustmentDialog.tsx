@@ -127,7 +127,7 @@ export function FeeAdjustmentDialog({ open, onOpenChange, students, initialStude
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div className="rounded-md bg-muted p-2"><div className="text-muted-foreground">Frais annuels</div><div className="font-semibold">{fmt(fee)}</div></div>
                 <div className="rounded-md bg-muted p-2"><div className="text-muted-foreground">Réductions</div><div className="font-semibold">{fmt(activeTotal)}</div></div>
-                <div className="rounded-md bg-muted p-2"><div className="text-muted-foreground">Dû net</div><div className="font-semibold">{fmt(remainingToCover)}</div></div>
+                <div className="rounded-md bg-muted p-2"><div className="text-muted-foreground">À payer après réduction</div><div className="font-semibold">{fmt(remainingToCover)}</div></div>
               </div>
 
               {remainingToCover > 0 ? (

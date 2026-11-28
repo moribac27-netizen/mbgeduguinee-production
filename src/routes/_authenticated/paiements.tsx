@@ -280,7 +280,7 @@ function PaymentsPage() {
             <Table>
               <TableHeader><TableRow>
                 <TableHead className="w-10"><input type="checkbox" checked={lateStudents.length > 0 && lateStudents.every((s: any) => selected.has(s.id))} onChange={(e) => setSelected(e.target.checked ? new Set(lateStudents.map((s: any) => s.id)) : new Set())} /></TableHead>
-                <TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>Dû net</TableHead><TableHead>Payé</TableHead><TableHead>Reste</TableHead><TableHead>Progression</TableHead><TableHead>Dernière relance</TableHead><TableHead className="text-right">Actions</TableHead>
+                <TableHead>Élève</TableHead><TableHead>Classe</TableHead><TableHead>À payer après réduction</TableHead><TableHead>Payé</TableHead><TableHead>Reste</TableHead><TableHead>Progression</TableHead><TableHead>Dernière relance</TableHead><TableHead className="text-right">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {lateStudents.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Aucun retard</TableCell></TableRow>}
