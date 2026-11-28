@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import * as XLSX from "xlsx";
-import { Loader2, Lock, Printer, FileSpreadsheet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Loader2, Lock, Printer, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,21 +12,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatPublicGNF } from "@/lib/public-offers";
 import { formatDateFr } from "@/lib/flat-offers";
 import { printWhenReady } from "@/lib/print-ready";
+import { compactGNF, founderSummary, founderWatchList, monthLabelFr, recoveryRate, schoolYearToDate } from "@/lib/founder-utils";
 import {
   currentMonthConakry, fetchFounderOverview, fetchMyFounder, founderErrorMessage, logFounderExport, monthBounds, shiftMonth,
   type FounderOverview,
 } from "@/lib/founder";
 
+const currentDayConakry = () => new Date().toISOString().slice(0, 10);
 const PHASE: Record<string, string> = { trial: "Essai", active: "À jour", unpaid: "En retard", overdue: "Suspendue", none: "Sans forfait" };
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return <div className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="text-lg font-semibold">{value}</div>{hint && <div className="text-xs text-muted-foreground mt-0.5">{hint}</div>}</div>;
-}
-
-function Variation({ now, before }: { now: number; before: number }) {
-  if (!before) return null;
-  const pct = Math.round(((now - before) * 1000) / before) / 10;
-  return <span className={pct >= 0 ? "text-emerald-700" : "text-red-700"}>{pct >= 0 ? "+" : ""}{pct} % vs période précédente</span>;
 }
 
 /** Vue Fondateur : consultation seule. Toutes les données viennent des fonctions SQL founder_overview (agrégats, aucune ligne individuelle). */
@@ -60,7 +56,7 @@ export function FounderView() {
     const rows: Array<[string, string | number | null]> = [
       ["Établissement", o.school.name], ["Période", `${from} → ${to}`], ["Généré le", o.generated_at],
       ["Élèves actifs", o.headline?.students ?? null], ["Encaissements", o.headline?.collections ?? null], ["Dépenses", o.finance?.expense ?? null], ["Résultat", o.finance?.result ?? null],
-      ["Impayés scolarité (montant)", o.headline?.unpaid_amount ?? null], ["Familles en retard", o.headline?.unpaid_families ?? null], ["Trésorerie", o.headline?.treasury_total ?? null],
+      ["Frais de scolarité attendus", o.recovery?.fees_expected ?? null], ["Frais de scolarité encaissés", o.recovery?.fees_collected ?? null], ["Reste à recouvrer", o.headline?.unpaid_amount ?? null], ["Familles n'ayant pas fini de payer", o.headline?.unpaid_families ?? null], ["Trésorerie", o.headline?.treasury_total ?? null],
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Synthèse");
@@ -78,7 +74,7 @@ export function FounderView() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-display font-bold">Vue Fondateur</h1>
-          <p className="text-sm text-muted-foreground">Consultation seule · indicateurs agrégés · fuseau Conakry</p>
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Lock className="size-3.5" />Consultation seule : vous ne pouvez rien modifier ici · totaux uniquement · heure de Conakry</p>
         </div>
         <div className="no-print flex flex-wrap items-end gap-2">
           {schools.length > 1 && (
@@ -86,9 +82,11 @@ export function FounderView() {
               {schools.map((s) => <option key={s.school_id} value={s.school_id}>{s.name}{s.suspended ? " (suspendu)" : ""}</option>)}
             </select>
           )}
-          <Button variant="outline" size="sm" onClick={() => { setCustom(null); setMonth(shiftMonth(month, -1)); }}>←</Button>
+          <Button variant={!custom && month === currentMonthConakry() ? "default" : "outline"} size="sm" onClick={() => { setCustom(null); setMonth(currentMonthConakry()); }}>Ce mois</Button>
+          <Button variant={custom && custom.from === schoolYearToDate(currentDayConakry()).from ? "default" : "outline"} size="sm" onClick={() => setCustom(schoolYearToDate(currentDayConakry()))}>Année scolaire</Button>
+          <Button variant="outline" size="sm" onClick={() => { setCustom(null); setMonth(shiftMonth(month, -1)); }} aria-label="Mois précédent">←</Button>
           <Input type="month" className="w-40" value={custom ? "" : month} onChange={(e) => { if (e.target.value) { setCustom(null); setMonth(e.target.value); } }} />
-          <Button variant="outline" size="sm" disabled={!custom && month >= currentMonthConakry()} onClick={() => { setCustom(null); setMonth(shiftMonth(month, 1)); }}>→</Button>
+          <Button variant="outline" size="sm" disabled={!custom && month >= currentMonthConakry()} onClick={() => { setCustom(null); setMonth(shiftMonth(month, 1)); }} aria-label="Mois suivant">→</Button>
           <Input type="date" className="w-36" value={from} onChange={(e) => e.target.value && setCustom({ from: e.target.value, to: custom?.to ?? to })} aria-label="Du" />
           <Input type="date" className="w-36" value={to} onChange={(e) => e.target.value && setCustom({ from: custom?.from ?? from, to: e.target.value })} aria-label="Au" />
           {d && <><Button size="sm" variant="outline" onClick={() => void exportXlsx(d)}><FileSpreadsheet className="size-4 mr-1" />Excel</Button><Button size="sm" variant="outline" onClick={() => void exportPdf(d)}><Printer className="size-4 mr-1" />PDF</Button></>}
@@ -108,34 +106,42 @@ export function FounderView() {
 
           {!d.suspended && d.headline && d.finance && (
             <>
+              <EssentialsCard d={d} />
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Tile label="Élèves actifs" value={String(d.headline.students)} hint={d.headline.student_cap ? `Plafond de l'offre : ${d.headline.student_cap}` : undefined} />
-                <Tile label="Encaissements" value={formatPublicGNF(d.headline.collections)} hint={d.headline.collections_variation_pct == null ? undefined : `${d.headline.collections_variation_pct >= 0 ? "+" : ""}${d.headline.collections_variation_pct} % vs période précédente`} />
-                <Tile label="Impayés de scolarité" value={formatPublicGNF(d.headline.unpaid_amount ?? 0)} hint={`${d.headline.unpaid_families ?? 0} famille(s) concernée(s)`} />
-                <Tile label="Trésorerie (comptes actifs)" value={formatPublicGNF(d.headline.treasury_total)} />
+                {d.recovery ? (
+                  <Tile label="Scolarité encaissée" value={recoveryRate(d.recovery.fees_expected, d.recovery.fees_collected) == null ? "—" : `${recoveryRate(d.recovery.fees_expected, d.recovery.fees_collected)} %`} hint={`${formatPublicGNF(d.recovery.fees_collected)} sur ${formatPublicGNF(d.recovery.fees_expected)} attendus (année ${d.recovery.academic_year})`} />
+                ) : <Tile label="Recettes de la période" value={formatPublicGNF(d.headline.collections)} />}
+                <Tile label="Reste à recouvrer" value={formatPublicGNF(d.headline.unpaid_amount ?? 0)} hint={`${d.headline.unpaid_families ?? 0} famille(s) n'ont pas fini de payer`} />
+                <Tile label="Trésorerie (comptes actifs)" value={formatPublicGNF(d.headline.treasury_total)} hint={Object.keys(d.headline.treasury_by_type ?? {}).length === 0 ? "Aucun compte créé en comptabilité" : "Caisses, banques et mobile money"} />
               </div>
 
               <Card>
-                <CardHeader><CardTitle>Finances de la période</CardTitle><CardDescription>Écritures annulées exclues (même calcul que la Comptabilité).</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Finances de la période</CardTitle><CardDescription>Recettes et dépenses enregistrées en comptabilité (écritures annulées exclues, même calcul que la page Comptabilité).</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <Tile label="Recettes" value={formatPublicGNF(d.finance.revenue)} hint={undefined} />
+                    <Tile label="Recettes" value={formatPublicGNF(d.finance.revenue)} hint={d.headline.collections_variation_pct == null ? undefined : `${d.headline.collections_variation_pct >= 0 ? "+" : ""}${d.headline.collections_variation_pct} % vs période précédente`} />
                     <Tile label="Dépenses" value={formatPublicGNF(d.finance.expense)} />
-                    <Tile label="Résultat" value={formatPublicGNF(d.finance.result)} />
+                    <Tile label="Résultat (recettes − dépenses)" value={formatPublicGNF(d.finance.result)} />
                   </div>
-                  <div className="text-xs"><Variation now={d.finance.revenue} before={d.finance.previous.revenue} /></div>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={d.finance.months}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1_000_000)} M`} />
-                        <Tooltip formatter={(v: any) => formatPublicGNF(Number(v))} />
-                        <Bar dataKey="revenue" name="Recettes" fill="#2563eb" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="expense" name="Dépenses" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <div className="text-sm font-medium">Évolution sur les 12 derniers mois</div>
+                  {d.finance.months.every((m) => !m.revenue && !m.expense) ? (
+                    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">Aucune recette ni dépense enregistrée sur les 12 derniers mois.</div>
+                  ) : (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={d.finance.months.map((m) => ({ ...m, label: monthLabelFr(m.month) }))}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                          <YAxis tick={{ fontSize: 11 }} width={48} tickFormatter={(v) => compactGNF(Number(v))} />
+                          <Tooltip formatter={(v: any) => formatPublicGNF(Number(v))} />
+                          <Bar dataKey="revenue" name="Recettes" fill="#2563eb" radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="expense" name="Dépenses" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -144,8 +150,8 @@ export function FounderView() {
                   <CardHeader><CardTitle>Recouvrement de la scolarité</CardTitle><CardDescription>Année {d.recovery.academic_year} · {d.recovery.basis}</CardDescription></CardHeader>
                   <CardContent className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <Tile label="Frais attendus" value={formatPublicGNF(d.recovery.fees_expected)} />
-                      <Tile label="Frais encaissés" value={formatPublicGNF(d.recovery.fees_collected)} />
+                      <Tile label="Frais attendus" value={formatPublicGNF(d.recovery.fees_expected)} hint="Frais des classes, réductions et bourses déduites" />
+                      <Tile label="Frais encaissés" value={formatPublicGNF(d.recovery.fees_collected)} hint="Paiements de scolarité validés" />
                       <Tile label="Reste à recouvrer" value={formatPublicGNF(d.recovery.amount_due)} hint={`${d.recovery.students_late} élève(s) · ${d.recovery.families_late} famille(s)`} />
                     </div>
                     {d.recovery.by_class.length > 0 && (
@@ -176,19 +182,11 @@ export function FounderView() {
                 )}
               </div>
 
-              {d.alerts && d.alerts.voided_entries.count > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-                  {d.alerts.voided_entries.count} écriture(s) comptable(s) annulée(s) sur la période, pour {formatPublicGNF(d.alerts.voided_entries.amount)}.
-                </div>
-              )}
             </>
           )}
 
           <SubscriptionCard sub={d.subscription} />
 
-          {d.unavailable && d.unavailable.length > 0 && !d.suspended && (
-            <p className="text-xs text-muted-foreground">Non disponible : {d.unavailable.map((u) => u.reason).join(" · ")}.</p>
-          )}
         </>
       )}
     </div>
@@ -204,13 +202,43 @@ function SubscriptionCard({ sub }: { sub: Record<string, any> | null }) {
       {sub.available !== false && sub.monthly_price != null && (
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile label="Prix mensuel" value={formatPublicGNF(Number(sub.monthly_price))} />
-          {sub.annual_commitment != null && <Tile label="Engagement annuel" value={formatPublicGNF(Number(sub.annual_commitment))} />}
+          {sub.valid_until && <Tile label="Valable jusqu'au" value={formatDateFr(sub.valid_until)} />}
+          {sub.annual_commitment != null && <Tile label={sub.annual_mode ? "Montant de l'abonnement (payé en une fois)" : "Engagement annuel"} value={formatPublicGNF(Number(sub.annual_commitment))} />}
           {sub.paid_amount != null && <Tile label="Déjà payé" value={formatPublicGNF(Number(sub.paid_amount))} />}
           {sub.balance != null && <Tile label="Solde restant" value={formatPublicGNF(Number(sub.balance))} />}
           {sub.overdue_amount != null && Number(sub.overdue_amount) > 0 && <Tile label="En retard" value={formatPublicGNF(Number(sub.overdue_amount))} />}
           {sub.next_due_date && <Tile label="Prochaine échéance" value={formatDateFr(sub.next_due_date)} hint={sub.next_installment_amount ? formatPublicGNF(Number(sub.next_installment_amount)) : undefined} />}
         </CardContent>
       )}
+    </Card>
+  );
+}
+
+
+/** Résumé en langage simple + points d'attention : l'essentiel à lire en quelques secondes. */
+function EssentialsCard({ d }: { d: FounderOverview }) {
+  const lines = founderSummary(d as any);
+  const watch = founderWatchList(d as any);
+  return (
+    <Card className="border-primary/30">
+      <CardHeader className="pb-2"><CardTitle>L'essentiel</CardTitle><CardDescription>Ce qu'il faut retenir de la période, en quelques lignes.</CardDescription></CardHeader>
+      <CardContent className="space-y-4">
+        <ul className="space-y-1.5 text-sm">{lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
+        <div>
+          <div className="mb-1.5 text-sm font-medium">À surveiller</div>
+          {watch.length === 0 ? (
+            <div className="flex items-center gap-2 text-sm text-emerald-800"><CheckCircle2 className="size-4" />Rien d'anormal détecté sur la période.</div>
+          ) : (
+            <ul className="space-y-1.5">
+              {watch.map((w, i) => (
+                <li key={i} className={"flex gap-2 rounded-lg border p-2.5 text-sm " + (w.level === "alert" ? "border-red-200 bg-red-50 text-red-950" : w.level === "warn" ? "border-amber-200 bg-amber-50 text-amber-950" : "bg-muted/40 text-muted-foreground")}>
+                  {w.level === "info" ? <Info className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}<span>{w.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
     </Card>
   );
 }
