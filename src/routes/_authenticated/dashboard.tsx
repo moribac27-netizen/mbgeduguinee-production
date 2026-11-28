@@ -40,8 +40,6 @@ import {
 } from "recharts";
 
 import { NurseryDashboard } from "@/components/NurseryDashboard";
-import { adjustmentsByStudent, feeStatus, isLate } from "@/lib/fees";
-import { getCurrentAcademicYear } from "@/lib/academic-year";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
@@ -88,25 +86,20 @@ function Dashboard() {
   const showPedago = roles.some((r) => ["admin", "directeur", "enseignant"].includes(r));
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["dashboard-smart"],
+    queryKey: ["dashboard-smart", showFinance],
     staleTime: 60_000,
     queryFn: async () => {
       const today = todayISO();
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      const monthStartISO = monthStart.toISOString().slice(0, 10);
 
       const [
         students,
         teachers,
         parentsRes,
         classesRes,
-        payments,
         studentsWithPay,
-        feeAdjustments,
+        financeRes,
+        balancesRes,
         attendanceToday,
-        expensesAll,
-        refundLinks,
         upcomingExams,
         recentAnnouncements,
         recentPayments,
@@ -119,12 +112,11 @@ function Dashboard() {
         supabase.from("teachers").select("id", { count: "exact", head: true }),
         supabase.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "parent"),
         supabase.from("classes").select("id, name, annual_fee"),
-        supabase.from("payments").select("amount, paid_at, payment_type").eq("validation_status", "validé"),
-        supabase.from("students").select("id, full_name, class_id, classes(name, annual_fee), payments(amount, validation_status, payment_type, paid_at)"),
-        (supabase as any).from("fee_adjustments").select("student_id, amount").eq("academic_year", getCurrentAcademicYear()).is("voided_at", null),
+        supabase.from("students").select("id, classes(name)"),
+        // Tous les chiffres financiers sont calculés en base (pas de plafond de 1000 lignes, même règle que Paiements/Comptabilité).
+        showFinance ? (supabase as any).rpc("finance_dashboard") : Promise.resolve({ data: null, error: null }),
+        showFinance ? (supabase as any).rpc("accounting_balances") : Promise.resolve({ data: null, error: null }),
         supabase.from("student_attendance").select("status").eq("date", today),
-        (supabase as any).from("expenses").select("id, amount, occurred_at").is("voided_at", null),
-        (supabase as any).from("payment_refunds").select("expense_id").not("expense_id", "is", null),
         supabase.from("exams").select("id, name, exam_date, subject_id, class_id, classes(name)").gte("exam_date", today).order("exam_date", { ascending: true }).limit(5),
         supabase.from("announcements").select("id, title, created_at, target_role").order("created_at", { ascending: false }).limit(5),
         supabase.from("payments").select("id, amount, paid_at, payment_type, students(full_name)").order("paid_at", { ascending: false }).limit(5),
@@ -134,48 +126,17 @@ function Dashboard() {
         supabase.from("notifications").select("id, title, body, created_at, link").order("created_at", { ascending: false }).limit(5),
       ]);
 
-      const allPayments = payments.data ?? [];
-      // Un remboursement baisse déjà les recettes (paiement négatif) : sa dépense comptable liée ne doit pas être comptée une 2e fois.
-      const refundExpenseIds = new Set(((refundLinks.data ?? []) as any[]).map((r) => r.expense_id));
-      const allExpenses = ((expensesAll.data ?? []) as any[]).filter((e) => !refundExpenseIds.has(e.id));
-
-      const totalRevenue = allPayments.reduce((s, p: any) => s + Number(p.amount), 0);
-      const totalExpenses = allExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0);
-      const monthRevenue = allPayments
-        .filter((p: any) => String(p.paid_at) >= monthStartISO)
-        .reduce((s, p: any) => s + Number(p.amount), 0);
-      const dayRevenue = allPayments
-        .filter((p: any) => String(p.paid_at).slice(0, 10) === today)
-        .reduce((s, p: any) => s + Number(p.amount), 0);
-      const dayCount = allPayments.filter((p: any) => String(p.paid_at).slice(0, 10) === today).length;
-      const monthExpenses = allExpenses
-        .filter((e: any) => String(e.occurred_at) >= monthStartISO)
-        .reduce((s: number, e: any) => s + Number(e.amount), 0);
-
-      // Réductions : lisibles par la direction et la comptabilité seulement (sinon liste vide, comportement inchangé).
-      const adjustments = adjustmentsByStudent(feeAdjustments?.error ? [] : feeAdjustments?.data);
-      const late = (studentsWithPay.data ?? []).filter((s: any) => isLate(feeStatus(s.classes?.annual_fee, s.payments, undefined, adjustments.get(s.id))));
-
-      // Revenus vs Dépenses par mois (6 derniers)
-      const now = new Date();
-      const months: { label: string; revenus: number; depenses: number }[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const label = d.toLocaleDateString("fr-FR", { month: "short" });
-        const revenus = allPayments
-          .filter((p: any) => {
-            const pd = new Date(p.paid_at);
-            return pd.getMonth() === d.getMonth() && pd.getFullYear() === d.getFullYear();
-          })
-          .reduce((s, p: any) => s + Number(p.amount), 0);
-        const depenses = allExpenses
-          .filter((e: any) => {
-            const pd = new Date(e.occurred_at);
-            return pd.getMonth() === d.getMonth() && pd.getFullYear() === d.getFullYear();
-          })
-          .reduce((s: number, e: any) => s + Number(e.amount), 0);
-        months.push({ label, revenus, depenses });
-      }
+      const fin: any = financeRes?.error ? null : financeRes?.data ?? null;
+      const num = (k: string) => Number(fin?.[k] ?? 0);
+      const balanceRows: any[] = balancesRes?.error ? [] : balancesRes?.data ?? [];
+      // Solde = somme des comptes (identique à la page Comptabilité) ; sans compte, repli sur recettes − dépenses.
+      const hasAccounts = balanceRows.length > 0;
+      const balance = hasAccounts ? balanceRows.reduce((t, a: any) => t + Number(a.balance), 0) : num("revenue_total") - num("expenses_total");
+      const months = ((fin?.months ?? []) as any[]).map((m) => ({
+        label: new Date(String(m.month) + "T12:00:00").toLocaleDateString("fr-FR", { month: "short" }),
+        revenus: Number(m.revenus),
+        depenses: Number(m.depenses),
+      }));
 
       // Répartition genre
       const genderData = (() => {
@@ -213,14 +174,17 @@ function Dashboard() {
         teachers: teachers.count ?? 0,
         parents: parentsRes.count ?? 0,
         classes: (classesRes.data ?? []).length,
-        revenue: totalRevenue,
-        dayRevenue,
-        dayCount,
-        monthRevenue,
-        monthExpenses,
-        monthNet: monthRevenue - monthExpenses,
-        balance: totalRevenue - totalExpenses,
-        late: late.length,
+        revenue: num("revenue_total"),
+        dayRevenue: num("revenue_day"),
+        dayCount: num("revenue_day_count"),
+        monthRevenue: num("revenue_month"),
+        monthExpenses: num("expenses_month"),
+        monthNet: num("revenue_month") - num("expenses_month"),
+        yearRevenue: num("revenue_year"),
+        tuitionRemaining: num("tuition_remaining"),
+        balance,
+        hasAccounts,
+        late: num("late_count"),
         months,
         genderData,
         topClasses,
@@ -245,7 +209,9 @@ function Dashboard() {
     { label: "Paiements du jour", value: fmt(stats?.dayRevenue ?? 0) + " GNF", icon: Receipt, color: "text-success bg-success/10", to: "/paiements" as const, show: showFinance },
     { label: "Paiements du mois", value: fmt(stats?.monthRevenue ?? 0) + " GNF", icon: CreditCard, color: "text-success bg-success/10", to: "/paiements" as const, show: showFinance },
     { label: "Dépenses du mois", value: fmt(stats?.monthExpenses ?? 0) + " GNF", icon: Wallet, color: "text-destructive bg-destructive/10", to: "/comptabilite" as const, show: showFinance },
-    { label: "Solde actuel", value: fmt(stats?.balance ?? 0) + " GNF", icon: TrendingUp, color: (stats?.balance ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10", to: "/comptabilite" as const, show: showFinance },
+    { label: stats?.hasAccounts ? "Solde des comptes" : "Solde actuel", value: fmt(stats?.balance ?? 0) + " GNF", icon: TrendingUp, color: (stats?.balance ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10", to: "/comptabilite" as const, show: showFinance },
+    { label: "Encaissé cette année", value: fmt(stats?.yearRevenue ?? 0) + " GNF", icon: CreditCard, color: "text-success bg-success/10", to: "/paiements" as const, show: showFinance },
+    { label: "Reste à recouvrer", value: fmt(stats?.tuitionRemaining ?? 0) + " GNF", icon: AlertTriangle, color: "text-warning bg-warning/10", to: "/paiements" as const, show: showFinance },
     { label: "Présence aujourd'hui", value: stats?.attRate == null ? "—" : `${stats.attRate}%`, icon: CalendarCheck, color: "text-chart-3 bg-chart-3/10", to: "/presences" as const, show: showPedago },
     { label: "Retards paiement", value: fmt(stats?.late ?? 0), icon: AlertTriangle, color: "text-destructive bg-destructive/10", to: "/paiements" as const, show: showFinance },
   ].filter((c) => c.show);
