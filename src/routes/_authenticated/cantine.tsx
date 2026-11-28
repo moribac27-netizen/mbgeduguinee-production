@@ -184,7 +184,7 @@ function Cantine() {
             orderBy={{ column: "start_date", ascending: false }}
             searchKeys={["students.full_name"]}
             fields={[
-              { name: "student_id", label: "Élève", type: "select", options: studentOptions, required: true },
+              { name: "student_id", label: "Élève", type: "select", searchable: true, options: studentOptions, required: true },
               { name: "plan", label: "Formule", type: "select", options: PLANS, required: true, default: "mensuel" },
               { name: "amount", label: "Montant (GNF)", type: "number", min: 0, required: true, default: 0 },
               { name: "start_date", label: "Début", type: "date", required: true, default: today() },
@@ -217,7 +217,7 @@ function Cantine() {
             orderBy={{ column: "paid_at", ascending: false }}
             searchKeys={["students.full_name", "reference", "period"]}
             fields={[
-              { name: "student_id", label: "Élève", type: "select", options: studentOptions, required: true },
+              { name: "student_id", label: "Élève", type: "select", searchable: true, options: studentOptions, required: true },
               { name: "subscription_id", label: "Abonnement lié", type: "select", options: subOptions },
               { name: "amount", label: "Montant (GNF)", type: "number", min: 0, required: true, default: 0 },
               { name: "method", label: "Méthode", type: "select", options: METHODS, required: true, default: "especes" },
@@ -247,7 +247,7 @@ function Cantine() {
             orderBy={{ column: "date", ascending: false }}
             searchKeys={["students.full_name"]}
             fields={[
-              { name: "student_id", label: "Élève", type: "select", options: studentOptions, required: true },
+              { name: "student_id", label: "Élève", type: "select", searchable: true, options: studentOptions, required: true },
               { name: "date", label: "Date", type: "date", required: true, default: today() },
               { name: "meal_type", label: "Type de repas", type: "select", options: MEAL_TYPES, required: true, default: "dejeuner" },
               { name: "menu_id", label: "Menu servi", type: "select", options: menuOptions },
